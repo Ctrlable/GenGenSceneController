@@ -1,5 +1,5 @@
-// User interface for GenGeneric Scene Controller Version 1.00
-// Copyright 2016 Gustavo A Fernandez All Rights Reserved
+// User interface for GenGeneric Scene Controller Version 1.01
+// Copyright 2016 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
 
@@ -12,7 +12,7 @@ var EVOLVELCD1 = {
 	HasPresetLanguages      : true,
 	HasThremostatControl    : true,
     NumButtons              : 5,
-	MaxSscroll	        	: 10,
+	MaxScroll	        	: 10,
     LastFixedSceneId        : 10,
 	HasOffScenes            : true,
 	HasCooperConfiguration  : false,
@@ -31,7 +31,7 @@ var EVOLVELCD1 = {
 		// { prefix: "W", name: "Welcome",     num: 1 },
 	],
 	CustomModeList 			: [
-		"M", "T", "3", "4", "5", "6", "X", "N"
+		"M", "T", "3", "4", "5", "6", "7", "8", "9", "X", "N"
 	],
 	SceneBases              : {
 		C: 1,	// Custom      screen scenes start at base 1
@@ -160,7 +160,7 @@ var COOPERRFWC5 = {
 		{ prefix: "P", name: "Preset",      num: 1 }
 	],
 	CustomModeList 			: [
-		"T", "M", "2", "3", "4", "5", "6"
+		"T", "M", "3", "4", "5", "6", "7", "8", "9"
 	],
 	SceneBases              : {
 		P: 1	// Preset screen scenes start at base 1
@@ -188,8 +188,8 @@ var NEXIAONETOUCH = {
 	HasScreen               : true,
 	HasPresetLanguages      : false,
 	HasThremostatControl    : true,
-    NumButtons              : 5,
-	MaxScroll               : 10,
+    NumButtons              : 15,
+	MaxScroll               : 15,
     LastFixedSceneId        : 46,
 	HasOffScenes            : false,
 	HasCooperConfiguration  : false,
@@ -205,7 +205,7 @@ var NEXIAONETOUCH = {
 		{ prefix: "C", name: "Custum",      num: 3 }
 	],
 	CustomModeList 			: [
-		"M", "T", "2", "3", "4", "5", "6", "X"
+		"M", "2", "3", "4", "5", "6", "7", "8", "9"
 	],
 	SceneBases              : {
 		C: 1	// Custom screen scenes start at base 1
@@ -1248,8 +1248,9 @@ function SceneController_Screens(SCObj, deviceId) {
 							     +  '   <select class="styled" style="width:'+ (SceneController_IsUI7() ? 135 : 90) + 'px; height:22px;" id="Mode_'+peerId+'_'+curScreen+'_'+button+'" onChange="SceneController_ChangeCustomMode('+SCObj.Id+','+peerId+',\''+curScreen+'\','+button+')">\n';
 							for (var j = 0; j < SCObj.CustomModeList.length; ++j) {
 								var optionPrefix = SCObj.CustomModeList[j];
-								if (screenType != "P" || !SCObj.HasScreen || optionPrefix < "2" || optionPrefix > "9") { // Preset screens of Evolve LCD1 don't have 3+state buttons
-									html += '    <option style="height:22px;" value="'+optionPrefix+'" '+(optionPrefix == mode.prefix ? 'selected' : '')+'>'+SceneController_Modes[SCObj.CustomModeList[j]]+'</option>\n';
+								var selected = optionPrefix == (mode.newScreen ? "N" : mode.prefix)
+								if (screenType != "P" || !SCObj.HasScreen || optionPrefix < "2" || optionPrefix > "9") { // Preset screens don't have 3+state buttons
+									html += '    <option style="height:22px;" value="'+optionPrefix+'" '+(selected ? 'selected' : '')+'>'+SceneController_Modes[SCObj.CustomModeList[j]]+'</option>\n';
 								}
 							}
 							html += '   </select>\n  </td>\n';

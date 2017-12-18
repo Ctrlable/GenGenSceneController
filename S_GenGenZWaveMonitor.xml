@@ -172,6 +172,16 @@
       </argumentList>
     </action>
     <action>
+      <name>Timeout</name>
+      <argumentList>
+        <argument>
+          <name>Key</name>
+          <direction>in</direction>
+          <relatedStateVariable>A_ARG_TYPE_Key</relatedStateVariable>
+        </argument>
+      </argumentList>
+    </action>
+    <action>
       <name>Error</name>
       <argumentList>
         <argument>

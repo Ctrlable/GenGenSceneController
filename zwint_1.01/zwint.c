@@ -28,7 +28,6 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/timeb.h>
 #include <sys/types.h>
 #include <time.h>
 
@@ -37,22 +36,14 @@
 #include <lauxlib.h>
 #include <luaconf.h>
 
-#define VERSION 1.03
+#define VERSION 1.01
 
 #ifndef DEBUG
 #define DEBUG 0
 #endif
 
 #if DEBUG
-/* Timestamp compatible with LuaUPnP.log format */
-static void timestamp() {
-    struct timeb calendar;
-	struct tm b;
-	ftime(&calendar);
-	localtime_r(&calendar.time, &b);
-	fprintf(stderr, "77      %02d/%02d/%02d %d:%02d:%02d.%03d    ", b.tm_mon, b.tm_mday, b.tm_year%100, b.tm_hour, b.tm_min, b.tm_sec, calendar.millitm); 
-}
-#define DBG(str, ...) timestamp(); fprintf(stderr, str "\n", ##__VA_ARGS__)
+#define DBG(str, ...) fprintf(stderr, str "\n", ##__VA_ARGS__)
 #else
 #define DBG(str, ...)
 #endif
