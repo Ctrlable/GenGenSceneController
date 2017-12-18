@@ -1,4 +1,4 @@
-// User interface for GenGeneric Scene Controller Version 1.04
+// User interface for GenGeneric Scene Controller Version 1.05
 // Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
@@ -635,17 +635,18 @@ function SceneController_GetDevice(id)
 	return null
 }
 
-// Mode strings consist or Prefix {newScreen:+}? {(S{SceneId@}?{offSceneId@}?)|C}? {entry}[0-5]
+// Mode strings consist or Prefix {newScreen:+}? {(S|C{SceneId@}?{offSceneId@}?)}? {entry}+
 // Prefix is M for momentary, T for Toggle, etc.
 // newScreen is a letter/digit such as C3 for Custom 3 or P4 for Preset 4
-// The S flag indicates that all subsequent associated devices are scene capable
+// The S or C flags indicates that all subsequent associated devices are scene capable
 //   and is optinally followed by a sceneId @ which is optional followed by an offSceneId @
-// The C flag indicates to use Coope configuration for non-secene capable devices
+// The C flag indicates to use Cooper configuration for non-secene capable devices
 // Scene-capable modes are a ; separated list of 0 or more deviceNum,level,dimmingDuration triplets
 // Cooper condiguration modes are a ; separate list of 0 or more deviceNum,level pairs
 // Non-scene capabile modes are a ; separated list of 0 or more deviceNums
 function SceneController_ParseModeString(SCObj, str) {
 	var mode = [];
+	var reResult;
 	if (!str) {
 		mode.prefix = SCObj.DefaultModeString;
 	} else {
@@ -660,10 +661,8 @@ function SceneController_ParseModeString(SCObj, str) {
 			mode.newScreen = str;
 			return mode;
 		}
-		if (str.charAt(0) == "S") {
+		if (str.charAt(0) == "S" || str.charAt(0) == "C") {
 			mode.sceneControllable = true;
-			var re2 = /(\d+),(\d+),(\d+)/g;
-			var reResult;
 			if ((reResult = /^.(\d+)@(\d+)@(.*)$/.exec(str)) != null) {
 				mode.sceneId = parseInt(reResult[1]);
 		 		mode.offSceneId = parseInt(reResult[2]);
@@ -672,36 +671,19 @@ function SceneController_ParseModeString(SCObj, str) {
 				mode.sceneId = parseInt(reResult[1]);
 				str = reResult[2];
 			}
-			while ((reResult = re2.exec(str)) != null) {
-				var device = parseInt(reResult[1])
-				var level = parseInt(reResult[2])
-				var dimmingDuration = parseInt(reResult[3])
-				if (SceneController_GetDevice(device)) {
-					mode.push({device: device,
-				           	   level: level,
-				           	   dimmingDuration: dimmingDuration})
-				}
-			}
-		} else if (str.charAt(0) == "C") {
-			mode.cooperConfiguration = true
-			var re = /(\d+),(\d+)/g;
-			var reResult
-			while ((reResult = re.exec(str)) != null) {
-				var device = parseInt(reResult[1])
-				var level = parseInt(reResult[2])
-				if (SceneController_GetDevice(device)) {
-					mode.push({device: device,
-				           	   level: level});
-				}
-			}
-		} else {
-			var re = /(\d+)/g;
-			var reResult
-			while ((reResult = re.exec(str)) != null) {
-				var device = parseInt(reResult[1])
-				if (SceneController_GetDevice(device)) {
-					mode.push({device: device});
-				}
+		}
+		if (!/;$/.exec(str)) {
+			str += ";"
+		}
+		var re = /(\d+)(?:,(\d+)(?:,(\d+))?)?,?;/g
+		while ((reResult = re.exec(str))) {
+			var device = parseInt(reResult[1])
+			if (SceneController_GetDevice(device)) {
+				var level = reResult[2] ? parseInt(reResult[2]) : null; 
+				var dimmingDuration = reResult[3] ? parseInt(reResult[3]) : null; 
+				mode.push({device: device,
+			           	   level: level,
+			           	   dimmingDuration: dimmingDuration})
 			}
 		}
 	}
@@ -719,50 +701,35 @@ function SceneController_GenerateModeString(SCObj, mode) {
 	if (mode.newScreen) {
 		str += mode.newScreen + ":"
 	}
-	if (mode.length > 0) {
-		if (mode.sceneControllable) {
-			str += "S";
-			if (mode.sceneId) {
-				str += mode.sceneId + "@"
-				if (mode.offSceneId) {
-					str += mode.offSceneId + "@"
-				}
+	if (mode.sceneControllable) {
+		str += "S";
+		if (mode.sceneId) {
+			str += mode.sceneId + "@"
+			if (mode.offSceneId) {
+				str += mode.offSceneId + "@"
 			}
-		} else if (mode.cooperConfiguration) {
-			str += "C";
 		}
-		var first = true;
-		for (var i = 0; i < mode.length; ++i) {
-			if (mode[i] && mode[i].device) {
-				if (!first) {
-					str += ";"
-				}
-				first = false;
-				if (mode.sceneControllable) {
-					var level = mode[i].level;
-					if (level == null || level == undefined) {
-						level = 255;
-					}
-					var dim = mode[i].dimmingDuration;
-					if (dim == null || dim == undefined) {
-						dim = 255;
-					}
-					str += mode[i].device + "," + level + "," + dim
-				} else if (mode.cooperConfiguration) {
-					var level = mode[i].level;
-					if (level == null || level == undefined) {
-						level = 255;
-					}
-					str += mode[i].device + "," + level
-				} else {
-					str += mode[i].device
-				}
+	}
+	var first = true;
+	for (var i = 0; i < mode.length; ++i) {
+		if (mode[i] && mode[i].device) {
+			if (!first) {
+				str += ";"
 			}
+			if (mode[i].dimmingDuration || mode[i].dimmingDuration == 0) {
+				str += mode[i].device + "," + mode[i].level + "," + mode[i].dimmingDuration
+			} else if (mode[i].level || mode[i].level == 0) {
+				str += mode[i].device + "," + mode[i].level
+			} else {
+				str += mode[i].device
+			}
+			first = false;
 		}
 	}
 	return str;
 }
 
+/* ItemChanged: 1=Device Menu, 2=Level Checkbox, 3=Level Input, 4=DimmingDuration Checkbox, 5=DimmingDuration Input */
 function SceneController_SelectDirectDevice(SCObj, prefix, peerId, screen, labelIndex, associationNum, itemChanged) {
 	var modeStr  = SceneController_get_device_state(peerId, SCObj.ServiceId, "Mode_"+screen+"_"+labelIndex, 0);
 	if (!modeStr || typeof modeStr != "string") {
@@ -778,7 +745,9 @@ function SceneController_SelectDirectDevice(SCObj, prefix, peerId, screen, label
 
 	// If we are changing the first device in the list, it may switch from a scene-capable to a none-scene capable
 	// device (or no device) or vice versa. This affects the treatment of the remaining devices on the list.
-	if (associationNum == 0) {
+	if (SCObj.HasCooperConfiguration) {
+		mode.sceneControllable = true
+	} else if (associationNum == 0) {
 		var oldsceneControllable = mode.sceneControllable;
 		var affectStart = 1;
 		var masterDevice = Number(assocDevice);
@@ -789,9 +758,6 @@ function SceneController_SelectDirectDevice(SCObj, prefix, peerId, screen, label
 		if (masterDevice) {
 			var masterObj = SceneController_get_device_object(masterDevice);
 			mode.sceneControllable = SceneController_GetDeviceProperties(masterObj).scene;
-			if (!mode.sceneControllable && SCObj.HasCooperConfiguration) {
-				mode.cooperConfiguration = true;
-			}
 		}
 		else {
 			mode.sceneControllable = true;
@@ -822,7 +788,7 @@ function SceneController_SelectDirectDevice(SCObj, prefix, peerId, screen, label
 			for (var i = affectStart; i < mode.length; ++i) {
 				if (mode[i]) {
 					var obj = SceneController_get_device_object(mode[i].device);
-					if (SceneController_GetDeviceProperties(obj).basicSet) {
+					if (SceneController_GetDeviceProperties(obj).basicSetOnly) {
 						numDelete++;
 						lastName = obj.name;
 					}
@@ -838,7 +804,7 @@ function SceneController_SelectDirectDevice(SCObj, prefix, peerId, screen, label
 			for (var i = 0; i < mode.length; ++i) {
 				if (mode[i]) {
 					var obj = SceneController_get_device_object(mode[i].device);
-					if (SceneController_GetDeviceProperties(obj).basicSet) {
+					if (SceneController_GetDeviceProperties(obj).basicSetOnly) {
 						mode[i] = null;
 					}
 				}
@@ -877,13 +843,13 @@ function SceneController_SelectDirectDevice(SCObj, prefix, peerId, screen, label
 		}
 	}
 
-	var dummingDuration = 255
+	var dimmingDuration = 255
 	if (itemChanged == 4) { // Dimming duration Checkbox toggled.
 		var dimmingCheckbox = document.getElementById('DimmingDurationSelect_'+peerId+'_'+screen+'_'+labelIndex+'_'+associationNum);
 		if (dimmingCheckbox) {
 			var dimmingSelected = dimmingCheckbox.checked;
 			if 	(dimmingSelected) {
-				dummingDuration = 0;
+				dimmingDuration = 0;
 			}
 		}
 	}
@@ -892,23 +858,35 @@ function SceneController_SelectDirectDevice(SCObj, prefix, peerId, screen, label
 		if (dimmingObject) {
 			var dimmingValue = dimmingObject.value;
 			if (dimmingValue == "") {
-				dummingDuration = 255;
+				dimmingDuration = 255;
 			} else {
 				var num = Number(dimmingValue);
 				if (num == NaN || num < 0 || num > 254 || num != Math.floor(num)) {
 					window.alert("Dimming duration must be a number between 0 and 254");
 					if (mode[associationNum] && mode[associationNum].dimmingDuration) {
-						dummingDuration = mode[associationNum].dimmingDuration;
+						dimmingDuration = mode[associationNum].dimmingDuration;
 					}
 				}
 				else {
-					dummingDuration = num;
+					dimmingDuration = num;
 				}
 			}
 		}
 	}
 
-	mode[parseInt(associationNum)] = {device: parseInt(assocDevice), level:level, dimmingDuration:dummingDuration};
+	if (!mode.sceneControllable) {
+		dimmingDuration = null;
+		if (!SCObj.HasCooperConfiguration) {
+			level = null;
+		}
+	}
+	assocDevice = parseInt(assocDevice)
+	var props = SceneController_GetDeviceProperties(SceneController_get_device_object(assocDevice))
+	if (props && !props.scene) {
+		dimmingDuration = null;
+	}
+	
+	mode[parseInt(associationNum)] = {device: assocDevice, level:level, dimmingDuration:dimmingDuration};
 	modeStr = SceneController_GenerateModeString(SCObj, mode);
 
 	if (SCObj.HasScreen) {
@@ -1033,14 +1011,14 @@ function SceneController_IsZWaveObject(obj) {
 // This will return:
 // zWave: Boolean - Device is Z-Wave
 // scene: Boolean - Device is Scene Controllable
-// basicSet: Boolean - Device is not scene controllable but Basic Set contrllable
-// multiL: Boolean - Device is multiL
+// basicSetOnly: Boolean - Device is not scene controllable but Basic Set contrllable
+// multiLevel: Boolean - Device is multiLevel
 // binary: Boolean - Device is binary
 function SceneController_GetDeviceProperties(obj) {
 	var result = {
 		zWave: false,
 		scene: false,
-		basicSet: false,
+		basicSetOnly: false,
 		multiLevel: false,
 		binary: false
 	}
@@ -1067,10 +1045,10 @@ function SceneController_GetDeviceProperties(obj) {
 		supportedClasses[44]) { // COMMAND_CLASS_SCENE_ACTUATOR_CONF) {
 		result.scene = true;
 	} else {
-		result.basicSet = true; // Every Z-Wave device should implicitly support Basic Get/Set.
+		result.basicSetOnly = true; // Every Z-Wave device should implicitly support Basic Get/Set.
 	}
 	if (supportedClasses[38]) { // COMMAND_CLASS_SWITCH_MULTILEVEL
-		result.multiL = true
+		result.multiLevel = true
 	} else if (supportedClasses[37]) {	// COMMAND_CLASS_SWITCH_BINARY
 		result.binary = true
 	}
@@ -1304,10 +1282,11 @@ function SceneController_Screens(SCObj, deviceId) {
 							     +       SceneController_ScreenMenu(SCObj, modeParam, curScreen, lcdVersion)
 							     +  '   </select>\n';
 						}
-						//var disableVeraScene = mode.length > 0 && SceneController_GetDeviceProperties(SceneController_get_device_object(mode[0].device)).basicSet;
-						var disableVeraScene = false;
-						//var enableNonSceneDirect = SceneController_FindScene(peerId, sceneNum, -1) == null && states == 1;
-						var enableNonSceneDirect = true;
+						// Disable Vera scenes if we have already selected a non-scene-capable direct device. 
+						var disableVeraScene = !SCObj.HasCooperConfiguration && 
+						    mode.length > 0 && 
+						    SceneController_GetDeviceProperties(SceneController_get_device_object(mode[0].device)).basicSetOnly;
+						var enableNonSceneDirect = SCObj.HasCooperConfiguration || (SceneController_FindScene(peerId, sceneNum, -1) == null && states == 1);
 						switch (mode.prefix) {
 						   	case "M":	// Momentary
 							case "X":	// EXclusive
@@ -1355,27 +1334,37 @@ function SceneController_Screens(SCObj, deviceId) {
 										}
 									}
 									var controllable = SceneController_GetDeviceProperties(obj);
-									if (controllable.basicSet && ((mode.sceneControllable && j > 0) || (!SCObj.HasCooperConfiguration && mode.prefix != "T") || !enableNonSceneDirect)) {
-										// not scene-capable, but allow the first item to change that if in toggle mode or Cooper Configuration and there are no Vera scenes.
-										// There is no basic SET momentary unless we allow Cooper Configuration..
-										return 0;
+									if (!controllable.zWave) { // Non-Z-Wave devices cannot be controlled by direct scenes
+										return 0
 									}
-									return controllable.scene ? 2 : controllable.zWave ? 1 : 0;
+									var result = controllable.scene ? 2 : 1
+									if (SCObj.HasCooperConfiguration) {
+										return result // Cooper can handle both Scene and non-scene direct devices 
+									}
+									if (j == 0) {
+										return result // The first entry in the list decides scene vs non-scene mode
+									}
+									if (controllable.basicSetOnly) { // The target device is not scene capable
+										if (!enableNonSceneDirect && mode.prefix != "T") {
+											return 0  // A vera scene is enabled. We need Scene Activate mode unless we can figure which button was pushed indifectly by reading the toggling indicator.
+										}
+									}
+									return result;
 		  	 					});
 							var controllable = SceneController_GetDeviceProperties(SceneController_get_device_object(mode[j].device))
-							if (mode[j].level != undefined ) {
-								html +=  '    <input type="checkbox"'+(mode[j].level != 255 ?' checked':'')+' id="LevelSelect_'+peerId+'_'+curScreen+'_'+stateButton+'_'+j+'"'
+							if (mode.sceneControllable && (controllable.scene && controllable.multiLevel) || SCObj.HasCooperConfiguration) {
+								html +=  '    <input type="checkbox"'+((mode[j].level || mode[j].level == 0) && mode[j].level != 255 ?' checked':'')+' id="LevelSelect_'+peerId+'_'+curScreen+'_'+stateButton+'_'+j+'"'
 								     +   ' style="min-width:10px;margin-left:10px;" onChange="SceneController_SelectDirectDevice('+SCObj.Id+',\''+mode.prefix+'\','+peerId+',\''+curScreen+'\',\''+stateButton+'\',\''+j+'\',2)"><span/>\n'
 								     +   'Level: '
 								     +   '    <input class="styled" id="Level_'+peerId+'_'+curScreen+'_'+stateButton+'_'+j+'" type="number"'
-								     +   ' value="'+(mode[j].level == 255?"":mode[j].level)+'" style="width:40px;" onChange="SceneController_SelectDirectDevice('+SCObj.Id+',\''+mode.prefix+'\','+peerId+',\''+curScreen+'\',\''+stateButton+'\',\''+j+'\',3)">\n';
+								     +   ' value="'+((!(mode[j].level || mode[j].level == 0) || mode[j].level == 255)?"":mode[j].level)+'" style="width:40px;" onChange="SceneController_SelectDirectDevice('+SCObj.Id+',\''+mode.prefix+'\','+peerId+',\''+curScreen+'\',\''+stateButton+'\',\''+j+'\',3)">\n';
 							}
-							if (mode.sceneControllable && controllable.scene && controllable.multiL) {
-								html +=  '<input type="checkbox"'+(mode[j].dimmingDuration != 255 ?' checked':'')+' id="DimmingDurationSelect_'+peerId+'_'+curScreen+'_'+stateButton+'_'+j+'"'
+							if (mode.sceneControllable && controllable.scene && controllable.multiLevel) {
+								html +=  '<input type="checkbox"'+((mode[j].dimmingDuration || mode[j].dimmingDuration == 0) && mode[j].dimmingDuration != 255 ?' checked':'')+' id="DimmingDurationSelect_'+peerId+'_'+curScreen+'_'+stateButton+'_'+j+'"'
 								     +   ' style="min-width:10px;margin-left:10px;" onChange="SceneController_SelectDirectDevice('+SCObj.Id+',\''+mode.prefix+'\','+peerId+',\''+curScreen+'\',\''+stateButton+'\',\''+j+'\',4)"><span/>\n'
 								     +   'Duration: '
 								     +   '<input class="styled" id="DimmingDuration_'+peerId+'_'+curScreen+'_'+stateButton+'_'+j+'" type="number"'
-								     +   ' value="'+(mode[j].dimmingDuration == 255?"":mode[j].dimmingDuration)+'" style="width:40px;" onChange="SceneController_SelectDirectDevice('+SCObj.Id+',\''+mode.prefix+'\','+peerId+',\''+curScreen+'\',\''+stateButton+'\',\''+j+'\',5)">\n';
+								     +   ' value="'+((!(mode[j].dimmingDuration || mode[j].dimmingDuration == 0) || mode[j].dimmingDuration == 255)?"":mode[j].dimmingDuration)+'" style="width:40px;" onChange="SceneController_SelectDirectDevice('+SCObj.Id+',\''+mode.prefix+'\','+peerId+',\''+curScreen+'\',\''+stateButton+'\',\''+j+'\',5)">\n';
 							}
 						}
 					} // ScreenType != T or button == 1 or button == 5
