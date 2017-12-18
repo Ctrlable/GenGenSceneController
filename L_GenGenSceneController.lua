@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller Version 1.12
+-- GenGeneric Scene Controller Version 1.13
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -261,6 +261,7 @@ Devices = {
 					W=0,  -- Welcome
 					P=0,  -- Thermostat Operating mode
 					E=0,  -- Thermostat Energy mode
+					L=0,  -- scroLL
 		},
 
 		-- Convert a mode object to a mode type.
@@ -377,6 +378,7 @@ Devices = {
 					W=0,  -- Welcome
 					P=0,  -- Thermostat Operating mode
 					E=0,  -- Thermostat Energy mode
+					L=0,  -- scroLL
 		},
 
 		-- Convert a mode object to a mode type.
@@ -687,6 +689,7 @@ Flags = List Mode | Group Count=1 ---------------------------------------+   ¦  
 					W=1,  -- Welcome
 					P=1,  -- Thermostat Operating mode
 					E=1,  -- Thermostat Energy mode
+					L=1,  -- scroLL
 		},
 
 		-- Convert a mode object to a mode type.
@@ -814,7 +817,7 @@ function findBestDelay(labels, node_id, zwave_dev_num, first, last, screenFlags)
 		local bad = 0
 		for i = 1,10 do
 			log("Benchmark Testing ", labels, "delay=", test, " iteration=", i)
-		    if EVLCDWrapStrings(labels, {}, {}, node_id, zwave_dev_num, first, last, screenFlags, test) then
+		    if EVLCDWrapStrings(labels, {}, {}, node_id, zwave_dev_num, screenFlags, test) then
 				count = count + 1
 			else
 			    bad = bad + 1
@@ -843,7 +846,7 @@ end
 
 function Benchmark(peer_dev_num, screen)
 	test_node_id, test_zwave_dev_num = GetZWaveNode(peer_dev_num)
-	EVLCDWrapStrings({""}, {}, {}, test_node_id, test_zwave_dev_num, 1, 1, true, 1000)
+	EVLCDWrapStrings({""}, {}, {}, test_node_id, test_zwave_dev_num, true, 1000)
 	if screen == 1 then
 		test_clear = SCREEN_MD.ClearScreen
 	else
@@ -1036,272 +1039,268 @@ end
 --EVLCDLabel(screenFlags,{line1,line2,...,linen)
 --linex = {lineFlags,linePosition,label}
 function EVLCDLabel(screenFlags,lineArray, node_id, zwave_dev_num, delay_override)
-	if not SCObj.HasScreen then
-		return true
-	end
-	local peer_dev_num = GetPeerDevNum(zwave_dev_num)
-	if param.SCENE_CTRL_CharDelay == nil then
-		SCObj.SetTuningParameters(zwave_dev_num)
-	end
-	local data = "146 2 " .. tostring(screenFlags) -- COMMAND_CLASS_SCREEN_META_DATA version 1 REPORT
-	local part = 1
-	local delay = param.SCENE_CTRL_BaseDelay
-	local screenMask = bit.band(screenFlags,SCREEN_MD.ScreenMask)
-	if screedMask == SCREEN_MD.ClearScreen then
-		delay = delay + param.SCENE_CTRL_ClearDelay
-	elseif screedMask ~= SCREEN_MD.NoChange then
-		delay = delay + param.SCENE_CTRL_ScrollDelay
-	end
-	for lnum = 1,#lineArray do
-   		local line = lineArray[lnum]
-   		assert(#line == 3,"EVDLCDLabel Line " .. lnum .. ": Each line must have 3 parts: flags, position, label")
-		assert(line[1] >= 0 and line[1] <= 255, "EVDLCDLabel Line " .. lnum .. ": Flags must be 1 byte")
-   		assert(line[2] >= 0                  ,  "EVDLCDLabel Line " .. lnum .. ": position should be between >= 0")
-   		assert(#line[3] <= 16,                  "EVDLCDLabel Line " .. lnum .. ": Label too long")
-   		data = data .. " " .. tostring(line[1])
-        	        .. " " .. tostring(line[2])
-             	    .. " " .. ExpandString(line[3])
-        delay = delay + #line[3] * param.SCENE_CTRL_CharDelay
-   		if part == 1 and lnum < #lineArray and param.SCENE_CTRL_MaxParts > 1 then
-			delay = delay + param.SCENE_CTRL_LineDelay
-   	  		part = 2
-   		else
-			if delay_override then
-				delay = delay_override
-			end
-			EnqueueZWaveMessage("SetLabel_"..node_id, node_id, data, peer_dev_num, delay);
-			screenFlags = SCREEN_MD.NoChange
-	        data = "0x92 2 " .. tostring(screenFlags)
-			part = 1
-			delay = param.SCENE_CTRL_BaseDelay
+	if SCObj.HasScreen then
+		local peer_dev_num = GetPeerDevNum(zwave_dev_num)
+		if param.SCENE_CTRL_CharDelay == nil then
+			SCObj.SetTuningParameters(zwave_dev_num)
 		end
-   	end -- for lnum
-	return true
+		local data = "146 2 " .. tostring(screenFlags) -- COMMAND_CLASS_SCREEN_META_DATA version 1 REPORT
+		local part = 1
+		local delay = param.SCENE_CTRL_BaseDelay
+		local screenMask = bit.band(screenFlags,SCREEN_MD.ScreenMask)
+		if screedMask == SCREEN_MD.ClearScreen then
+			delay = delay + param.SCENE_CTRL_ClearDelay
+		elseif screedMask ~= SCREEN_MD.NoChange then
+			delay = delay + param.SCENE_CTRL_ScrollDelay
+		end
+		for lnum = 1,#lineArray do
+	   		local line = lineArray[lnum]
+	   		assert(#line == 3,"EVDLCDLabel Line " .. lnum .. ": Each line must have 3 parts: flags, position, label")
+			assert(line[1] >= 0 and line[1] <= 255, "EVDLCDLabel Line " .. lnum .. ": Flags must be 1 byte")
+	   		assert(line[2] >= 0                  ,  "EVDLCDLabel Line " .. lnum .. ": position should be between >= 0")
+	   		assert(#line[3] <= 16,                  "EVDLCDLabel Line " .. lnum .. ": Label too long")
+	   		data = data .. " " .. tostring(line[1])
+	        	        .. " " .. tostring(line[2])
+	             	    .. " " .. ExpandString(line[3])
+	        delay = delay + #line[3] * param.SCENE_CTRL_CharDelay
+	   		if part == 1 and lnum < #lineArray and param.SCENE_CTRL_MaxParts > 1 then
+				delay = delay + param.SCENE_CTRL_LineDelay
+	   	  		part = 2
+	   		else
+				if delay_override then
+					delay = delay_override
+				end
+				EnqueueZWaveMessage("SetLabel_"..node_id, node_id, data, peer_dev_num, delay);
+				screenFlags = SCREEN_MD.NoChange
+		        data = "0x92 2 " .. tostring(screenFlags)
+				part = 1
+				delay = param.SCENE_CTRL_BaseDelay
+			end
+	   	end -- for lnum
+	end -- if SCObj.HasScreen
 end -- EVDLCDLabel
 
 --
 -- Screen display function. Pass an array of up to 5 strings.
 -- Lines will automatically wrap at word boundaries.
 --
-function  EVLCDWrapStrings(stringArray, fontArray, alignArray, node_id, zwave_dev_num, first, last, screenFlags, delay_override)
-	if not SCObj.HasScreen then
-		return true
-	end
-	local lineArray = {}
-	local entryNum = 1
-	for lnum = first-1, last-1 do
-		local index = 2+lnum-first;
-		local displayString = stringArray[index]
-		local font = fontArray[index];
-		local align = alignArray[index];
-		if type(displayString) == "string" then
-			local part = 1
-			local pos = 1
-			local width = 0
-			local lastSpace = 0
-			local label = ""
-			local label1 = ""
-			local width1 = ""
-			local flags1 = 0
-			local word = ""
-			local wordWidth = 0
-			local prevc
-			local cWidth
-			local spaceWidth = 0
-			local space = ""
-			local longWord = false;
-			local addLine;
-			local widths = SCObj.SmallFontWidths;
-			local lineFlags = 0;
-			if font == nil or font == "" then
-				font = "Normal"
-			end
-			if align == nil or align == "" then
-				align = "Center"
-			end
-			if font == "Normal" then  -- Only the normal font can get 2 lines and thus gets - or \r subsitutions
-				displayString = displayString:gsub("\\r",      "\r")
-				displayString = displayString:gsub("-([^\r])", "-\r%1")
-			elseif font == "Compressed" then -- The "Large" font is taller but actually the compressed font
-				widths = SCObj.LargeFontWidths
-				lineFlags = SCREEN_MD.LargeFont;
-			else  -- Inverted
-				lineFlags = SCREEN_MD.Highlighted;
-			end
+function  EVLCDWrapStrings(stringArray, fontArray, alignArray, node_id, zwave_dev_num, screenFlags, delay_override)
+	if SCObj.HasScreen then
+		local lineArray = {}
+		local entryNum = 1
+		for index = 1, SCObj.NumButtons do
+			local lnum = index - 1;
+			local displayString = stringArray[index]
+			local font = fontArray[index];
+			local align = alignArray[index];
+			if type(displayString) == "string" then
+				local part = 1
+				local pos = 1
+				local width = 0
+				local lastSpace = 0
+				local label = ""
+				local label1 = ""
+				local width1 = ""
+				local flags1 = 0
+				local word = ""
+				local wordWidth = 0
+				local prevc
+				local cWidth
+				local spaceWidth = 0
+				local space = ""
+				local longWord = false;
+				local addLine;
+				local widths = SCObj.SmallFontWidths;
+				local lineFlags = 0;
+				if font == nil or font == "" then
+					font = "Normal"
+				end
+				if align == nil or align == "" then
+					align = "Center"
+				end
+				if font == "Normal" then  -- Only the normal font can get 2 lines and thus gets - or \r subsitutions
+					displayString = displayString:gsub("\\r",      "\r")
+					displayString = displayString:gsub("-([^\r])", "-\r%1")
+				elseif font == "Compressed" then -- The "Large" font is taller but actually the compressed font
+					widths = SCObj.LargeFontWidths
+					lineFlags = SCREEN_MD.LargeFont;
+				else  -- Inverted
+					lineFlags = SCREEN_MD.Highlighted;
+				end
 
-			if align:sub(1,3) == "Raw" then
-				local offset = 0
-				if align:len() > 3 then
-					local offsetString = align:sub(4);
-					offset = tunumber(offsetString);
-				end
-				local flags = lineFlags;
-				if screenFlags ~= SCREEN_MD.ClearScreen then
-					flags = bit.bor(flags, SCREEN_MD.ClearLine)
-				end
-				lineArray[entryNum] = { bit.bor(flags,lnum), offset, displayString:sub(1,16) }
-	    		entryNum = entryNum + 1
-			else
-				local eol;
-				if displayString == "" then
-					eol = 0;
+				if align:sub(1,3) == "Raw" then
+					local offset = 0
+					if align:len() > 3 then
+						local offsetString = align:sub(4);
+						offset = tunumber(offsetString);
+					end
+					local flags = lineFlags;
+					if screenFlags ~= SCREEN_MD.ClearScreen then
+						flags = bit.bor(flags, SCREEN_MD.ClearLine)
+					end
+					lineArray[entryNum] = { bit.bor(flags,lnum), offset, displayString:sub(1,16) }
+		    		entryNum = entryNum + 1
 				else
-					eol = displayString:byte(#displayString)
-				end
-				if eol ~= 13 and eol ~= 10 then
-					displayString = displayString .. '\r';
-				end
-				while pos <= #displayString and lnum < last do
-			  		if longWord then
-			    		longWord = false
-						label = word
-						width = wordWidth;
-						addLine = true
-						word = ""
-						wordWidth = 0
+					local eol;
+					if displayString == "" then
+						eol = 0;
 					else
-						addLine = pos == #displayString
-						longWord = false;
-						local c = displayString:byte(pos)
-						if c == 32 then -- space
-							if wordWidth > 0 then
-					  			if font ~= "Normal" or (width + spaceWidth + wordWidth <= SCObj.ScreenWidth) then
-									label = label .. space .. word
-									width = width + spaceWidth + wordWidth
-									word = ""
-									wordWidth = 0
-									space = " "
-									spaceWidth = widths[1]
-								else
-									addLine = true
-					  			end
-					  		else -- wordWidth > 0
-					  			space = space .. " "
-					  			spaceWidth = spaceWidth + widths[1]
-							end -- wordWidth > 0
-			      		elseif (c == 10 or c == 13) and (font == "Normal" or pos == #displayString) then -- \n or \r
-				    		if c == 13 or prevc ~= 13 then -- ignore lf after cr
-					  			if width > 0 or wordWidth > 0 then
-					    			if wordWidth > 0 then
-						  				label = label .. space .. word
-						  				width = width + spaceWidth + wordWidth
-						  				word = ""
-						  				wordWidth = 0
-									end
-					    			addLine = true;
-					  			end -- cr/lf processing
-							end
-				  		elseif (c > 32 and c <= 127) or (c >= 160 and c <= 255) then -- normal character
-							if (c <= 127) then
-				      			cWidth = widths[c-31]
-				    		else
-					  			cWidth = widths[c-159]
-							end
-							if font ~= "Normal" or (width + spaceWidth + wordWidth + cWidth <= SCObj.ScreenWidth) then
-					  			word = word .. string.char(c)
-					  			wordWidth = wordWidth + cWidth
-							elseif width > 0 then -- Current word must spill to next line
-					  			if wordWidth > SCObj.ScreenWidth then -- output current line followed by long word.
-					    			longWord = true;
-					    			addLine = true;
-					  			else -- Normal word wrap
-					    			word = word .. string.char(c)
-					    			wordWidth = wordWidth + cWidth
-					    			addLine = true;
-					  			end
-				    		else -- long word but nothing else on this line
-					  			label = word
-					  			word = string.char(c)
-					  			wordWidth = cWidth
-					  			addLine = true;
-							end
-				  		end -- regular character processing
-				  		prevc = c
-				  		pos = pos + 1
-					end -- not longWord
-			    	if addLine then
-						DLog("Adding line \"", label, "\" entryNum=", entryNum, " lnum=", lnum, " part=", part, " word=", word, " wordWidth=", wordWidth, " font=", font, " align=", align)
-						local flags = lineFlags;
-				  		if part == 1 then
-							if screenFlags ~= SCREEN_MD.ClearScreen then
-								flags = bit.bor(flags, SCREEN_MD.ClearLine)
-							end
-							label1 = label;
-							width1 = width;
-							flags1 = flags;
-							local offset = 0;
-							if align == "Left" then -- Left justify 1 line.
-							    spaces = math.floor((SCObj.ScreenWidth - width) / widths[1]);
-							    if spaces < 0 then
-							    	spaces = 0
-							    end
-							    while spaces > 0 and #label < 16 do
-									label = label .. " ";
-							    end
-							elseif align == "Right" then -- Right justify 1 line.
-								offset = math.floor((SCObj.RightJustifyScreenWidth - width) / 3);
-								if offset < 0 then
-									offset = 0
+						eol = displayString:byte(#displayString)
+					end
+					if eol ~= 13 and eol ~= 10 then
+						displayString = displayString .. '\r';
+					end
+					while pos <= #displayString and lnum < SCObj.NumButtons do
+				  		if longWord then
+				    		longWord = false
+							label = word
+							width = wordWidth;
+							addLine = true
+							word = ""
+							wordWidth = 0
+						else
+							addLine = pos == #displayString
+							longWord = false;
+							local c = displayString:byte(pos)
+							if c == 32 then -- space
+								if wordWidth > 0 then
+						  			if font ~= "Normal" or (width + spaceWidth + wordWidth <= SCObj.ScreenWidth) then
+										label = label .. space .. word
+										width = width + spaceWidth + wordWidth
+										word = ""
+										wordWidth = 0
+										space = " "
+										spaceWidth = widths[1]
+									else
+										addLine = true
+						  			end
+						  		else -- wordWidth > 0
+						  			space = space .. " "
+						  			spaceWidth = spaceWidth + widths[1]
+								end -- wordWidth > 0
+				      		elseif (c == 10 or c == 13) and (font == "Normal" or pos == #displayString) then -- \n or \r
+					    		if c == 13 or prevc ~= 13 then -- ignore lf after cr
+						  			if width > 0 or wordWidth > 0 then
+						    			if wordWidth > 0 then
+							  				label = label .. space .. word
+							  				width = width + spaceWidth + wordWidth
+							  				word = ""
+							  				wordWidth = 0
+										end
+						    			addLine = true;
+						  			end -- cr/lf processing
 								end
-							end
-							lineArray[entryNum] = { bit.bor(flags,lnum), offset, label:sub(1,16) }
-				    		entryNum = entryNum + 1
-							part = 2
-				  		else
-							local offset = 0;
-							if align == "Left" then -- Left justify 2 lines;
-								while width1 < SCObj.ScreenWidth and width < SCObj.ScreenWidth and #label1 + #label < 15 do
-									if width1 < SCObj.ScreenWidth and #label1 + #label < 15 then
-										label1 = label1 .. " ";
-										width1 = width1 + widths[1];
-									end
-									if width < SCObj.ScreenWidth and #label1 + #label < 15 then
+					  		elseif (c > 32 and c <= 127) or (c >= 160 and c <= 255) then -- normal character
+								if (c <= 127) then
+					      			cWidth = widths[c-31]
+					    		else
+						  			cWidth = widths[c-159]
+								end
+								if font ~= "Normal" or (width + spaceWidth + wordWidth + cWidth <= SCObj.ScreenWidth) then
+						  			word = word .. string.char(c)
+						  			wordWidth = wordWidth + cWidth
+								elseif width > 0 then -- Current word must spill to next line
+						  			if wordWidth > SCObj.ScreenWidth then -- output current line followed by long word.
+						    			longWord = true;
+						    			addLine = true;
+						  			else -- Normal word wrap
+						    			word = word .. string.char(c)
+						    			wordWidth = wordWidth + cWidth
+						    			addLine = true;
+						  			end
+					    		else -- long word but nothing else on this line
+						  			label = word
+						  			word = string.char(c)
+						  			wordWidth = cWidth
+						  			addLine = true;
+								end
+					  		end -- regular character processing
+					  		prevc = c
+					  		pos = pos + 1
+						end -- not longWord
+				    	if addLine then
+							DLog("Adding line \"", label, "\" entryNum=", entryNum, " lnum=", lnum, " part=", part, " word=", word, " wordWidth=", wordWidth, " font=", font, " align=", align)
+							local flags = lineFlags;
+					  		if part == 1 then
+								if screenFlags ~= SCREEN_MD.ClearScreen then
+									flags = bit.bor(flags, SCREEN_MD.ClearLine)
+								end
+								label1 = label;
+								width1 = width;
+								flags1 = flags;
+								local offset = 0;
+								if align == "Left" then -- Left justify 1 line.
+								    spaces = math.floor((SCObj.ScreenWidth - width) / widths[1]);
+								    if spaces < 0 then
+								    	spaces = 0
+								    end
+								    while spaces > 0 and #label < 16 do
 										label = label .. " ";
+								    end
+								elseif align == "Right" then -- Right justify 1 line.
+									offset = math.floor((SCObj.RightJustifyScreenWidth - width) / 3);
+									if offset < 0 then
+										offset = 0
+									end
+								end
+								lineArray[entryNum] = { bit.bor(flags,lnum), offset, label:sub(1,16) }
+					    		entryNum = entryNum + 1
+								part = 2
+					  		else
+								local offset = 0;
+								if align == "Left" then -- Left justify 2 lines;
+									while width1 < SCObj.ScreenWidth and width < SCObj.ScreenWidth and #label1 + #label < 15 do
+										if width1 < SCObj.ScreenWidth and #label1 + #label < 15 then
+											label1 = label1 .. " ";
+											width1 = width1 + widths[1];
+										end
+										if width < SCObj.ScreenWidth and #label1 + #label < 15 then
+											label = label .. " ";
+											width = width + widths[1];
+										end
+									end
+								elseif align == "Right" then -- Right justify 2 lines
+									while (width <= width1 - widths[1]) and #label1 + #label < 15 do
+										label = " " .. label;
 										width = width + widths[1];
 									end
+									while (width1 <= width - widths[1]) and #label1 + #label < 15 do
+										label1 = " " .. label1;
+										width1 = width1 + widths[1];
+									end
+									if width > width1 then
+										offset = math.floor((SCObj.RightJustifyScreenWidth - width) / 3);
+									else
+										offset = math.floor((SCObj.RightJustifyScreenWidth - width1) / 3);
+									end
 								end
-							elseif align == "Right" then -- Right justify 2 lines
-								while (width <= width1 - widths[1]) and #label1 + #label < 15 do
-									label = " " .. label;
-									width = width + widths[1];
-								end
-								while (width1 <= width - widths[1]) and #label1 + #label < 15 do
-									label1 = " " .. label1;
-									width1 = width1 + widths[1];
-								end
-								if width > width1 then
-									offset = math.floor((SCObj.RightJustifyScreenWidth - width) / 3);
-								else
-									offset = math.floor((SCObj.RightJustifyScreenWidth - width1) / 3);
-								end
-							end
-							lineArray[entryNum-1][2] = offset;
-					  		lineArray[entryNum-1][3] = (label1 .. "\r" .. label):sub(1,16);
-							break
-				  		end
-				  		label = ""
-				  		width = 0
-				  		space = ""
-				  		spaceWidth = 0
-					end -- if addline
-				end -- pos <= #displayString and lnum < last
-			end -- else not raw
-		end -- if string
-	end -- for lnum
-	-- printTable(lineArray)
-	local result
-	--if param.SCENE_CTRL_Retries > 0 then
-	  --	SetFlushLogs(true)
-	--end
-	if screenFlags == SCREEN_MD.NoChange then
-		result = EVLCDLabel(screenFlags, lineArray, node_id, zwave_dev_num, delay_override)
-	else
-		result = EVLCDLabel(bit.bor(SCREEN_MD.MoreData, screenFlags), lineArray, node_id, zwave_dev_num, delay_override)
-	end
-	--if param.SCENE_CTRL_Retries > 0 then
-	--	SetFlushLogs(false)
-	--end
-	return result
+								lineArray[entryNum-1][2] = offset;
+						  		lineArray[entryNum-1][3] = (label1 .. "\r" .. label):sub(1,16);
+								break
+					  		end
+					  		label = ""
+					  		width = 0
+					  		space = ""
+					  		spaceWidth = 0
+						end -- if addline
+					end -- pos <= #displayString and lnum < SCObj.NumButtons
+				end -- else not raw
+			end -- if string
+		end -- for lnum
+		-- printTable(lineArray)
+		if screenFlags == SCREEN_MD.NoChange then
+			-- Apply a work-around for a bug in the Evolve LCD1 firmware which causes the highlighting of other lines to
+			-- become wide or narrow if a different line is drawn.
+			-- We temporarily turn off the indicator, draw the line(s) and turn it back on again.
+			-- If the indicator is 0 (no lines highlighted) the SetIndicatorValue calls are no-ops.
+			local peer_dev_num = GetPeerDevNum(zwave_dev_num)
+			local indicator = SetIndicatorValue(peer_dev_num, 0, false, true)
+			EVLCDLabel(screenFlags, lineArray, node_id, zwave_dev_num, delay_override)
+			SetIndicatorValue(peer_dev_num, indicator, false, false)
+		else
+			EVLCDLabel(bit.bor(SCREEN_MD.MoreData, screenFlags), lineArray, node_id, zwave_dev_num, delay_override)
+		end
+	end -- if SCObj.HasScreen
 end
 
 --
@@ -1894,6 +1893,7 @@ end
 -- Scene-capable modes are a ; separated list of 0 or more deviceNum,level,dimmingDuration triplets
 -- Cooper configuration modes are a ; separated list of 0 or more deviceNum,level pairs
 -- Non-scene capabile modes are a ; separated list of 0 or more deviceNums
+-- DeviceNums can be negative if they should only be monitored but not controlled, to set the indicator
 function ParseModeString(str)
 	VEntry()
 	local mode = {};
@@ -1936,25 +1936,35 @@ function ParseModeString(str)
 		str = str .. ";"
 	end
 	while true do
-		local device, level, dimmingDuration, rest = string.match(str, "^(%d+),(%d+),(%d+),?;(.*)")
+		local element = nil;
+		local device, level, dimmingDuration, rest = string.match(str, "^(-?%d+),(%d+),(%d+),?;(.*)")
 		if device then
-	    	mode[i] = {device=tonumber(device), level=tonumber(level), dimmingDuration=tonumber(dimmingDuration)};
+	    	element = {device=tonumber(device), level=tonumber(level), dimmingDuration=tonumber(dimmingDuration)};
 		else
-			device, level, rest = string.match(str, "^(%d+),(%d+);(.*)")
+			device, level, rest = string.match(str, "^(-?%d+),(%d+);(.*)")
 			if device then
-	    		mode[i] = {device=tonumber(device), level=tonumber(level)};
+	    		element = {device=tonumber(device), level=tonumber(level)};
 			else
-				device, rest = string.match(str, "^(%d+);(.*)")
+				device, rest = string.match(str, "^(-?%d+);(.*)")
 				if device then
-	    			mode[i] = {device=tonumber(device)};
+					element = {device=tonumber(device)};
 				else
-					break
+					break;
 				end
 			end
 		end
+		if element.device < 0 then
+			element.device = -element.device
+			if not mode.veraSceneSet then
+				mode.veraSceneSet = {}
+			end
+			table.insert(mode.veraSceneSet, element)
+		else
+			table.insert(mode, element)
+		end
 		str = rest
-		i = i + 1
 	end
+	VLog("ParseModeString: mode=",mode)
 	return mode;
 end
 
@@ -1969,6 +1979,28 @@ function GenerateModeString(mode)
 	if mode.newScreen then
 		str = str .. mode.newScreen .. ":"
 	end
+	local first = true
+
+	function generateArray(arr, sign)
+		if arr then
+			for i = 0, #arr do
+				if arr[i] and arr[i].device then
+					if not first then
+						str = str .. ";"
+					end
+					first = false
+					if arr[i].dimmingDuration then
+						str = str .. arr[i].device*sign .. "," .. arr[i].level .. "," .. arr[i].dimmingDuration
+					elseif arr[i].level then
+						str = str .. arr[i].device*sign .. "," .. arr[i].level
+					else
+						str = str .. arr[i].device*sign
+					end
+				end
+			end
+		end
+	end
+
 	if #mode > 0 then
 		if mode.sceneControllable then
 			str = str .. "S"
@@ -1979,36 +2011,23 @@ function GenerateModeString(mode)
 				end
 			end
 		end
-		local first = true
-		for i = 0, #mode do
-			if mode[i] and mode[i].device then
-				if not first then
-					str = str .. ";"
-				end
-				first = false
-				if mode[i].dimmingDuration then
-					str = str .. mode[i].device .. "," .. mode[i].level .. "," .. mode[i].dimmingDuration
-				elseif mode[i].level then
-					str = str .. mode[i].device .. "," .. mode[i].level
-				else
-					str = str .. mode[i].device
-				end
-			end
-		end
+		generateArray(mode, 1)
 	end
+	generateArray(mode.veraSceneSet, -1)
 	return str;
 end
 
-function SetIndicatorValue(peer_dev_num, indicator, force)
+function SetIndicatorValue(peer_dev_num, indicator, force, cascadable)
+    local previous_indicator = 0
 	if SCObj.HasIndicator then
 	    DLog("SetIndicatorValue peer_dev_num=", peer_dev_num," indicator=", indicator, " force=", force)
 		local node_id, zwave_dev_num = GetZWaveNode(peer_dev_num)
 		if not node_id then
 			ELog("SetIndicatorValue: bad peer_dev_num=", peer_dev_num)
-			return
+			return previous_indicator 
 		end
 		local previous_indicator_string = luup.variable_get(SID_SCENECONTROLLER, CURRENT_INDICATOR, peer_dev_num)
-		local previous_indicator = tonumber(previous_indicator_string)
+		previous_indicator = tonumber(previous_indicator_string)
 		if force or previous_indicator ~= indicator then
 			local delay = 0
 			if param.SCENE_CTRL_IndicatorDelay > 0 then
@@ -2027,29 +2046,33 @@ function SetIndicatorValue(peer_dev_num, indicator, force)
 			-- The * at the start of the label indicates that this can replace an existing command with a similar node ID and label (up to the first "(")
 			-- We avoid merging in force mode to resolve redraw issues on Evolve LCD1.
 			local label = "SetIndicator("..indicator..")"..node_id
-			if param.SCENE_CTRL_IndicatorDelay == 0 or not force then
+			if cascadable and (param.SCENE_CTRL_IndicatorDelay == 0 or not force) then
 				label = "*" .. label
 			end 
 			EnqueueZWaveMessage(label, node_id,  "0x87 0x01 "..indicator, zwave_dev_num, delay);
 			luup.variable_set(SID_SCENECONTROLLER, CURRENT_INDICATOR, tostring(indicator), peer_dev_num)
 		end
 	end
+	return previous_indicator
 end
 
 -- Return a score between 0 and 1 indicating how close the devices for this mode match the target levels. Higher is closer.
 function GetDeviceScoreForMode(mode, peer_dev_num, screen)
+	VEntry()
 	local score = 1
 	local count = 0
-	for i = 1, #mode do
-		local device = mode[i].device
+
+	function GetScoreForElement(obj)
+		VEntry("GetScoreForElement")
+		local device = obj.device
 		local status, lastUpdate, service, variable = GetDeviceStatus(device)
 		if VerboseLogging > 0 then
 			DLog("GetDeviceScoreForMode: monitored device=", device, " status=", status, " lastUpdate=", os.date(nil,tonumber(lastUpdate)), " service=", service, " variable=", variable)
 		end
 		if status ~= nil then
 			local target = 100;
-			if mode[i].level ~= nil then
-				target = mode[i].level
+			if obj.level ~= nil then
+				target = obj.level
 			end
 			count = count + 1
 			score = score + ((target - status) ^ 2)
@@ -2057,6 +2080,16 @@ function GetDeviceScoreForMode(mode, peer_dev_num, screen)
 			VariableWatch("SceneController_WatchedIndicatorDeviceChanged", service, variable, device, context)
 		end
 	end
+
+	for i = 1, #mode do
+		GetScoreForElement(mode[i])
+	end
+	if mode.veraSceneSet then
+		for i = 1, #mode.veraSceneSet do
+			GetScoreForElement(mode.veraSceneSet[i])
+		end
+	end
+
 	if count == 0 then
 		return 0
 	else
@@ -2099,7 +2132,7 @@ function ChooseBestFromMultiState(peer_dev_num, screen, virtualButton, mode)
 	return bestState
 end
 
-function SetIndicator(peer_dev_num, screen, force)
+function SetIndicator(peer_dev_num, screen, force, cascadable)
 	DEntry()
 	if SCObj.HasIndicator then
 		if IndicatorLocks[peer_dev_num] and IndicatorLocks[peer_dev_num] > 0 then
@@ -2117,8 +2150,11 @@ function SetIndicator(peer_dev_num, screen, force)
 	    local indicator = 0
 		local threshold = 5
 		local bestXbutton = 0
+		local bestXhidden = false
 		local bestXscore = 0
-		local xsCeneFound = false
+		local xSceneFound = false
+		local xSceneeButton = 0
+		local xSceneHidden = false
 		local numLines, scrollOffset = GetNumLinesAndScrollOffset(peer_dev_num, screen)
 		local node_id, zwave_dev_num = GetZWaveNode(peer_dev_num)
 		local oldIndicator = luup.variable_get(SID_SCENECONTROLLER, CURRENT_INDICATOR, peer_dev_num)
@@ -2127,13 +2163,46 @@ function SetIndicator(peer_dev_num, screen, force)
 		else
 			oldIndicator = 0
 		end
-		for physicalButton = 1, SCObj.NumButtons do
-			local virtualButton = physicalButton+scrollOffset
+		for virtualButton = 1, numLines do
+			local physicalButton = virtualButton - scrollOffset
+			local hidden = physicalButton < 1 or (physicalButton == 1 and scrollOffset > 0) or
+			               physicalButton > SCObj.NumButtons or (physicalButton == SCObj.NumButtons and scrollOffset < numLines-SCObj.NumButtons)
+			local modeStr = luup.variable_get(SID_SCENECONTROLLER,"Mode_"..screen.."_"..virtualButton,peer_dev_num)
+			local mode  = ParseModeString(modeStr)
 		    local highlighted = false;
-			if numLines == SCObj.NumButtons or ((physicalButton ~= 1 or scrollOffset == 0) and (physicalButton ~= SCObj.NumButtons or scrollOffset == numLines-SCObj.NumButtons)) then
-				local modeStr = luup.variable_get(SID_SCENECONTROLLER,"Mode_"..screen.."_"..virtualButton,peer_dev_num)
-				local mode  = ParseModeString(modeStr)
-				if #mode == 0 then
+			if not hidden or mode.prefix == "X" then
+				if mode.prefix == "X" then
+					if #mode > 0 or mode.veraSceneSet then
+						local score = GetDeviceScoreForMode(mode, peer_dev_num, screen)
+						if score > bestXscore then
+							bestXscore = score
+							bestXbutton = virtualButton
+							bestXhidden = hidden
+						end
+						VLog("  Score=",score," bestXscore=",bestXscore," bestXbutton=",bestXbutton, " bestXhidden=",bestXhidden) 
+					else
+				   		local scene = luup.variable_get(SID_SCTRL, "sl_SceneActivated", peer_dev_num)
+						if scene then
+							scene = tonumber(scene)
+							local sceneButton = ((scene-1) % SCObj.NumButtons) + 1
+							if scene >= 300 then
+								sceneButton = sceneButton + math.floor((scene-200)/100) * SCObj.NumButtons
+							end
+							highlighted = sceneButton == virtualButton
+							VLog("  Default scene=",scene," sceneButton=",sceneButton," virtualButton=",virtualButton," highlighted=",highlighted) 
+						else
+							highlighted = false
+						end
+						if highlighted then
+							xSceneFound = true
+							if hidden then
+								xSceneButton = virtualButton
+								xSceneHidden = true
+								highlighted = false
+							end
+						end
+					end
+				elseif #mode == 0 and not mode.veraSceneSet then
 					highlighted = bit.band(oldIndicator,SCObj.PhysicalButtonToIndicator(physicalButton, true)) ~= 0
 				elseif mode.prefix >= "2" and mode.prefix <= "9" then
 					local oldModeStr = GetModeStr(peer_dev_num, screen, virtualButton)
@@ -2145,11 +2214,11 @@ function SetIndicator(peer_dev_num, screen, force)
 					local state
 					if SCObj.HasScreen then
 						local oldLabels, oldFonts, oldAligns = {}, {}, {}
-						ChooseLabelFontAndAlign(peer_dev_num, screen, 1, virtualButton, oldState, oldLabels, oldFonts, oldAligns)
+						ChooseLabelFontAndAlign(peer_dev_num, screen, physicalButton, virtualButton, oldState, oldLabels, oldFonts, oldAligns)
 						local newLabels, newFonts, newAligns = {}, {}, {}
-						state = ChooseLabelFontAndAlign(peer_dev_num, screen, 1, virtualButton, nil, newLabels, newFonts, newAligns)
-						if (oldLabels[1] ~= newLabels[1] or oldFonts[1] ~= newFonts[1] or oldAligns[1] ~= newAligns[1]) then
-							EVLCDWrapStrings(newLabels, newFonts, newAligns, node_id, zwave_dev_num, physicalButton, physicalButton, SCREEN_MD.NoChange)
+						state = ChooseLabelFontAndAlign(peer_dev_num, screen, physicalButton, virtualButton, nil, newLabels, newFonts, newAligns)
+						if (oldLabels[physicalButton] ~= newLabels[physicalButton] or oldFonts[physicalButton] ~= newFonts[physicalButton] or oldAligns[physicalButton] ~= newAligns[physicalButton]) then
+							EVLCDWrapStrings(newLabels, newFonts, newAligns, node_id, zwave_dev_num, SCREEN_MD.NoChange)
 						end
 					else
 						state = ChooseBestFromMultiState(peer_dev_num, screen, virtualButton, mode)
@@ -2162,11 +2231,11 @@ function SetIndicator(peer_dev_num, screen, force)
 				elseif mode.prefix == "T" then
 					local num_off = 0
 					local num_on = 0
-					for i = 1, #mode do
-						local device = mode[i].device
-						local status, lastUpdate, service, variable = GetDeviceStatus(device)
+
+					function checkElement(obj) 
+						local status, lastUpdate, service, variable = GetDeviceStatus(obj.device)
 						if VerboseLogging > 0 then
-							DLog("  monitored device=", device, " threshold=", threshold, " status=", status, " lastUpdate=", os.date(nil,tonumber(lastUpdate)), " service=", service, " variable=", variable)
+							DLog("  monitored device=", obj.device, " threshold=", threshold, " status=", status, " lastUpdate=", os.date(nil,tonumber(lastUpdate)), " service=", service, " variable=", variable)
 						end
 						if status ~= nil then
 							if status >= threshold then
@@ -2175,47 +2244,64 @@ function SetIndicator(peer_dev_num, screen, force)
 								num_off = num_off + 1
 							end
 							local context = tostring(peer_dev_num) .. "," .. screen
-							VariableWatch("SceneController_WatchedIndicatorDeviceChanged", service, variable, device, context)
+							VariableWatch("SceneController_WatchedIndicatorDeviceChanged", service, variable, obj.device, context)
+						end
+					end
+
+					for i = 1, #mode do
+						checkElement(mode[i])
+					end
+					if mode.veraSceneSet then
+						for i = 1, #mode.veraSceneSet do
+							checkElement(mode.veraSceneSet[i])
 						end
 					end
 					if num_on >= num_off and num_on > 0 then
 						highlighted = true
 					end
 				    DLog("  button=", physicalButton, " mode=", modeStr, " num_on=", num_on, " num_off=", num_off, " highlighted=", highlighted)
-				elseif mode.prefix == "X" then
-					if #mode > 0 then
-						local score = GetDeviceScoreForMode(mode, peer_dev_num, screen)
-						if score > bestXscore then
-							bestXscore = score
-							bestXbutton = physicalButton
-						end
-					else
-				   		local scene = luup.variable_get(SID_SCTRL, "sl_SceneActivated", peer_dev_num)
-						if scene then
-							scene = tonumber(scene)
-							local sceneButton = ((scene-1) % SCObj.NumButtons) + 1
-							if scene >= 300 then
-								sceneButton = sceneButton + math.floor((scene-200)/100) * SCObj.NumButtons
-							end
-							highlighted = sceneButton == virtualButton
-						else
-							highlighted = false
-						end
-						if highlighted then
-							xsCeneFound = true
-						end
-					end
 				end
 			end
 			if highlighted then
 				indicator = bit.bor(indicator,SCObj.PhysicalButtonToIndicator(physicalButton, true))
 			end
 		end
-		if bestXbutton > 0 and not xsCeneFound then
-			indicator = bit.bor(indicator,SCObj.PhysicalButtonToIndicator(bestXbutton, true))
+
+		local function MakeLineVisible(virtualButton)
+			local wouldBePhysicalButton = virtualButton - scrollOffset
+			VEntry("MakeLineVisible")
+			if wouldBePhysicalButton == 1 or wouldBePhysicalButton == SCObj.NumButtons then
+				-- Scrolling by one line up or down would make the highlighted line visible
+				SceneButtonPressed(peer_dev_num, true, wouldBePhysicalButton, false)
+			else
+				-- We need to scroll by more than one line so redraw the screen but 
+				-- try to put the highlighted line in the center.
+				local newScrollOffset = virtualButton - math.floor((SCObj.NumButtons+1)/2)
+				if newScrollOffset < 0 then
+					newScrollOffset = 0
+				elseif newScrollOffset > numLines - SCObj.NumButtons then
+					newScrollOffset = numLines - SCObj.NumButtons
+				end
+				luup.variable_set(SID_SCENECONTROLLER, SCROLLOFFSET_VAR.."_"..screen, newScrollOffset, peer_dev_num)
+				SetScreen(peer_dev_num, screen, true, false, false)
+			end
+		end
+
+		if xSceneFound then
+			if xSceneHidden then
+				MakeLineVisible(xSceneButton)
+				return
+			end
+		elseif bestXbutton > 0 then
+			if bestXhidden then
+				MakeLineVisible(bestXbutton)
+				return
+			else
+				indicator = bit.bor(indicator,SCObj.PhysicalButtonToIndicator(bestXbutton - scrollOffset, true))
+			end
 		end
 		DLog("  New indicator value=", indicator)
-		SetIndicatorValue(peer_dev_num, indicator, force)
+		SetIndicatorValue(peer_dev_num, indicator, force, cascadable)
 	end
 end
 
@@ -2229,7 +2315,7 @@ function SceneController_WatchedIndicatorDeviceChanged(device, service, variable
 		local curScreen = GetCurrentScreen(peer_dev_num)
 		DLog("  WatchedIndicatorDeviceChanged: context=", context, " peer_dev_num=", peer_dev_num, " screen=", screen, " curScreen=", curScreen);
 		if not SCObj.HasScreen or curScreen == screen then
-			SetIndicator(peer_dev_num, screen, false)
+			SetIndicator(peer_dev_num, screen, false, true)
 		end
 		RunZWaveQueue("WatchedIndicatorDeviceChanged", 250) -- 250ms delay to avoid a "cannot get lock" crash as job is in progress
 	end
@@ -2432,7 +2518,7 @@ end
 -- associated with that group (button) so the scene ID must be unique for all screens
 -- and buttons of this controller and all scenes used by any controllers operating on this
 -- device.
-function SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton, modeStr)
+function SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton, prevModeStr, modeStr)
 	DEntry("SelectZWaveSceneId")
 	local mode = ParseModeString(modeStr)
 	local controller_node_id, controller_dev_num = GetZWaveNode(peer_dev_num)
@@ -2442,7 +2528,9 @@ function SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton,
 		mode.sceneControllable = false
 		mode.zWaveSceneId = nil
 		mode.offZWaveSceneId = nil
+		VLog("  SelectZWaveSceneId #mode == 0 mode=",mode)
 	elseif mode.sceneControllable then	
+		VLog("  SelectZWaveSceneId #mode == ",#mode," mode=",mode)
 		local needSceneId = false;
 		local defaultSceneId = physicalButton;
 		local sceneSet = {max=SCObj.LastFixedSceneId}
@@ -2506,8 +2594,8 @@ function SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton,
 		mode.zWaveSceneId = newZWaveSceneId
 		mode.offZWaveSceneId = newOffZWaveSceneId
 	end
-	local prevModeStr =luup.variable_get(SID_SCENECONTROLLER, "Mode_"..screen.."_"..virtualButton, peer_dev_num)
 	local newModeStr = GenerateModeString(mode)
+	VLog("  SelectZWaveSceneId mode=",mode," prevModeStr=",prevModeStr," newModeStr=",newModeStr)
 	if prevModeStr ~= newModeStr then
 		for i = 1, #mode do
 			if mode[i].dimmingDuration then
@@ -2517,7 +2605,9 @@ function SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton,
 				WriteDeviceActuatorConfList(mode[i].device, actConfList)
 			end
 		end
-		luup.variable_set(SID_SCENECONTROLLER, "Mode_"..screen.."_"..virtualButton, newModeStr, peer_dev_num)
+		if mode.prefix ~= "L" then
+			luup.variable_set(SID_SCENECONTROLLER, "Mode_"..screen.."_"..virtualButton, newModeStr, peer_dev_num)
+		end
 	end
 	return mode
 end
@@ -2711,7 +2801,7 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 	if force or prevModeStr ~= modeStr then
 		local node_id = GetZWaveNode(zwave_dev_num)
 		local peer_dev_num = GetPeerDevNum(zwave_dev_num)
-		local mode = SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton, modeStr)
+		local mode = SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton, prevModeStr, modeStr)
 		DLog("  newMode=", mode)
 		if force then
 			prevModeStr = mode.prefix
@@ -2887,12 +2977,17 @@ function GetModeStr(peer_dev_num, screen, virtualButton)
 end
 
 function SetButtonMode(peer_dev_num, prevModeStr, screen, force, temperatureSettable, physicalButton)
+	DEntry()
 	local modeStr 
 	local state = 1
 	local node_id, zwave_dev_num = GetZWaveNode(peer_dev_num)
 	if not node_id then
 		ELog("SetButtonMode: bad peer_dev_num=", peer_dev_num, "  screen=", screen)
 		return
+	end
+	if not prevModeStr then
+		prevModeStr = "M"
+		force = true
 	end
 	local numLines, scrollOffset = GetNumLinesAndScrollOffset(peer_dev_num, screen)
 	local virtualButton = physicalButton + scrollOffset
@@ -2912,10 +3007,7 @@ function SetButtonMode(peer_dev_num, prevModeStr, screen, force, temperatureSett
 	elseif numLines > SCObj.NumButtons and
            ((physicalButton == 1 and scrollOffset > 0) or
             (physicalButton == SCObj.NumButtons and scrollOffset < numLines - SCObj.NumButtons)) then
-		modeStr = "M"
-		if not prevModeStr then
-			prevModeStr = "M"
-		end
+		modeStr = "L"
 	else
 		modeStr, state = GetModeStr(peer_dev_num, screen, virtualButton)
 	end
@@ -2924,7 +3016,7 @@ function SetButtonMode(peer_dev_num, prevModeStr, screen, force, temperatureSett
 	if not force then
 		oldType = SCObj.ModeType(ParseModeString(prevModeStr))
 	end
-	DLog("SetButtonMode: peer_dev_num=", peer_dev_num, " prevModeStr=", prevModeStr, " screen=", screen, " force=", force, " temperatureSettable=", temperatureSettable, " pysicalButton=", physicalButton,
+	DLog("  SetButtonMode: peer_dev_num=", peer_dev_num, " prevModeStr=", prevModeStr, " screen=", screen, " force=", force, " temperatureSettable=", temperatureSettable, " pysicalButton=", physicalButton,
 	     " oldType=", oldType, " modeStr=", modeStr, " newType=", newType, " NumLines=", numLines, " scrollOffset=", scrollOffset, " virtualButton=", virtualButton, " state=",state)
 	SCObj.SetButtonType(peer_dev_num, node_id, physicalButton, newType, force, oldType)
 	UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevModeStr, modeStr, physicalButton, virtualButton+(state-1)*1000)
@@ -2945,7 +3037,7 @@ function SceneController_UpdateCustomLabel(peer_dev_num, screen, virtualButton, 
 			luup.variable_set(SID_SCENECONTROLLER, "Font_" .. screen .. "_" .. virtualButton, font, peer_dev_num)
 			luup.variable_set(SID_SCENECONTROLLER, "Align_" .. screen .. "_" .. virtualButton, align, peer_dev_num)
 		end
-		SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton, modeStr)
+		SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton, prevModeStr, modeStr)
 		local currentScreen = luup.variable_get(SID_SCENECONTROLLER, CURRENT_SCREEN, peer_dev_num)
 		if not SCObj.HasMultipleScreens or currentScreen == screen then
 			if physicalButton >= 1 and
@@ -2961,7 +3053,13 @@ function SceneController_UpdateCustomLabel(peer_dev_num, screen, virtualButton, 
 					end
 					local s = label:gsub("\\r",      "\r")
 					      s =     s:gsub("-([^\r])", "-\r%1")
-				    EVLCDWrapStrings({s}, {font}, {align}, node_id, zwave_dev_num, physicalButton, physicalButton, SCREEN_MD.NoChange)
+					local labels = {}
+					local fonts = {}
+					local aligns = {}
+					labels[physicalButton] = s
+					fonts[physicalButton] = font
+					aligns[physicalButton] = align
+				    EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, SCREEN_MD.NoChange)
 				end
 				SetButtonMode(peer_dev_num, prevModeStr, screen, false, true, physicalButton)
 			end
@@ -3080,7 +3178,7 @@ function SetCustomScreen(peer_dev_num, screenNum, doTimeout, forceClear, indicat
 	DLog("  SetCustomScreen: numLines=", numLines, " scrollOffset=", scrollOffset)
 	local earlyButtonConfig = false;
 	if not indicatorOnly then
-		SetIndicatorValue(peer_dev_num, 0, forceClear)
+		SetIndicatorValue(peer_dev_num, 0, forceClear, true)
 		if prevScreen and prevScreen:sub(1,1) == "T" then
 			earlyButtonConfig = true;
 			forceClear = true;
@@ -3113,7 +3211,7 @@ function SetCustomScreen(peer_dev_num, screenNum, doTimeout, forceClear, indicat
 		else
 			screenFlags = SCREEN_MD.NoChange
 		end
-		EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, 1, SCObj.NumButtons, screenFlags)
+		EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, screenFlags)
 		for i = 1, SCObj.NumButtons do
 			if not earlyButtonConfig or i == 1 or i == SCObj.NumButtons then
 				local prevModeStr = GetModeStr(peer_dev_num, prevScreen, i+prevScrollOffset)
@@ -3121,12 +3219,12 @@ function SetCustomScreen(peer_dev_num, screenNum, doTimeout, forceClear, indicat
 			end
 		end
 	end
-	SetIndicator(peer_dev_num, screen, forceClear)
+	SetIndicator(peer_dev_num, screen, forceClear, true)
     SetScreenTimeout(peer_dev_num, screen, doTimeout)
 end
 
 function SetPresetScreen(peer_dev_num, screenNum, doTimeout, forceClear, indicatorOnly)
-	DEntry("SetCustomScreen")
+	DEntry("SetPresetScreen")
 	local screen = "P"..tostring(screenNum)
    	local node_id = GetZWaveNode(peer_dev_num)
 	local prevScreen
@@ -3147,14 +3245,14 @@ function SetPresetScreen(peer_dev_num, screenNum, doTimeout, forceClear, indicat
 		luup.variable_set(SID_SCENECONTROLLER, CURRENT_SCREEN, screen, peer_dev_num)
 	end
 	if not indicatorOnly and (forceClear or prevScreen ~= screen) then
-		SetIndicatorValue(peer_dev_num, 0, forceClear)
+		SetIndicatorValue(peer_dev_num, 0, forceClear, true)
 		SCObj.SetDeviceScreen(peer_dev_num, screen)
 		for i = 1, SCObj.NumButtons do
 			local prevModeStr = GetModeStr(peer_dev_num, prevScreen, i+prevScrollOffset)
 			SetButtonMode(peer_dev_num, prevModeStr, screen, forceClear, false, i);
 		end
 	end
-	SetIndicator(peer_dev_num, screen, forceClear)
+	SetIndicator(peer_dev_num, screen, forceClear, true)
     SetScreenTimeout(peer_dev_num, screen, doTimeout)
 end
 
@@ -3376,7 +3474,7 @@ function SetTemperatureScreen(peer_dev_num, screenNum, doTimeout, forceClear, in
 
 	if not indicatorOnly then
 		if screenNum > SCObj.NumTemperatureScreens then
-		    SetIndicatorValue(peer_dev_num, 0, forceClear)
+		    SetIndicatorValue(peer_dev_num, 0, forceClear, false)
 			if prevScreen:sub(1,1) ~= "T" then
 				ClearScreen(peer_dev_num, node_id)
 			end
@@ -3391,7 +3489,7 @@ function SetTemperatureScreen(peer_dev_num, screenNum, doTimeout, forceClear, in
 					fonts[i] = "Normal";
 					aligns[i] = "Raw";
 				end
-				EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, 1, SCObj.NumButtons, SCREEN_MD.NoChange)
+				EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, SCREEN_MD.NoChange)
 				labels = {};
 				fonts = {};
 				aligns = {};
@@ -3410,7 +3508,7 @@ function SetTemperatureScreen(peer_dev_num, screenNum, doTimeout, forceClear, in
 			for i = 1, SCObj.NumButtons, SCObj.NumButtons-1 do
 				ChooseLabelFontAndAlign(peer_dev_num, screen, i, i, nil, labels, fonts, aligns)
 			end
-			EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, 1, SCObj.NumButtons, SCREEN_MD.NoChange)
+			EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, SCREEN_MD.NoChange)
 		else
 			for i = 1, SCObj.NumButtons do
 				local prevModeStr = GetModeStr(peer_dev_num, prevScreen, i+prevScrollOffset)
@@ -3424,7 +3522,7 @@ function SetTemperatureScreen(peer_dev_num, screenNum, doTimeout, forceClear, in
 		end
 	end
 
-	SetIndicator(peer_dev_num, screen, forceClear)
+	SetIndicator(peer_dev_num, screen, forceClear, false)
 	luup.variable_set(SID_SCENECONTROLLER, CURRENT_SCREEN, screen, peer_dev_num)
     SetScreenTimeout(peer_dev_num, screen, doTimeout)
 
@@ -3708,6 +3806,14 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 	local numLines, scrollOffset = GetNumLinesAndScrollOffset(peer_dev_num, currentScreen)
 	local virtualButton = physicalButton + scrollOffset
 	DEntry("SceneButtonPressed")
+
+	local oldIndicator_string = luup.variable_get(SID_SCENECONTROLLER, CURRENT_INDICATOR, peer_dev_num)
+	local oldIndicator = 0
+	if oldIndicator_string then
+		oldIndicator = tonumber(oldIndicator_string)
+	end
+	local newIndicator = oldIndicator
+
 	-- Handle scroll up and scrolll down events if numLines > SCObj.NumButtons
 	-- Using the ScrollUp and ScrollDown commands, labels, indicators, and button modes all scroll together but not associations.
 	-- We also need to handle to top and bottom ^^^^ and vvvv scrolling indicators which always use momentary buttons.
@@ -3726,21 +3832,27 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 				ChooseLabelFontAndAlign(peer_dev_num, currentScreen, i, i+scrollOffset, nil, labels, fonts, aligns)
 			end
 		end
-		EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, 1, 2, SCREEN_MD.ScrollDown)
-		SetIndicatorValue(peer_dev_num, 0, false)
-		if scrollOffset == 0 then
-			SetButtonMode(peer_dev_num, "M", currentScreen, false, false, 1)
+		EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, SCREEN_MD.ScrollDown)
+		-- Due to the Evolve LCD1 narrow/wid indicator bug, we might as well clear the indicator here and set it again below.
+		SetIndicatorValue(peer_dev_num, 0, false, true)
+		for i = 1, SCObj.NumButtons do
+			local curModeStr
+			if i <= 2 then
+				curModeStr = "L"
+			else
+				curModeStr = GetModeStr(peer_dev_num, currentScreen, scrollOffset+i)
+			end
+			local prevModeStr
+			if i == 1 or (i == SCObj.NumButtons and scrollOffset+i+1 < numLines) then  
+				prevModeStr = "L"
+			else  
+				prevModeStr = GetModeStr(peer_dev_num, currentScreen, scrollOffset+i+1)
+			end
+			prevModeStr = string.sub(curModeStr, 1, 1) .. string.sub(prevModeStr, 2)
+			SetButtonMode(peer_dev_num, prevModeStr, currentScreen, false, false, i)
 		end
-		SetButtonMode(peer_dev_num, "M", currentScreen, false, false, 2)
-		for i = 3, SCObj.NumButtons-1 do
-			local prevModeStr = GetModeStr(peer_dev_num, currentScreen, scrollOffset+i+1)
-			local modeStr, state = GetModeStr(peer_dev_num, currentScreen, scrollOffset+i)
-			UpdateAssociationForPhysicalButton(zwave_dev_num, currentScreen, false, prevModeStr, modeStr, i, (scrollOffset+i)+(state-1)*1000)
-		end
-		local prevModeStr = GetModeStr(peer_dev_num, currentScreen, scrollOffset+SCObj.NumButtons)
-		SetButtonMode(peer_dev_num, prevModeStr, currentScreen, false, false, SCObj.NumButtons)
-		EVLCDWrapStrings({"\nvvvvvv"}, {"Inverted"}, {"Center"}, node_id, zwave_dev_num, SCObj.NumButtons, SCObj.NumButtons, SCREEN_MD.NoChange)
-		SetIndicator(peer_dev_num, currentScreen, false)
+		EVLCDWrapStrings({[SCObj.NumButtons]="\nvvvvvv"}, {[SCObj.NumButtons]="Inverted"}, {[SCObj.NumButtons]="Center"}, node_id, zwave_dev_num, SCREEN_MD.NoChange)
+		SetIndicator(peer_dev_num, currentScreen, false, false)
 		luup.sleep(param.SCENE_CTRL_SwitchScreenDelay) -- Avoid a CAN when LCD1 sends the second scene activation message
 		SetScreenTimeout(peer_dev_num, currentScreen, true);
 		return
@@ -3752,39 +3864,39 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 	  	luup.variable_set(SID_SCENECONTROLLER, "ScrollOffset_" .. currentScreen, tostring(scrollOffset), peer_dev_num)
 		for i = SCObj.NumButtons-1, SCObj.NumButtons do
 			if i == SCObj.NumButtons and scrollOffset < numLines-SCObj.NumButtons then
-				labels[2] = "\nvvvvvv"
-				fonts[2] = "Inverted";
-				aligns[2] = "Center";
+				labels[i] = "\nvvvvvv"
+				fonts[i] = "Inverted";
+				aligns[i] = "Center";
 			else
-				ChooseLabelFontAndAlign(peer_dev_num, currentScreen, i-(SCObj.NumButtons-2), i+scrollOffset, nil, labels, fonts, aligns)
+				ChooseLabelFontAndAlign(peer_dev_num, currentScreen, i, i+scrollOffset, nil, labels, fonts, aligns)
 			end
 		end
-		EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, SCObj.NumButtons-1, SCObj.NumButtons, SCREEN_MD.ScrollUp)
-		SetIndicatorValue(peer_dev_num, 0, false)
-		if scrollOffset == numLines-SCObj.NumButtons then
-			SetButtonMode(peer_dev_num, "M", currentScreen, false, false, SCObj.NumButtons)
+		EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, SCREEN_MD.ScrollUp)
+		-- Due to the Evolve LCD1 narrow/wid indicator bug, we might as well clear the indicator here and set it again below.
+		SetIndicatorValue(peer_dev_num, 0, false, true)
+		for i = SCObj.NumButtons, 1, -1 do
+			local curModeStr
+			if i >= SCObj.NumButtons-1 then
+				curModeStr = "L"
+			else
+				curModeStr = GetModeStr(peer_dev_num, currentScreen, scrollOffset+i)
+			end
+			local prevModeStr
+			if i == SCObj.NumButtons or (i == 1 and scrollOffset > 1) then
+				prevModeStr = "L"
+			else
+				prevModeStr = GetModeStr(peer_dev_num, currentScreen, scrollOffset+i-1)
+			end
+			prevModeStr = string.sub(curModeStr, 1, 1) .. string.sub(prevModeStr, 2)
+			SetButtonMode(peer_dev_num, prevModeStr, currentScreen, false, false, i)
 		end
-		SetButtonMode(peer_dev_num, "M", currentScreen, false, false, SCObj.NumButtons-1)
-		for i = SCObj.NumButtons-2, 2, -1 do
-			local prevModeStr = GetModeStr(peer_dev_num, currentScreen, scrollOffset+i-1)
-			local modeStr, state     = GetModeStr(peer_dev_num, currentScreen, scrollOffset+i)
-			UpdateAssociationForPhysicalButton(zwave_dev_num, currentScreen, false, prevModeStr, modeStr, i, scrollOffset+i+(state-1)*1000)
-		end
-		local prevModeStr = GetModeStr(peer_dev_num, currentScreen, scrollOffset+1)
-		SetButtonMode(peer_dev_num, prevModeStr, currentScreen, false, false, 1)
-		EVLCDWrapStrings({"^^^^^^"}, {"Inverted"}, {"Center"}, node_id, zwave_dev_num, 1, 1, SCREEN_MD.NoChange)
-		SetIndicator(peer_dev_num, currentScreen, false)
+		EVLCDWrapStrings({[1]="^^^^^^"}, {[1]="Inverted"}, {[1]="Center"}, node_id, zwave_dev_num, SCREEN_MD.NoChange)
+		SetIndicator(peer_dev_num, currentScreen, false, false)
 		luup.sleep(param.SCENE_CTRL_SwitchScreenDelay) -- Avoid a CAN when LCD1 sends the second scene activation message
 		SetScreenTimeout(peer_dev_num, currentScreen, true);
 		return
 	end
 
-	local oldIndicator_string = luup.variable_get(SID_SCENECONTROLLER, CURRENT_INDICATOR, peer_dev_num)
-	local oldIndicator = 0
-	if oldIndicator_string then
-		oldIndicator = tonumber(oldIndicator_string)
-	end
-	local newIndicator = oldIndicator
 	local modeStr = luup.variable_get(SID_SCENECONTROLLER,"Mode_"..currentScreen.."_"..virtualButton, peer_dev_num)
 	if modeStr == nil then
 		modeStr = SCObj.DefaultModeString
@@ -3804,7 +3916,7 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 		newIndicator = bit.band(oldIndicator,SCObj.PhysicalButtonToIndicator(physicalButton, false))
 		if not SCObj.HasButtonModes then
 			-- For "Fake" Momentary buttons, force-reset the indicator
-			SetIndicatorValue(peer_dev_num, newIndicator, true);
+			SetIndicatorValue(peer_dev_num, newIndicator, true, true);
 		end
 	end
 	if newIndicator ~= oldIndicator then
@@ -3847,7 +3959,7 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 		local oldFonts = {}
 		local oldAligns = {}
 		if SCObj.HasScreen then
-			ChooseLabelFontAndAlign(peer_dev_num, currentScreen, 1, virtualButton, state, oldLabels, oldFonts, oldAligns)
+			ChooseLabelFontAndAlign(peer_dev_num, currentScreen, physicalButton, virtualButton, state, oldLabels, oldFonts, oldAligns)
 		end
 		state = state % states + 1
 		luup.variable_set(SID_SCENECONTROLLER,"State_"..currentScreen.."_"..virtualButton,tostring(state),peer_dev_num)
@@ -3864,7 +3976,7 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 		local fonts = {}
 		local aligns = {}
 		if SCObj.HasScreen then
-			ChooseLabelFontAndAlign(peer_dev_num, currentScreen, 1, virtualButton, state, labels, fonts, aligns)
+			ChooseLabelFontAndAlign(peer_dev_num, currentScreen, physicalButton, virtualButton, state, labels, fonts, aligns)
 		end
 		local nextState = state % states + 1
 		local newModeStr = luup.variable_get(SID_SCENECONTROLLER,"Mode_"..currentScreen.."_"..(virtualButton+(nextState-1)*1000), peer_dev_num)
@@ -3873,8 +3985,8 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 		end
 		DLog("  SceneButtonPressed: modeStr for next state ", nextState, " = ", newModeStr)
 		UpdateAssociationForPhysicalButton(zwave_dev_num, currentScreen, false, modeStr, newModeStr, physicalButton, virtualButton+(nextState-1)*1000)
-		if SCObj.HasScreen and (oldLabels[1] ~= labels[1] or oldFonts[1] ~= fonts[1] or oldAligns[1] ~= aligns[1]) then
-			EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, physicalButton, physicalButton, SCREEN_MD.NoChange)
+		if SCObj.HasScreen and (oldLabels[physicalButton] ~= labels[physicalButton] or oldFonts[physicalButton] ~= fonts[physicalButton] or oldAligns[physicalButton] ~= aligns[physicalButton]) then
+			EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, SCREEN_MD.NoChange)
 		end
 	end
 	-- For direct or toggle direct, we set the status of the target device to whatever the controller
@@ -3900,7 +4012,7 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 			local buttonGroup = math.floor((virtualButton - 1) / SCObj.NumButtons)
 			local buttonOffset = 0
 			if buttonGroup > 0 then
-			   buttonOffset = 300 + buttonGroup * 100
+			   buttonOffset = 200 + buttonGroup * 100
 			end
 			peer_scene = ((tonumber(customScreen) - 1) * SCObj.NumButtons) + ((virtualButton - 1) % SCObj.NumButtons) + 1 + (buttonOffset) + (state-1) * 1000
 		else
@@ -4005,7 +4117,7 @@ function SceneChange(peer_dev_num, isSceneId, zwave_scene, cur_scene_time)
 							local lock = IndicatorLocks[peer_dev_num]
 							IndicatorLocks[peer_dev_num] = 0
 							if anyChange or lock > 1 then
-								SetIndicator(peer_dev_num, GetCurrentScreen(peer_dev_num), false)
+								SetIndicator(peer_dev_num, GetCurrentScreen(peer_dev_num), false, true)
 							end
 						end
 					else
@@ -4028,7 +4140,7 @@ function SceneChange(peer_dev_num, isSceneId, zwave_scene, cur_scene_time)
 							local lock = IndicatorLocks[peer_dev_num]
 							IndicatorLocks[peer_dev_num] = 0
 							if lock > 1 then
-								SetIndicator(peer_dev_num, GetCurrentScreen(peer_dev_num), false)
+								SetIndicator(peer_dev_num, GetCurrentScreen(peer_dev_num), false, true)
 							end
 						end
 					end
@@ -4099,7 +4211,7 @@ Device 20=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦
 	end
 	SceneButtonPressed(peer_dev_num, activate, physicalButton, false)
 	-- See comment above regarding SetIndicator here.
-	SetIndicator(peer_dev_num, GetCurrentScreen(peer_dev_num), false)
+	SetIndicator(peer_dev_num, GetCurrentScreen(peer_dev_num), false, true)
 end
 
 ---
@@ -4109,77 +4221,73 @@ end
 -- Returns on%, lastUpdate, service, variable if the given device is on or off. (In the case of a binary device, retun 0 or 100%
 -- Returns nil if the device does not exist or is not settable
 function GetDeviceStatus(device_num)
-  local device = luup.devices[device_num]
-  if not device then
-    return nil
-  end
-  if device.device_type == DEVTYPE_BINARY then
-    local service = SID_SWITCHPOWER
-	local variable = "Status"
-    local result, lastUpdate = luup.variable_get(service, variable, device_num)
-    if result == "1" or result == "0" then
-      return tonumber(result)*100, lastUpdate, service, variable
-    end
-    return nil
-  end
-  if device.device_type == DEVTYPE_DIMMABLE or device.device_type == DEVTYPE_WINDOWCOVERING then
-    local service = SID_DIMMING
+	DEntry()
+	local device = luup.devices[device_num]
+  	if not device then
+		ELog("GetDeviceStatus: device ",device_num," not found") 
+    	return nil
+  	end
+	local service = SID_DIMMING
 	local variable = "LoadLevelStatus"
-    local result, lastUpdate = luup.variable_get(service, variable, device_num)
-	local value = tonumber(result)
-	if value == nil then
-	  return nil
+	local result, lastUpdate = luup.variable_get(service, variable, device_num)
+	if result then
+		local value = tonumber(result)
+		if value ~= nil then
+			return value, lastUpdate, service, variable
+		end
 	end
-	return value, lastUpdate, service, variable
-  end
-  return nil
+    service = SID_SWITCHPOWER
+	variable = "Status"
+    result, lastUpdate = luup.variable_get(service, variable, device_num)
+    if result == "1" or result == "0" then
+    	return tonumber(result)*100, lastUpdate, service, variable
+    end
+	ELog("GetDeviceStatus: device ", device_num, " has neither ",SID_DIMMING," LoadLevelStatus nor ",SID_SWITCHPOWER," Status") 
+    return nil
 end
 
 -- Set the device's status without sending any Z-Wave messages when we know what the controller set it to.
 function SetDeviceStatus(device_num, value)
-  DEntry()
-  local device = luup.devices[device_num]
-  if not device then
-	DLog("  SetDeviceStatus: Device not found");
-    return
-  end
-  local service, variable, status
-  if device.device_type == DEVTYPE_BINARY then
+	DEntry()
+	local foundVariable = false
+	local device = luup.devices[device_num]
+  	if not device then
+		ELog("SetDeviceStatus: device ",device_num," not found") 
+    	return
+  	end
+	local service = SID_DIMMING
+	local variable = "LoadLevelStatus"
+	local result, lastUpdate = luup.variable_get(service, variable, device_num)
+	if result then
+  		DLog("  SetDeviceStatus: service=", service, " variable=", variable, " oldValue=", oldValue, " value=", value)
+		local oldValue = tonumber(result)
+		if oldValue ~= value then
+		    -- Temporarily unwatch the variable to avoid a loop which can cause problems if more than one device is attached to a button.
+		    TempVariableUnwatch(service, variable, device_num) 
+		  	luup.variable_set(service, variable, tostring(value), device_num)
+		end
+		foundVariable = true
+	end
+	local status
 	if value > 0 then
 		status = "1"
 	else
 	    status = "0"
 	end
-	-- leave service as null since binary devices only have 1 status
-  elseif device.device_type == DEVTYPE_DIMMABLE or device.device_type == DEVTYPE_WINDOWCOVERING then
-    service = SID_DIMMING
-	variable = "LoadLevelStatus"
-	if value > 0 then
-		status = "1"
-	else
-	    status = "0"
+  	service = SID_SWITCHPOWER
+  	variable = "Status"
+	result, lastUpdate = luup.variable_get(service, variable, device_num)
+	if result then
+		local oldStatus = tonumber(result)
+	  	DLog("  SetDeviceStatus: service=", service, " variable=", variable, " oldStatus=", oldStatus, " status=", status)
+		if oldStatus ~= status then
+		    -- Temporarily unwatch the variable to avoid a loop which can cause problems if more than one device is attached to a button.
+		    TempVariableUnwatch(service, variable, device_num) 
+		  	luup.variable_set(service, variable, tostring(status), device_num)
+		end
+		foundVariable = true
 	end
-	value = tostring(value)
-  else
-	DLog("  SetDeviceStatus: ", device.device_type, " not one of ", DEVTYPE_BINARY, ", ", DEVTYPE_DIMMABLE, " or ", DEVTYPE_WINDOWCOVERING);
-    return
-  end
-  if service then
-	  local oldValue = luup.variable_get(service, variable, device_num)
-	  DLog("  SetDeviceStatus: service=", service, " variable=", variable, " oldValue=", oldValue, " value=", value)
-	  if oldValue ~= value then
-	    -- Temporarily unwatch the variable to avoid a loop which can cause problems if more than one device is attached to a button.
-	    TempVariableUnwatch(service, variable, device_num) 
-	  	luup.variable_set(service, variable, tostring(value), device_num)
-	  end
-  end
-  service = SID_SWITCHPOWER
-  variable = "Status"
-  local oldStatus = luup.variable_get(service, variable, device_num)
-  DLog("  SetDeviceStatus: service=", service, " variable=", variable, " oldStatus=", oldStatus, " status=", status)
-  if oldStatus ~= status then
-    -- Temporarily unwatch the variable to avoid a loop which can cause problems if more than one device is attached to a button.
-    TempVariableUnwatch(service, variable, device_num) 
-  	luup.variable_set(service, variable, tostring(status), device_num)
-  end
-end
+	if not foundVariable then
+		ELog("SetDeviceStatus: device ", device_num, " has neither ",SID_DIMMING," LoadLevelStatus nor ",SID_SWITCHPOWER," Status")
+	end
+end 

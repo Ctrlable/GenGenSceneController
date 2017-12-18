@@ -1,4 +1,4 @@
-// User interface for GenGeneric Scene Controller Version 1.12
+// User interface for GenGeneric Scene Controller Version 1.13
 // Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
@@ -15,6 +15,7 @@ var EVOLVELCD1 = {
 	MaxScroll	        	: 10,
     LastFixedSceneId        : 10,
 	HasOffScenes            : true,
+	HasIndicator			: true,
 	HasCooperConfiguration  : false,
 	MaxDirectAssociations   : 30,
 	DefaultScreen           : "C1",
@@ -39,7 +40,7 @@ var EVOLVELCD1 = {
 		W: 61,	// Welcome     screen scenes start at base T + 5 buttons * 6 temperature screens
 		P: 66	// Preset      screen scenes start at base W + 5 buttons * 1 welcome screen
 		// 271-300 - Unused	                 start at base P + 5 buttons * 41 preset screens
-		// 301-330 - Lines 6-10 for Custom screens 1
+		// 301-330 - Lines 6-10 for Custom screens 1-6
 		// 331-1000 - Unused
 		// 1001-1030 - State 2 for multi-state custom screens. (1031-2000 - Unused)
 		// ...
@@ -153,6 +154,7 @@ var COOPERRFWC5 = {
 	MaxScroll               : 5,
     LastFixedSceneId        : 5,
 	HasOffScenes            : false,
+	HasIndicator			: true,
 	HasCooperConfiguration  : true,
 	MaxDirectAssociations   : 5,
 	DefaultScreen           : "P1",
@@ -198,6 +200,7 @@ var NEXIAONETOUCH = {
 	MaxScroll               : 15,
     LastFixedSceneId        : 46,
 	HasOffScenes            : false,
+	HasIndicator			: false,
 	HasCooperConfiguration  : false,
 	MaxDirectAssociations   : 2,
 	DefaultScreen           : "C1",
@@ -474,7 +477,8 @@ SceneController_Modes = {
 	X:"Exclusive",
 	N:"Switch Screen",
 	H:"Thermostat",
-	W:"Welcome"
+	W:"Welcome",
+	L:"Scroll"	// Used internally by Lua. Should never be visible at the JS level.
 };
 
 SceneController_CustomFontList = [
@@ -650,6 +654,7 @@ function SceneController_GetDevice(id)
 // Scene-capable modes are a ; separated list of 0 or more deviceNum,level,dimmingDuration triplets
 // Cooper condiguration modes are a ; separate list of 0 or more deviceNum,level pairs
 // Non-scene capabile modes are a ; separated list of 0 or more deviceNums
+// DeviceNums can be negative if they should only be monitored but not controlled, to set the indicator
 function SceneController_ParseModeString(SCObj, str) {
 	var mode = [];
 	var reResult;
@@ -681,15 +686,27 @@ function SceneController_ParseModeString(SCObj, str) {
 		if (!/;$/.exec(str)) {
 			str += ";"
 		}
-		var re = /(\d+)(?:,(\d+)(?:,(\d+))?)?,?;/g
+		var re = /(-?\d+)(?:,(\d+)(?:,(\d+))?)?,?;/g
 		while ((reResult = re.exec(str))) {
 			var device = parseInt(reResult[1])
-			if (SceneController_GetDevice(device)) {
-				var level = reResult[2] ? parseInt(reResult[2]) : null; 
-				var dimmingDuration = reResult[3] ? parseInt(reResult[3]) : null; 
-				mode.push({device: device,
-			           	   level: level,
-			           	   dimmingDuration: dimmingDuration})
+			var level = reResult[2] ? parseInt(reResult[2]) : null; 
+			var dimmingDuration = reResult[3] ? parseInt(reResult[3]) : null; 
+			if (device > 0) {
+				if (SceneController_GetDevice(device)) {
+					mode.push({device: device,
+				           	   level: level,
+				           	   dimmingDuration: dimmingDuration})
+				}
+			} else {
+				device = -device;
+				if (SceneController_GetDevice(device)) {
+					if (!mode.veraSceneSet) {
+					   mode.veraSceneSet=[];	
+					}
+					mode.veraSceneSet.push({device: device,
+				           	   				level: level,
+				           	   				dimmingDuration: dimmingDuration})
+				}
 			}
 		}
 	}
@@ -697,6 +714,27 @@ function SceneController_ParseModeString(SCObj, str) {
 }
 
 function SceneController_GenerateModeString(SCObj, mode) {
+	function generateArray(array, sign) {
+		if (array) {
+			for (var i = 0; i < array.length; ++i) {
+				var element = array[i];
+				if (element && element.device) {
+					if (!first) {
+						str += ";";
+					}
+					if (element.dimmingDuration || element.dimmingDuration == 0) {
+						str += element.device*sign + "," + element.level + "," + element.dimmingDuration
+					} else if (element.level || element.level == 0) {
+						str += element.device*sign + "," + element.level
+					} else {
+						str += element.device*sign
+					}
+					first = false;
+				}
+			}
+		}
+	}
+
 	if (!mode) {
 		mode = [];
 	}
@@ -707,6 +745,7 @@ function SceneController_GenerateModeString(SCObj, mode) {
 	if (mode.newScreen) {
 		str += mode.newScreen + ":"
 	}
+	var first = true;
 	if (mode.sceneControllable) {
 		str += "S";
 		if (mode.sceneId) {
@@ -716,22 +755,8 @@ function SceneController_GenerateModeString(SCObj, mode) {
 			}
 		}
 	}
-	var first = true;
-	for (var i = 0; i < mode.length; ++i) {
-		if (mode[i] && mode[i].device) {
-			if (!first) {
-				str += ";"
-			}
-			if (mode[i].dimmingDuration || mode[i].dimmingDuration == 0) {
-				str += mode[i].device + "," + mode[i].level + "," + mode[i].dimmingDuration
-			} else if (mode[i].level || mode[i].level == 0) {
-				str += mode[i].device + "," + mode[i].level
-			} else {
-				str += mode[i].device
-			}
-			first = false;
-		}
-	}
+	generateArray(mode, 1);
+	generateArray(mode.veraSceneSet, -1);
 	return str;
 }
 
@@ -1159,7 +1184,8 @@ function SceneController_Screens(SCObj, deviceId) {
 				var font = "";
 				var align = "";
 				var custom = false;
-				var modeStr  = SceneController_get_device_state(peerId, SCObj.ServiceId, "Mode_"+curScreen+"_"+button, 0);
+				var modeVar = "Mode_"+curScreen+"_"+button; 
+				var modeStr  = SceneController_get_device_state(peerId, SCObj.ServiceId, modeVar, 0);
 				if (!modeStr || typeof modeStr != "string") {
 					modeStr = SCObj.DefaultModeString;
 				}
@@ -1206,7 +1232,8 @@ function SceneController_Screens(SCObj, deviceId) {
 						if (!label) {
 							label = "";
 						}
-						var modeStr  = SceneController_get_device_state(peerId, SCObj.ServiceId, "Mode_"+curScreen+"_"+stateButton, 0);
+						modeVar = "Mode_"+curScreen+"_"+stateButton;
+						modeStr  = SceneController_get_device_state(peerId, SCObj.ServiceId, modeVar, 0);
 						if (!modeStr || typeof modeStr != "string") {
 							modeStr = "M";
 						}
@@ -1296,12 +1323,12 @@ function SceneController_Screens(SCObj, deviceId) {
 						                        (SceneController_GetDeviceProperties(SceneController_get_device_object(mode[0].device)).basicSetOnly ||
 						                         (mode.prefix == "T" && !SCObj.HasOffScenes))) ||
 						                       mode.length >= SCObj.MaxDirectAssociations;
-						var hasVeraScenes = SceneController_FindScene(peerId, sceneNum, -1)
+						var veraSceneObj = SceneController_FindScene(peerId, sceneNum, -1)
 						var enableMoreDirectScenes = mode.length < SCObj.MaxDirectAssociations &&
-						                             (!hasVeraScenes ||
+						                             (!veraSceneObj ||
 													  SCObj.HasCooperConfiguration ||
 													  (mode.prefix != "T" || SCObj.HasOffScenes))
-						var enableNonSceneDirect = SCObj.HasCooperConfiguration || (!hasVeraScenes && states == 1);
+						var enableNonSceneDirect = SCObj.HasCooperConfiguration || (!veraSceneObj && states == 1);
 						switch (mode.prefix) {
 						   	case "M":	// Momentary
 							case "X":	// EXclusive
@@ -1309,13 +1336,44 @@ function SceneController_Screens(SCObj, deviceId) {
 							case "P":   // Thermostat oPerating mode
 							case "E":	// Thermostat Energy mode
 							default:
+								if (SCObj.HasIndicator && ((mode.prefix >= "2" && mode.prefix <= "9") || mode.prefix == "X"))  {
+									// For multistate and exclusive modes, we look at all of the devices affected by each state
+									// to allow the indicator to automatically track which state is most appropriate.
+									var sceneSet = SceneController_GetSceneSet(veraSceneObj)
+									if (!SceneController_SceneSetsEqual(sceneSet, mode.veraSceneSet)) {
+										mode.veraSceneSet = sceneSet;
+										var newModeStr=SceneController_GenerateModeString(SCObj, mode);
+										if (SCObj.HasScreen) {
+											SceneController_send_action(peerId,SID_SCENECONTROLLER,"UpdateCustomLabel",{Screen:curScreen,Button:stateButton,Label:label,Font:font,Align:align,Mode:newModeStr});
+										} else {
+											SceneController_send_action(peerId,SID_SCENECONTROLLER,"UpdateCustomLabel",{Screen:curScreen,Button:stateButton,Mode:newModeStr});
+										}
+										SceneController_set_device_state(peerId, SCObj.ServiceId, modeVar, newModeStr);
+									}
+								}
 								html += '   <button type="button" class="btn" '+(disableVeraScene?'disabled ':'')+'style="min-width:10px;'+
 								             (SceneController_FindScene(peerId, sceneNum, 2)?';color:orange;':'')+(disableVeraScene?'background-color:#AAAAAA;':'')+
 								             '" onClick="SceneController_SetScene('+peerId+','+sceneNum+',2,\''+SceneController_EscapeHTML(label)+'\')">Scene</button>\n';
 						      	break;
 						   	case "T":  // Toggle
+								var onScene = SceneController_FindScene(peerId, sceneNum, 1)
+								if (SCObj.HasIndicator) {
+									// For toggle modes, we look at all of the devices affected by any Vera "on" scene and used them to
+									// to allow the indicator to automatically track when most of the affected devices are on or off.
+									var onSceneSet = SceneController_GetSceneSet(veraSceneObj)
+									if (!SceneController_SceneSetsEqual(onSceneSet, mode.veraSceneSet)) {
+										mode.veraSceneSet = onSceneSet;
+										var newModeStr=SceneController_GenerateModeString(SCObj, mode);
+										if (SCObj.HasScreen) {
+											SceneController_send_action(peerId,SID_SCENECONTROLLER,"UpdateCustomLabel",{Screen:curScreen,Button:stateButton,Label:label,Font:font,Align:align,Mode:newModeStr});
+										} else {
+											SceneController_send_action(peerId,SID_SCENECONTROLLER,"UpdateCustomLabel",{Screen:curScreen,Button:stateButton,Mode:newModeStr});
+										}
+										SceneController_set_device_state(peerId, SCObj.ServiceId, modeVar, newModeStr);
+									}
+								}
 								html += '   <button type="button" class="btn" '+(disableVeraScene?'disabled ':'')+'style="min-width:10px;'+
-								             (SceneController_FindScene(peerId, sceneNum, 1)?';color:orange;':'')+(disableVeraScene?'background-color:#AAAAAA;':'')+
+								             (onScene?';color:orange;':'')+(disableVeraScene?'background-color:#AAAAAA;':'')+
 								             '" onClick="SceneController_SetScene('+peerId+','+sceneNum+',1,\''+SceneController_EscapeHTML(label)+'\')">On</button>\n';
 								if (/*SCObj.HasOffScenes*/ true) {
 									html += '    <button type="button" class="btn" '+(disableVeraScene?'disabled ':'')+'style="min-width:10px;'+
@@ -1552,6 +1610,55 @@ function SceneController_FindScene(deviceID, scenNum, activate) {
 	return null;
 }
 
+// Return an object who's keys are the device numbers affected by the given scene object regardless of delay
+function SceneController_GetSceneSet(sceneObj) {
+	if (!sceneObj || !sceneObj.groups) {
+		return null;
+	}
+	var result = [];
+	for (var i = 0; i < sceneObj.groups.length; ++i) {
+		var group = sceneObj.groups[i];
+		for (var j = 0; j < group.actions.length; ++j) {
+			var levelSet = false;
+			var action = group.actions[j];
+			if (action.action == "SetLoadLevelTarget") {
+				var arguments = action.arguments;
+				for (var k = 0; k < arguments.length; ++k) {
+					var argument = arguments[k];
+					if (argument.name == "newLoadlevelTarget") {
+						result.push({device: action.device,
+									 level: parseInt(argument.value, 0)})
+					    levelSet = true;
+						break;
+					}
+				}
+			}
+			if (!levelSet) {
+				result.push({device: action.device})
+			}
+		}
+	}
+	return result;
+}
+
+function SceneController_SceneSetsEqual(s1, s2) {
+	if (!s1 || s1.length==0) {
+		return !s2 || s2.length==0;
+	}
+	if (!s2 || s2.length != s1.length) {
+		return false;
+	}
+	for (var i = 0; i < s1.length; ++ i) {
+		if (s1[i].device != s2[i].device) {
+			return false;
+		}
+		if (s1[i].level != s2[i].level) {
+			return false;
+		}
+	}
+	return true;
+}
+
 function SceneController_GetOrCreateNewScene(deviceID, scenNum, activate, label) {
     var sceneObj = SceneController_FindScene(deviceID, scenNum, activate)
 	if (sceneObj) {
@@ -1564,7 +1671,7 @@ function SceneController_GetOrCreateNewScene(deviceID, scenNum, activate, label)
         return [false, sceneObj, sceneObj.name];
     }
 	// The scene was not found. Create a new one
-    var sceneID = SceneController_IsUI7() ? application.newSceneId() : new_scene_id();
+    var sceneID = SceneController_IsUI7() ? application.newSceneId()+1000000 : new_scene_id();
 	var devObj = SceneController_IsUI7() ? application.getDeviceById(deviceID) : get_device_obj(deviceID);
     var sceneName = SceneController_CreateSceneName(devObj.name,
                                                label,

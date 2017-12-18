@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller shared code Version 1.12
+-- GenGeneric Scene Controller shared code Version 1.13
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -224,16 +224,16 @@ function take_global_lock()
 	local lockFile = nixio.open(global_lock_name, global_lock_flags, 666)
 	if lockFile then
 		lockFile:close()
-		log("Global lock taken")
+		DLog("Global lock taken")
 		return true
 	end
-	log("Waiting for global lock")
+	DLog("Waiting for global lock")
 	return false
 end
 
 function give_global_lock()
     nixFs.unlink(global_lock_name)	
-	log("Global lock given")
+	DLog("Global lock given")
 end
 
 --
@@ -909,15 +909,19 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 	end
 end
 
-function RegisterClientDevice()
+function RegisterClientDevice(backoff)
 	DEntry()
+	backoff = tonumber(backoff)
+	if not backoff then
+		backoff = 1
+	end
 	luup.variable_set(SID_SCENECONTROLLER, "ZQ_WritePtr", "0", luup.device)
 	-- luup.variable_set(SID_SCENECONTROLLER, "ZQ_ReadPtr", "0", luup.device)
 	local err_num, err_msg, job_num, arguments = luup.call_action(GENGENINSTALLER_SID, "RegisterClientDevice", {DeviceNumber=luup.device}, GetFirstInstaller())
 	if err_num ~= 0 then
 		DLog("RegisterClientDevice: call_action returnd ", err_num, ": ", err_msg,". Trying again.") 
 		local tryAgainSeconds = 3
-		luup.call_delay("RegisterClientDevice", tryAgainSeconds, "", true)
+		luup.call_delay("RegisterClientDevice", tryAgainSeconds, tostring(backoff+2), true)
 	end
 end
 

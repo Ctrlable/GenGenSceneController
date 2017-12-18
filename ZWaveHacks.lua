@@ -39,3 +39,11 @@ luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Dat
 luup.sleep(2700)
 --Manufacturer Specifc Get
 luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xbd, Data = "0x72 0x04"}, 1)
+
+
+--configuration_get
+for i = 1, 5 do
+	luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0x10, Data = "0x70 0x05 "..i}, 1)
+	luup.sleep(1000)
+end
+
