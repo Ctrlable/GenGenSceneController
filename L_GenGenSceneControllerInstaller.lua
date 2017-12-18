@@ -1,4 +1,4 @@
--- Installer for GenGeneric Scene Controller Version 1.11
+-- Installer for GenGeneric Scene Controller Version 1.12
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 --
 -- Includes installation files for
@@ -12,7 +12,7 @@
 -- VerboseLogging == 1: Includes debug logs:          ELog, log, DLog, DEntry
 -- VerboseLogging == 2: Include extended ZWave Queue  ELog, log, DLog, DEntry
 -- VerboseLogging == 3:	Includes verbose logs:        ELog, log, DLog, DEntry, VLog, VEntry
-VerboseLogging = 0
+VerboseLogging = 3
 
 -- Set UseDebugZWaveInterceptor to true to enable zwint log messages to log.LuaUPnP (Do not confuse with LuaUPnP.log)
 local UseDebugZWaveInterceptor = false
@@ -512,7 +512,7 @@ Xmit options = ACK | AUTO_ROUTE -------------------------------------------+    
            TRANSMIT_COMPLETE_OK ------------------------+    ¦
                     Checksum OK -----------------------------+
 41      04/02/17 15:21:37.410   ACK: 0x6 (#) 
-42      04/02/17 15:21:37.631   0x1 0xa 0x0 0x4 0x0 0xba 0x4 0x86 0x14 0x71 0x3 0xbd 
+42      04/02/17 15:21:37.631   0x1 0xa 0x0 0x4 0x0 0xba 0x4 0x86 0x14 0x71 0x1 0xbd 
            SOF - Start Of Frame --+   ¦   ¦   ¦   ¦    ¦   ¦    ¦    ¦   ¦    ¦    ¦
                     length = 10 ------+   ¦   ¦   ¦    ¦   ¦    ¦    ¦   ¦    ¦    ¦
                         Request ----------+   ¦   ¦    ¦   ¦    ¦    ¦   ¦    ¦    ¦
@@ -523,10 +523,10 @@ FUNC_ID_APPLICATION_COMMAND_HANDLER ----------+   ¦    ¦   ¦    ¦    ¦   ¦    ¦ 
           COMMAND_CLASS_VERSION --------------------------------+    ¦   ¦    ¦    ¦
    VERSION_COMMAND_CLASS_REPORT -------------------------------------+   ¦    ¦    ¦
 Requested Command Class = COMMAND_CLASS_ALARM ---------------------------+    ¦    ¦
-                    Version = 3 ----------------------------------------------+    ¦
+                    Version = 1 ----------------------------------------------+    ¦
                     Checksum OK ---------------------------------------------------+
 --]==]
-		                 "06 01 04 01 \\1 01 XX 01 05 00 \\1 \\2 00 XX 01 0A 00 04 00 " .. string.format("%02X", node_id) .. " 04 86 14 71 03 XX", -- Autoresponse,
+		                 "06 01 04 01 \\1 01 XX 01 05 00 \\1 \\2 00 XX 01 0A 00 04 00 " .. string.format("%02X", node_id) .. " 04 86 14 71 01 XX", -- Autoresponse,
 		                 ShlageLockVersionCallback,
 		                 false, -- Not OneShot
 		                 0, -- no timeout

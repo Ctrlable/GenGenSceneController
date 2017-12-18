@@ -30,3 +30,12 @@ end
 --LockRoute
 luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Data = "0x00 0x90 0x00"}, 1)
 
+
+--Delete return route
+luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Data = "0x0 0x47 0xbd 0x2"}, 1)
+luup.sleep(2000)
+--Assign return route
+luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Data = "0x0 0x46 0xbd 0x1 0x2"}, 1)
+luup.sleep(2700)
+--Manufacturer Specifc Get
+luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xbd, Data = "0x72 0x04"}, 1)

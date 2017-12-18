@@ -5,7 +5,7 @@
 -- VerboseLogging == 0: important logs and errors:    ELog, log
 -- VerboseLogging == 1: Includes debug logs:          ELog, log, DLog, DEntry
 -- VerboseLogging == 3:	Includes verbose logs:        ELog, log, DLog, DEntry, VLog, VEntry
-VerboseLogging = 0
+VerboseLogging = 3
 
 posix = require "posix"
 socket = require "socket"
@@ -2763,6 +2763,36 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 		DLog("  mode=", mode)
 		DLog("  unassociateList=", unassociateList)
 		DLog("  associateList=", associateList)
+		if mode.sceneControllable and SCObj.HasCooperConfiguration then
+			-- Special Cooper RFWC5 configuration for non-scene controllable devices. "Cooper configuration"
+			-- See http://www.cd-jackson.com/zwave_device_uploads/14/c57bf0c8-b86d-4b6c-bb23-706ee28885ad.pdf
+			-- First set association for non-scene-capable devices and set the configuration for that button to the level within the 5 second time-out.
+			-- Then set associations with scene-capable devices (including the controller) but wait for the 5-second timeout.
+			local sceneList = {}
+			local levels = {}
+			for k, v in pairs(associateList) do
+				if v.dimmingDuration then
+					sceneList[k] = v
+				else
+					if not levels[v.level] then
+						levels[v.level] = true
+						local list = {}
+						for k2, v2 in pairs(associateList) do
+							if not v2.dimmingDuration then
+								if v2.level == v.level then
+									list[k2] = true;
+								end
+							end
+						end
+						AssociateDevice(zwave_dev_num, list, groupId, groupId, 1, 0)
+						SetConfigurationOption("CooperConfiguration", zwave_dev_num, node_id, physicalButton, v.level, param.SCENE_CTRL_AssociationDelay)
+					end
+				end
+			end
+			associateList = sceneList
+			DLog("  Aftern non-scene capable cooper configuration, remaining scene-capable associateList=", associateList)
+		end
+
 		if force or zWaveSceneId ~= prevZWaveSceneId then
 			-- Set on scene controller configuration, group id, sceneid
 			EnqueueZWaveMessage("SetSceneControllerConfig_On("..tostring(physicalButton)..","..zWaveSceneId..")"..node_id, node_id,  "0x2d 0x01 "..SceneControllerConfGroupId.." "..zWaveSceneId.." 0xFF", zwave_dev_num, param.SCENE_CTRL_SceneControllerConfDelay)
@@ -2818,39 +2848,8 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 			UnassociateDevice(zwave_dev_num, unassociateList, offGroupId, offGroupId, 1, param.SCENE_CTRL_AssociationDelay) -- Unassociate activate with everything
 		end
 		
-		if SCObj.HasCooperConfiguration then
-			-- Special Cooper RFWC5 configuration
-			-- First set associations with scene-capable devices (including the controller) but wait for the 5-second timeout.
-			-- Then set association for non-scene-capable devices and set the configuration for that button to the level within the 5 second time-out.
-			local sceneList = {}
-			for k, v in pairs(associateList) do 
-				if v.dimmingDuration then
-					sceneList[k] = true
-				end
-			end
-			AssociateDevice(zwave_dev_num, sceneList, groupId, groupId, 1, 5000)
-			local levels = {}
-			for k, v in pairs(associateList) do
-				if not v.dimmingDuration then
-					if not levels[v.level] then
-						levels[v.level] = true
-						local list = {}
-						for k2, v2 in pairs(associateList) do
-							if not v2.dimmingDuration then
-								if v2.level == v.level then
-									list[k2] = true;
-								end
-							end
-						end
-						AssociateDevice(zwave_dev_num, list, groupId, groupId, 1, 0)
-						SetConfigurationOption("CooperConfiguration", zwave_dev_num, node_id, physicalButton, v.level, param.SCENE_CTRL_AssociationDelay)
-					end
-				end
-			end
-		else
-			-- Regular association. Can associate all devices regardless of level
-			AssociateDevice(zwave_dev_num, associateList, groupId, groupId, 1, param.SCENE_CTRL_AssociationDelay)
-		end
+		-- Regular association. Can associate all devices regardless of level
+		AssociateDevice(zwave_dev_num, associateList, groupId, groupId, 1, param.SCENE_CTRL_AssociationDelay)
 		if offGroupId then
 			AssociateDevice(zwave_dev_num, associateList, offGroupId, offGroupId, 1, param.SCENE_CTRL_AssociationDelay)
 		end	-- if SCObj.HasOffScenes
