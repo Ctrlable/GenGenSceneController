@@ -1,5 +1,5 @@
--- Installer for GenGeneric Scene Controller Version 1.03
--- Copyright 2016 Gustavo A Fernandez. All Rights Reserved
+-- Installer for GenGeneric Scene Controller Version 1.04
+-- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 --
 -- Includes installation files for
 --   Evolve LCD1
@@ -121,7 +121,7 @@ function UpdateFileWithContent(filename, content, permissions, version)
 			end
 		else
 			if oldversion > version then
-				verbose("Not updating " .. filename .. " because the old version is " .. oldversion .. " and the new version is " .. newversion)
+				verbose("Not updating " .. filename .. " because the old version is " .. oldversion .. " and the new version is " .. version)
 			else
 				verbose("Not updating " .. filename .. " because the new content is " .. #content .. " bytes and the old is " .. stat.size .. " bytes.")
 			end

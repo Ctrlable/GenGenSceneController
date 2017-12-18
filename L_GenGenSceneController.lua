@@ -1,5 +1,5 @@
--- GenGeneric Scene Controller Version 1.03
--- Copyright 2016 Gustavo A Fernandez. All Rights Reserved
+-- GenGeneric Scene Controller Version 1.04
+-- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
 -- VerboseLogging == 0: important logs and errors:    ELog, log
@@ -44,7 +44,7 @@ Devices = {
 		DeviceXml               = "D_EvolveLCD1.xml",
 		OldServiceId            = "urn:gengen_mcv-org:serviceId:EvolveLCD1",
 		OldParamPrefix          = "LCD",
-		ScreenList              = {C=6,T=6,P=41},
+		ScreenList              = {C=9,T=9,P=41},
 		NumTemperatureScreens   = 3, -- Preset Pages 8, 16, and 40
 		-- The "Large" font is actually narrower than the small font and can thus fit more characters per line.
 		-- However two lines of the small font can fit in one line of the large font.
@@ -135,6 +135,11 @@ Devices = {
 			GetTuningParameter("SceneControllerConfDelay", 375 , zwave_dev_num)
 		end,
 
+		DoDeviceConfiguration = function(peer_dev_num, node_id)
+			-- Enable fan mode control on button 3.
+			SetConfigurationOption("FanModeControl", peer_dev_num, node_id, 36, 1)
+		end,
+
 		SetDefaultLabels = function(peer_dev_num)
 			local labels = {"One", "Two", "Three", "Four", "Five",
 							"Six", "Seven", "Eight", "Nine", "Ten",
@@ -167,8 +172,14 @@ Devices = {
 			return button, button + 5
 		end,
 
-		SetButtonType = function(peer_dev_num, node_id, physicalButton, newType)
-			SetConfigurationOption("SetButtonType", peer_dev_num, node_id, physicalButton, newType)
+		SetButtonType = function(peer_dev_num, node_id, physicalButton, newType, force, oldType)
+			local delay = 0
+			if physicalButton >= 2 and physicalButton <= 4 and (newType == 3 or oldType == 3 or force) then -- Thermostat mode
+				delay = 300
+			end
+			if force or oldType ~= newType then
+				SetConfigurationOption("SetButtonType", peer_dev_num, node_id, physicalButton, newType, delay)
+			end
 		end,
 
 		ScreenPage = function(screen)
@@ -204,7 +215,7 @@ Devices = {
 		   	SetConfigurationOption("SetPresetLanguage", peer_dev_num, node_id, 16, language)
 		end,
 
-		SetBackLight = function(peer_dev_num, blackLightOn)
+		SetBacklight = function(peer_dev_num, blackLightOn)
 			local node_id = GetZWaveNode(peer_dev_num)
 			local level = 0
 			if blackLightOn then
@@ -240,6 +251,8 @@ Devices = {
 					N=0,  -- Switch Screen
 					H=3,  -- Temperature
 					W=0,  -- Welcome
+					P=0,  -- Thermostat Operating mode
+					E=0,  -- Thermostat Energy mode
 		},
 
 		-- Convert a mode object to a mode type.
@@ -292,6 +305,9 @@ Devices = {
 			GetTuningParameter("SceneControllerConfDelay", 0             , zwave_dev_num)
 		end,
 
+		DoDeviceConfiguration = function(peer_dev_num, node_id)
+		end,
+
 		SetDefaultLabels = function(peer_dev_num)
 			-- Empty if not HasScreen
 		end,
@@ -304,7 +320,7 @@ Devices = {
 			return button, nil
 		end,
 
-		SetButtonType = function(peer_dev_num, node_id, physicalButton, newType)
+		SetButtonType = function(peer_dev_num, node_id, physicalButton, newType, force, oldType)
 			-- TODO: Can we switch between momentary and toggle?
 		end,
 
@@ -321,7 +337,7 @@ Devices = {
 			-- empty if not HasPresetLanguages
 		end,
 
-		SetBackLight = function(peer_dev_num, blackLightOn)
+		SetBacklight = function(peer_dev_num, blackLightOn)
 			-- empty if no backlight
 		end,
 
@@ -343,6 +359,8 @@ Devices = {
 					N=0,  -- Switch Screen
 					H=3,  -- Temperature
 					W=0,  -- Welcome
+					P=0,  -- Thermostat Operating mode
+					E=0,  -- Thermostat Energy mode
 		},
 
 		-- Convert a mode object to a mode type.
@@ -484,8 +502,9 @@ Device 45=Nexia One Touch Scene Controller Z-Wave ----+   ¦    ¦   ¦    ¦    ¦
 --]==]
 							  "06 01 04 01 \\1 01 XX 01 05 00 \\1 \\2 00 XX 01 09 00 04 00 " .. string.format("%02X", node_id) .. " 03 85 06 01 XX",
 							  DummyCallback, 
-							  false, -- not oneShot,
-							  0) -- no timeout)
+							  false, -- not oneShot
+							  0, -- no timeout
+							  "NexiaBypass1")
 
 			MonitorZWaveData( true, -- outgoing
 							  nil, -- No arm data
@@ -549,7 +568,11 @@ Flags = List Mode | Group Count=1 ---------------------------------------+   ¦  
 							  "06 01 04 01 \\1 01 XX 01 05 00 \\1 \\2 00 XX 01 10 00 04 00 " .. string.format("%02X", node_id) .. " 0A 59 04 81 01 00 00 01 00 00 00 XX",
 							  DummyCallback, 
 							  false, -- not oneShot,
-							  0) -- no timeout)
+							  0, -- no timeout
+							  "NexiaBypass2")
+		end,
+
+		DoDeviceConfiguration = function(peer_dev_num, node_id)
 		end,
 
 		SetDefaultLabels = function(peer_dev_num)
@@ -574,8 +597,11 @@ Flags = List Mode | Group Count=1 ---------------------------------------+   ¦  
 			return button + 1, nil
 		end,
 
-		SetButtonType = function(peer_dev_num, node_id, physicalButton, newType)
-			SetConfigurationOption("SetButtonType", peer_dev_num, node_id, physicalButton + 1, newType)
+		SetButtonType = function(peer_dev_num, node_id, physicalButton, newType, force, oldType)
+			DEntry("SetButtonType")
+			if force or oldType ~= newType then
+				SetConfigurationOption("SetButtonType", peer_dev_num, node_id, physicalButton + 1, newType)
+			end
 		end,
 
 		ScreenPage = function(screen)
@@ -591,7 +617,7 @@ Flags = List Mode | Group Count=1 ---------------------------------------+   ¦  
 			-- No language support
 		end,
 
-		SetBackLight = function(peer_dev_num, blackLightOn)
+		SetBacklight = function(peer_dev_num, blackLightOn)
 			-- TODO - Is there a way to trigger the backlight?
 		end,
 
@@ -617,6 +643,8 @@ Flags = List Mode | Group Count=1 ---------------------------------------+   ¦  
 					N=1,  -- Switch Screen
 					H=4,  -- Temperature
 					W=1,  -- Welcome
+					P=1,  -- Thermostat Operating mode
+					E=1,  -- Thermostat Energy mode
 		},
 
 		-- Convert a mode object to a mode type.
@@ -649,14 +677,22 @@ SID_FANMODE        = "urn:upnp-org:serviceId:HVAC_FanOperatingMode1"
 SID_USERMODE       = "urn:upnp-org:serviceId:HVAC_UserOperatingMode1"
 SID_SWITCHPOWER    = "urn:upnp-org:serviceId:SwitchPower1"
 SID_TEMPSENSOR     = "urn:upnp-org:serviceId:TemperatureSensor1"
+SID_TEMPSETPOINT   = "urn:upnp-org:serviceId:TemperatureSetpoint1"
 SID_COOLSETPOINT   = "urn:upnp-org:serviceId:TemperatureSetpoint1_Cool"
 SID_HEATSETPOINT   = "urn:upnp-org:serviceId:TemperatureSetpoint1_Heat"
+SID_HVACOPSTATE    = "urn:micasaverde-com:serviceId:HVAC_OperatingState1"
+
+HVACOPSTATE_VAR     = "ModeState"
+HVACOPSTATE_IDLE    = "Idle"
+HVACOPSTATE_HEATING = "Heating"
+HVACOPSTATE_COOLING = "Cooling"
 
 ACTUATOR_CONF	   = "SceneActuatorConf"
 CURRENT_INDICATOR  = "CurrentIndicator"
 CURRENT_SCREEN     = "CurrentScreen"
 FANMODE_AUTO       = "Auto"
 FANMODE_ON         = "ContinuousOn"
+FANMODE_CYCLE	   = "PeriodicOn"
 FANMODE_VAR        = "Mode"
 NUMLINES_VAR       = "NumLines"
 PRESET_LANGUAGE    = "PresetLanguage"
@@ -664,12 +700,16 @@ RETURN_ROUTES      = "ReturnRoutes"
 SCROLLOFFSET_VAR   = "ScrollOffset"
 SETPOINT_TARG      = "SetpointTarget"
 SETPOINT_VAR       = "CurrentSetpoint"
+ALLSETPOINTS_VAR   = "AllSetpoints"
 TEMPSENSOR_VAR     = "CurrentTemperature"
 USERMODE_VAR       = "ModeStatus"
 USERMODE_AUTO      = "AutoChangeOver"
 USERMODE_COOL      = "CoolOn"
 USERMODE_HEAT      = "HeatOn"
 USERMODE_OFF       = "Off"
+ENERGYMODE_VAR     = "EnergyModeStatus"
+ENERGYMODE_NORMAL  = "Normal"
+ENERGYMODE_SAVING  = "EnergySavingsMode"
 
 SIGUSR2 = 17  -- Vera posix library does not define this - MIPS-specific value
 
@@ -713,6 +753,7 @@ local TaskHandleList = {}
 local ResponseContextList = {}
 local ResponseContextNum = 0
 local lastChangedModes = {}
+local temperatureAutoChoices = {}
 
 --
 -- Debugging functions
@@ -737,29 +778,30 @@ function stackDepthIndent()
 	return str
 end
 
-function getFunctionInfo(level)
+function getFunctionInfo(level,name)
     local info = debug.getinfo(level, "n")
-	local name
-	if info and info.name then
-		name = info.name
-	else
-		info = debug.getinfo(level)
-		if info then
-		    name = "unknown [line " .. tostring(info.currentline-1).."]"
-			local s2 = string.gsub(info.source,"[^\n]*\n", "", info.currentline-2)
-			if s2 then
-				local s3 = string.match(s2, "[^\n]*")
-				if s3 then
-					local s4 = string.match(s3, "function%s*([%w_]+)")
-					if s4 then
-						name = s4
-					else
-						name = s3
+	if not name then
+		if info and info.name then
+			name = info.name
+		else
+			info = debug.getinfo(level)
+			if info then
+			    name = "unknown [line " .. tostring(info.currentline-1).."]"
+				local s2 = string.gsub(info.source,"[^\n]*\n", "", info.currentline-2)
+				if s2 then
+					local s3 = string.match(s2, "[^\n]*")
+					if s3 then
+						local s4 = string.match(s3, "function%s*([%w_]+)")
+						if s4 then
+							name = s4
+						else
+							name = s3
+						end
 					end
 				end
+			else
+				name = "unknown"
 			end
-		else
-			name = "unknown"
 		end
 	end
 	local str = name.."("
@@ -815,9 +857,9 @@ function DLog(...)
   end
 end
 
-function DEntry()
+function DEntry(name)
   if VerboseLogging > 0 then
-    luup.log(GetDeviceName() .. "   debug: " .. stackDepthIndent() .. getFunctionInfo(3))
+    luup.log(GetDeviceName() .. "   debug: " .. stackDepthIndent() .. getFunctionInfo(3,name))
   end
 end
 
@@ -827,9 +869,9 @@ function VLog(...)
   end
 end
 
-function VEntry()
+function VEntry(name)
   if VerboseLogging > 2 then
-    luup.log(GetDeviceName() .. "   debug: " .. stackDepthIndent() .. getFunctionInfo(3))
+    luup.log(GetDeviceName() .. "   debug: " .. stackDepthIndent() .. getFunctionInfo(3,name))
   end
 end
 
@@ -1167,7 +1209,7 @@ function EnqueueZWaveMessageWithResponse(name, node_id, data, delay, pattern, ca
   local context
   if callback then
     ResponseContextNum = ResponseContextNum + 1
-  	context = "R" .. node_id .. "_" .. ResponseContextNum
+  	context = "R_" .. name .. "_" .. node_id .. "_" .. ResponseContextNum
   	ResponseContextList[context] = {incoming=true, callback=callback, oneshot=oneshot, releaseNodeId=node_id}
   end
   EnqueueActionOrMessage({
@@ -1209,26 +1251,18 @@ end
 -- Timeout and delay are in milliseconds.
 --   If timeout is 0 then the monitor will be active until canceled with CancelZWaveMonitor
 -- Returns a context which can be passed to CancelZWaveMonitor or nil if error.
-function MonitorZWaveData(outgoing, arm_regex, intercept_regex, autoResponse, callback, owneshot, timeout)
+function MonitorZWaveData(outgoing, arm_regex, intercept_regex, autoResponse, callback, owneshot, timeout, label)
 	VEntry()
   	local peer_dev_num
   	local context
-  	if type(callback) == "function" then
-    	peer_dev_num = GetPeerDevNum(luup.device)
-  		ResponseContextNum = ResponseContextNum + 1
-  		local prefix = "M"
-  		if outgoing then
-	  		prefix = "I"
-    	end
-    	context = prefix .. peer_dev_num.."_"..ResponseContextNum
-  		ResponseContextList[context] = {outgoing=outgoing, callback=callback, oneshot=oneshot}
-	elseif type(callback) == "string" then
-		peer_dev_num = GetFirstPeer()
-		context = "_" .. callback
-	else
-		ELog("MonitorZWaveData: Invalid callback: ", callback)
-		return
+	peer_dev_num = GetPeerDevNum(luup.device)
+	ResponseContextNum = ResponseContextNum + 1
+	local prefix = "M_"
+	if outgoing then
+  		prefix = "I_"
 	end
+	context = prefix .. label .. "_" .. peer_dev_num.."_"..ResponseContextNum
+	ResponseContextList[context] = {outgoing=outgoing, callback=callback, oneshot=oneshot}
   	local result, errcode, errmessage
   	if outgoing then
     	result, errcode, errmessage = zwint.intercept(peer_dev_num, context, intercept_regex, owneshot, timeout, arm_regex, autoResponse)
@@ -2017,7 +2051,9 @@ Device 10=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦   
 		                 "^01 .. 00 04 (..) " .. string.format("%02X", zwave_node) .. " .. 2B 01 (..) (..)", -- Main RegEx
 		                 "06", -- ACK response,
 		                 SceneActivatedMonitorCallback,
-		                 false, 0) -- OneShot, timeout
+		                 false, -- Not OneShot
+		                 0, -- no timeout
+						 "SceneActivate")
 
 
 --[==[
@@ -2040,7 +2076,9 @@ Device 10=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦
 		                 "^01 .. 00 04 (..) " .. string.format("%02X", zwave_node) .. " .. 20 01 (..)", -- Main RegEx
 		                 "06", -- ACK response,
 		                 BasicSetMonitorCallback,
-		                 false, 0) -- OneShot, timeout
+		                 false, -- Not OneShot
+		                 0, -- no timeout
+						 "BasicSet")
 
 --[==[
                                                  C1
@@ -2061,7 +2099,59 @@ SWITCH_MULTILEVEL_STOP_LEVEL_CHANGE -------------------------------+    ¦
 		                 "^01 .. 00 04 (..) " .. string.format("%02X", zwave_node) .. " .. 26 05", -- Main RegEx
 		                 "06", -- ACK response,
 		                 MultiLevelSwitchStopLevelChangeMonitorCallback,
-		                 false, 0) -- OneShot, timeout
+		                 false, -- Not OneShot
+		                 0, -- no timeout
+						 "MultilevelStop")
+
+--[==[
+                                                     C1               C2  C3   C4
+42      01/14/17 10:23:29.612   0x1 0xb 0x0 0x4 0x8 0xb 0x5 0x43 0x1 0x1 0x9 0x3f 0x83 (#######C###?#) 
+           SOF - Start Of Frame --+   ¦   ¦   ¦   ¦   ¦   ¦    ¦   ¦   ¦   ¦    ¦    ¦
+                    length = 11 ------+   ¦   ¦   ¦   ¦   ¦    ¦   ¦   ¦   ¦    ¦    ¦
+                        Request ----------+   ¦   ¦   ¦   ¦    ¦   ¦   ¦   ¦    ¦    ¦
+FUNC_ID_APPLICATION_COMMAND_HANDLER ----------+   ¦   ¦   ¦    ¦   ¦   ¦   ¦    ¦    ¦
+           Receive Status MULTI ------------------+   ¦   ¦    ¦   ¦   ¦   ¦    ¦    ¦
+Device 38=Evolve LCD1 Scene Controller Z-Wave --------+   ¦    ¦   ¦   ¦   ¦    ¦    ¦
+                Data length = 5 --------------------------+    ¦   ¦   ¦   ¦    ¦    ¦
+COMMAND_CLASS_THERMOSTAT_SETPOINT -----------------------------+   ¦   ¦   ¦    ¦    ¦
+        THERMOSTAT_SETPOINT_SET -----------------------------------+   ¦   ¦    ¦    ¦
+           SetPoint = Heating 1 ---------------------------------------+   ¦    ¦    ¦
+Level2 = Size=1 | Fahrenheit | Precision=0 --------------------------------+    ¦    ¦
+                     Value = 63 ------------------------------------------------+    ¦
+                    Checksum OK -----------------------------------------------------+
+--]==]
+		MonitorZWaveData(false, -- incoming,
+		                 nil, -- No arm_regex
+		                 "^01 .. 00 04 (..) " .. string.format("%02X", zwave_node) .. " .. 43 01 (..) (..) (..)", -- Main RegEx
+		                 "06", -- ACK response,
+		                 ThermostatSetPointMonitorCallback,
+		                 false, -- Not OneShot
+		                 0, -- no timeout
+						 "ThermostatSetPoint")
+
+--[==[
+                                                     C1               C2
+42      01/14/17 16:32:44.900   0x1 0x9 0x0 0x4 0x8 0xb 0x3 0x44 0x1 0x0 0xb7 (#######D###) 
+           SOF - Start Of Frame --+   ¦   ¦   ¦   ¦   ¦   ¦    ¦   ¦   ¦    ¦
+                     length = 9 ------+   ¦   ¦   ¦   ¦   ¦    ¦   ¦   ¦    ¦
+                        Request ----------+   ¦   ¦   ¦   ¦    ¦   ¦   ¦    ¦
+FUNC_ID_APPLICATION_COMMAND_HANDLER ----------+   ¦   ¦   ¦    ¦   ¦   ¦    ¦
+           Receive Status MULTI ------------------+   ¦   ¦    ¦   ¦   ¦    ¦
+Device 18=Evolve LCD1 Scene Controller Z-Wave --------+   ¦    ¦   ¦   ¦    ¦
+                Data length = 3 --------------------------+    ¦   ¦   ¦    ¦
+COMMAND_CLASS_THERMOSTAT_FAN_MODE -----------------------------+   ¦   ¦    ¦
+        THERMOSTAT_FAN_MODE_SET -----------------------------------+   ¦    ¦
+              Mode = Auto | Low ---------------------------------------+    ¦
+                    Checksum OK --------------------------------------------+
+--]==]
+		MonitorZWaveData(false, -- incoming,
+		                 nil, -- No arm_regex
+		                 "^01 .. 00 04 (..) " .. string.format("%02X", zwave_node) .. " .. 44 01 (..)", -- Main RegEx
+		                 "06", -- ACK response,
+		                 ThermostatFanModeMonitorCallback,
+		                 false, -- Not OneShot
+		                 0, -- no timeout
+						 "ThermostatFanMode")
 
 	end
 	RunZWaveQueue("Init", 0)
@@ -2135,7 +2225,8 @@ Xmit options = ACK | AUTO_ROUTE ------------------------------------+        ¦  
 						"06 01 04 01 \\1 01 XX 01 05 00 \\1 \\3 00 XX",
 						BatteryNoMoreInformationCallback, 
 						true, -- oneShot
-						0) -- no timeout
+						0, -- no timeout
+						"BatteryNoMoreInfo")
 				end
 			else
 				local context = NoMoreInformationContexts[peer_dev_num]
@@ -2878,11 +2969,11 @@ end
 -- This is a variable watch trigger which gets called whenever a device status changes which
 -- may affect the highlighting on the screen. It is called in a call_delay since it may call SendData
 function SceneController_WatchedIndicatorDeviceChanged(device, service, variable, value_old, value_new, context)
-	VEntry()
+	DEntry()
 	if IsVeraPrimaryController() then
 		local ix1, ix2, peer_string, screen = context:find("(%d+),(%w+)")
 		local peer_dev_num = tonumber(peer_string)
-		local curScreen = luup.variable_get(SID_SCENECONTROLLER, CURRENT_SCREEN, peer_dev_num)
+		local curScreen = GetCurrentScreen(peer_dev_num)
 		DLog("SceneController_WatchedIndicatorDeviceChanged: context=", context, " peer_dev_num=", peer_dev_num, " screen=", screen, " curScreen=", curScreen);
 		if not SCObj.HasScreen or curScreen == screen then
 			SetIndicator(peer_dev_num, screen, false, 100)
@@ -3251,15 +3342,14 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 		local prevMode = ParseModeString(prevModeStr)
   		local veraZWaveNode, ZWaveNetworkDeviceId = GetVeraIDs()
 		local onGroupId, offGroupId = SCObj.PhysicalButtonToGroupIds(physicalButton)
+		local associateList = {}
+		local unassociateList = {}
 		if force then
 			UnassociateDevice(zwave_dev_num, nil, onGroupId, onGroupId, 1, 0) -- Unassociate activate with everything
 			if SCObj.HasOffScenes then
 				UnassociateDevice(zwave_dev_num, nil, offGroupId, offGroupId, 1, 0) -- Unassociate activate with everything
 			end
-		end
-		local associateList = {}
-		local unassociateList = {}
-		if not force then
+		else
 			for i = 1, #prevMode do
 				unassociateList[prevMode[i].device] = true;
 			end
@@ -3271,8 +3361,6 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 			else
 				associateList[mode[i].device] = 255
 			end
-		end
-		if not SCObj.HasCooperConfiguration or not mode.sceneControllable then
 		end
 		if force then
 			associateList[ZWaveNetworkDeviceId] = 255
@@ -3292,8 +3380,8 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 				end
 			end
 		end
-		VLog("  prevMode=", prevMode)
-		VLog("  mode=", mode)
+		DLog("  prevMode=", prevMode)
+		DLog("  mode=", mode)
 		if not mode.cooperConfiguration then
 			local peer_dev_num = GetPeerDevNum(zwave_dev_num)
 			if mode.sceneControllable and ((not mode.zWaveSceneId) or (SCObj.HasOffScenes and mode.prefix == "T" and not mode.offZWaveSceneId)) then
@@ -3363,9 +3451,9 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 			end	-- if mode.sceneControllable
 		end -- if not mode.cooperConfiguration
 
-		UnassociateDevice(zwave_dev_num, unassociateList, onGroupId, onGroupId, 1) -- Unassociate activate with everything
+		UnassociateDevice(zwave_dev_num, unassociateList, onGroupId, onGroupId, 1, param.SCENE_CTRL_AssociationDelay) -- Unassociate activate with everything
 		if SCObj.HasOffScenes then
-			UnassociateDevice(zwave_dev_num, unassociateList, offGroupId, offGroupId, 1) -- Unassociate activate with everything
+			UnassociateDevice(zwave_dev_num, unassociateList, offGroupId, offGroupId, 1, param.SCENE_CTRL_AssociationDelay) -- Unassociate activate with everything
 		end
 		
 		if mode.cooperConfiguration then
@@ -3382,22 +3470,15 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 						end
 					end
 					AssociateDevice(zwave_dev_num, list, onGroupId, onGroupId, 1, 0)
-					SetConfigurationOption("CooperConfiguration", zwave_dev_num, node_id, physicalButton, v, param.SCENE_CTRL_AssociationDelay)
+					SetConfigurationOption("CooperConfiguration", zwave_dev_num, node_id, 1, v, param.SCENE_CTRL_AssociationDelay)
 				end
 			end
 		else
 			-- Regular association. Can associate all devices regardless of level
-			AssociateDevice(zwave_dev_num, associateList, onGroupId, onGroupId, physicalButton, param.SCENE_CTRL_AssociationDelay)
+			AssociateDevice(zwave_dev_num, associateList, onGroupId, onGroupId, 1, param.SCENE_CTRL_AssociationDelay)
 		end
 		if SCObj.HasOffScenes then
-			if prevMode.prefix == "T" then
-				UnassociateDevice(zwave_dev_num, unassociateList, offGroupId, offGroupId, 1);
-			end
-			if mode.prefix == "T" then
-				AssociateDevice(zwave_dev_num, associateList, offGroupId, offGroupId, 1)
-			elseif force then
-				AssociateDevice(zwave_dev_num, {[ZWaveNetworkDeviceId]=true}, offGroupId, offGroupId, 1)
-			end
+			AssociateDevice(zwave_dev_num, associateList, offGroupId, offGroupId, 1, param.SCENE_CTRL_AssociationDelay)
 		end	-- if SCObj.HasOffScenes
 	end	-- if force or prevModeStr ~= modeStr
 end
@@ -3446,6 +3527,13 @@ function SetButtonMode(peer_dev_num, prevModeStr, screen, force, temperatureSett
 		else
 			modeStr = "M";
 		end
+		if screen then
+			-- Need to do this here so that code that preModeStr and calls to GetModeStr will be correct later.
+			oldModeStr  = luup.variable_get(SID_SCENECONTROLLER,"Mode_"..screen.."_"..physicalButton,peer_dev_num)
+			if modeStr ~= oldModeStr then
+				luup.variable_set(SID_SCENECONTROLLER, "Mode_"..screen.."_"..physicalButton, modeStr, peer_dev_num)
+			end
+		end
 	elseif numLines > SCObj.NumButtons and
            ((physicalButton == 1 and scrollOffset > 0) or
             (physicalButton == SCObj.NumButtons and scrollOffset < numLines - SCObj.NumButtons)) then
@@ -3462,9 +3550,7 @@ function SetButtonMode(peer_dev_num, prevModeStr, screen, force, temperatureSett
 	end
 	DLog("SetButtonMode: peer_dev_num=", peer_dev_num, " prevModeStr=", prevModeStr, " screen=", screen, " force=", force, " temperatureSettable=", temperatureSettable, " pysicalButton=", physicalButton,
 	     " oldType=", oldType, " modeStr=", modeStr, " newType=", newType, " NumLines=", numLines, " scrollOffset=", scrollOffset, " virtualButton=", virtualButton, " state=",state)
-	if force or oldType ~= newType then
-		SCObj.SetButtonType(peer_dev_num, node_id, physicalButton, newType)
-	end
+	SCObj.SetButtonType(peer_dev_num, node_id, physicalButton, newType, force, oldType)
 	UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevModeStr, modeStr, physicalButton, virtualButton+(state-1)*1000)
 end
 
@@ -3512,43 +3598,73 @@ function SceneController_UpdateCustomLabel(peer_dev_num, screen, virtualButton, 
 	end
 end
 
+local UserModeMap = {
+	[USERMODE_HEAT]={label="Heat", next=USERMODE_COOL},
+	[USERMODE_COOL]={label="Cool", next=USERMODE_AUTO},
+	[USERMODE_AUTO]={label="Auto", next=USERMODE_OFF},
+	[USERMODE_OFF] ={label="Off",  next=USERMODE_HEAT}
+}
+
+local EnergyModeMap = {
+	[ENERGYMODE_NORMAL]={label="Normal", next=ENERGYMODE_SAVING},
+	[ENERGYMODE_SAVING]={label="Energy Saving", next=ENERGYMODE_NORMAL}
+}
+
 function ChooseLabelFontAndAlign(peer_dev_num, screen, line, virtualButton, stateOverride, labels, fonts, aligns)
-	if not SCObj.HasScreen then
-		return 1
-	end
-	local modeStr = luup.variable_get(SID_SCENECONTROLLER,"Mode_"..screen.."_"..virtualButton,peer_dev_num)
-	if modeStr == nil then
-		modeStr = SCObj.DefaultModeString
-	end
-	local mode = ParseModeString(modeStr)
-	if mode.prefix >= "2" and mode.prefix <= "9" then
-		local states = tonumber(mode.prefix)
-		if stateOverride ~= nil then
-			if stateOverride < 1 then
-				stateOverride = states
-			elseif stateOverride > states then
-			    stateOverride = 1
+	if SCObj.HasScreen then
+		local modeStr = luup.variable_get(SID_SCENECONTROLLER, "Mode_" .. screen .. "_" .. virtualButton, peer_dev_num)
+		if modeStr == nil then
+			modeStr = SCObj.DefaultModeString
+		end
+		local mode = ParseModeString(modeStr)
+		local label, font, align
+		if mode.prefix == "P" or mode.prefix == "E" then
+			local temperatureDevice = luup.variable_get(SID_SCENECONTROLLER, "TemperatureDevice_"  .. screen, peer_dev_num);
+			if temperatureDevice and temperatureDevice ~= "0" then
+				temperatureDevice = tonumber(temperatureDevice)
+				if mode.prefix == "P" then	
+					local userMode = luup.variable_get(SID_USERMODE, USERMODE_VAR, temperatureDevice)
+					if userMode and UserModeMap[userMode] then
+						label = UserModeMap[userMode].label
+					end
+				else
+					local energyMode = luup.variable_get(SID_USERMODE, ENERGYMODE_VAR, temperatureDevice)
+					if energyMode and EnergyModeMap[energyMode] then
+						label = EnergyModeMap[energyMode].label
+					end
+				end
 			end
 		else
-			stateOverride = ChooseBestFromMultiState(peer_dev_num, screen, virtualButton, mode)
+			if mode.prefix >= "2" and mode.prefix <= "9" then
+				local states = tonumber(mode.prefix)
+				if stateOverride ~= nil then
+					if stateOverride < 1 then
+						stateOverride = states
+					elseif stateOverride > states then
+					    stateOverride = 1
+					end
+				else
+					stateOverride = ChooseBestFromMultiState(peer_dev_num, screen, virtualButton, mode)
+				end
+				virtualButton = virtualButton + ((stateOverride-1) * 1000)
+			end
+			label = luup.variable_get(SID_SCENECONTROLLER,"Label_"..screen.."_"..virtualButton,peer_dev_num)
+			font = luup.variable_get(SID_SCENECONTROLLER,"Font_"..screen.."_"..virtualButton,peer_dev_num)
+			align = luup.variable_get(SID_SCENECONTROLLER,"Align_"..screen.."_"..virtualButton,peer_dev_num)
 		end
-		virtualButton = virtualButton + ((stateOverride-1) * 1000)
+		if label == nil then
+			label = ""
+		end
+		if font == nil then
+			font = "Normal"
+		end
+		if align == nil then
+			align = "Center"
+		end
+		labels[line] = label;
+		fonts[line] = font;
+		aligns[line] = align;
 	end
-	local label = luup.variable_get(SID_SCENECONTROLLER,"Label_"..screen.."_"..virtualButton,peer_dev_num)
-	if label == nil then
-		label = ""
-	end
-	labels[line] = label;
-	local font = luup.variable_get(SID_SCENECONTROLLER,"Font_"..screen.."_"..virtualButton,peer_dev_num)
-	if font == nil then
-		font = "Normal"
-	end
-	fonts[line] = font;
-	local align = luup.variable_get(SID_SCENECONTROLLER,"Align_"..screen.."_"..virtualButton,peer_dev_num)
-	if align == nil then
-		font = "Center"
-	end
-	aligns[line] = align;
 	return stateOverride
 end
 
@@ -3671,57 +3787,119 @@ function SceneController_SetPresetLanguage(peer_dev_num, language)
 	end
 end
 
-curTemperatureDevice = 0;
+function GetSetPoint(temperatureDevice, isHeat)
+	local sid
+	if isHeat then
+		sid = SID_HEATLSETPOINT
+	else
+		sid = SID_COOLSETPOINT
+	end
+	local setPointString = luup.variable_get(sid, SETPOINT_VAR, temperatureDevice)
+	if not setPointString then
+		local allSetpointString = luup.variable_get(SID_SETPOINT, ALLSETPOINTS_VAR, temperatureDevice)
+		if allSetpointString then
+			local heat, cool, auto = string.match(allSetpointString,"(%d+),(%d+),(%d+)")
+			if isHeat then
+				if heat then
+					setPointString = heat
+				end
+			else
+				if cool then
+					setPointString = cool
+				end
+			end
+		end
+	end 
+	if setPointString then
+		return math.floor(tonumber(setPointString) + 0.5);
+	end
+	return nil
+end
 
-function SetTemperatureLCDParameters(zwave_dev_num, temperatureDevice)
-	local lcd_node_id = GetZWaveNode(zwave_dev_num);
+function SetTemperatureLCDParameters(peer_dev_num, temperatureDevice)
+	DEntry()
+	local lcd_node_id = GetZWaveNode(peer_dev_num);
 
-	local temperatureString = "72" -- Default if no associated temperature device.
+	local temperatureString
 	if temperatureDevice > 0 then
 		temperatureString = luup.variable_get(SID_TEMPSENSOR, TEMPSENSOR_VAR, temperatureDevice)
 	end
-	DEntry()
-	if temperatureString ~= nil then
-		local temperature = math.floor(tonumber(temperatureString) + 0.5);
-		-- COMMAND_CLASS_SENSOR_MULTILEVEL SENSOR_MULTILEVEL_REPORT Sensor Type = Temperature Level = Size=1 | Scale=1 | Precision=0
-		EnqueueZWaveMessage("SetDisplayTemperature", lcd_node_id,  "0x31 0x5 0x1 0x9 ".. temperature, 0)
-	end
+	if not temperatureString then
+		temperatureString = "72" -- Default if no associated temperature device
+	end	
+	local temperature = math.floor(tonumber(temperatureString) + 0.5);
+	-- COMMAND_CLASS_SENSOR_MULTILEVEL SENSOR_MULTILEVEL_REPORT Sensor Type = Temperature Level = Size=1 | Scale=1 | Precision=0
+	EnqueueZWaveMessage("SetLCDTemperature", lcd_node_id,  "0x31 0x5 0x1 0x9 ".. temperature, 0)
 
-	if temperatureDevice == 0 then
-		return
-	end
+	if temperatureDevice > 0 and TemperatureDeviceIsSettable(temperatureDevice) then
+		local userMode = luup.variable_get(SID_USERMODE, USERMODE_VAR, temperatureDevice)
+		local choice, setPoint
+		if userMode == USERMODE_COOL then
+			choice = USERMODE_COOL
+			setPoint = GetSetPoint(temperatureDevice, false)
+		elseif userMode == USERMODE_HEAT then
+			choice = USERMODE_HEAT
+			setPoint = GetSetPoint(temperatureDevice, true)
+		else
+			local coolSetPoint = GetSetPoint(temperatureDevice, false)
+			local heatSetPoint = GetSetPoint(temperatureDevice, true)
+			if coolSetPoint then
+				if heatSetPoint then
+					local coolDiff = (coolSetPoint - temperature) ^ 2
+					local heatDiff = (heatSetPoint - temperature) ^ 2
+					if heatDiff <= coolDiff then
+						choice = USERMODE_HEAT
+						setPoint = heatSetPoint
+					else
+						choice = USERMODE_COOL
+						setPoint = coolSetPoint 
+					end
+				else
+					choice = USERMODE_COOL
+					setPoint = coolSetPoint 
+				end
+			else
+				if heatSetPoint then
+					choice = USERMODE_HEAT
+					setPoint = heatSetPoint
+				end
+			end
+		end
+		if choice then
+			temperatureAutoChoices[peer_dev_num] = choice
+			if setPoint then
+				if choice == USERMODE_COOL then
+					-- COMMAND_CLASS_THERMOSTAT_SETPOINT THERMOSTAT_SETPOINT_REPORT  SetPoint = Cooling 1 Level = Size=1 | Scale=1 | Precision=0
+					EnqueueZWaveMessage("SetLCDSetpointCool", lcd_node_id, "0x43 0x03 0x02 0x9 ".. setPoint, 0)
+				else
+					-- COMMAND_CLASS_THERMOSTAT_SETPOINT THERMOSTAT_SETPOINT_REPORT  SetPoint = Heating 1 Level = Size=1 | Scale=1 | Precision=0
+					EnqueueZWaveMessage("SetLCDSetpointHeat", lcd_node_id, "0x43 0x03 0x01 0x9 ".. setPoint, 0)
+				end
+			end
+		end
 
-	local userMode = luup.variable_get(SID_USERMODE, USERMODE_VAR, temperatureDevice)
-	if userMode == USERMODE_COOL then
-		local coolSetPointString = luup.variable_get(SID_COOLSETPOINT, SETPOINT_VAR, temperatureDevice)
-		if coolSetPointString ~= nil then
-			local coolSetPoint = math.floor(tonumber(coolSetPointString) + 0.5);
-			-- COMMAND_CLASS_THERMOSTAT_SETPOINT THERMOSTAT_SETPOINT_REPORT  SetPoint = Cooling 1 Level = Size=1 | Scale=1 | Precision=0
-			EnqueueZWaveMessage("SetDisplaySetpoint", lcd_node_id, "0x43 0x03 0x02 0x9 ".. coolSetPoint, 0)
-		end
-	elseif userMode == USERMODE_HEAT then
-		local heatSetPointString = luup.variable_get(SID_HEATSETPOINT, SETPOINT_VAR, temperatureDevice)
-		if heatSetPointString ~= nil then
-			local heatSetPoint = math.floor(tonumber(heatSetPointString) + 0.5);
-			-- COMMAND_CLASS_THERMOSTAT_SETPOINT THERMOSTAT_SETPOINT_REPORT  SetPoint = Heating 1 Level = Size=1 | Scale=1 | Precision=0
-			EnqueueZWaveMessage("SetDisplaySetpoint", lcd_node_id, "0x43 0x03 0x01 0x9 ".. heatSetPoint, 0)
-		end
-	else
-		if temperatureString ~= nil then
-			local temperature = math.floor(tonumber(temperatureString) + 0.5);
-			-- COMMAND_CLASS_THERMOSTAT_SETPOINT THERMOSTAT_SETPOINT_REPORT  SetPoint = Heating 1 Level = Size=1 | Scale=1 | Precision=0
-			EnqueueZWaveMessage("SetDisplaySetpoint", lcd_node_id, "0x43 0x03 0x01 0x9 ".. temperature, 0)
-		end
-	end
+		-- COMMAND_CLASS_THERMOSTAT_FAN_MODE  THERMOSTAT_FAN_MODE_SUPPORTED_REPORT
+		-- mode supportd  Z-Wave      LCD1   Vera
+		--  0     1       Auto/Low    Auto   Auto
+		--  1     2       On/Low      Low    Cycle
+		--  2     4       Auto/High
+		--  3     8       On/High     High   On
+		--  4    16       Auto/Medium
+		--  5    32       On/Medium   Medium   
+		local supported = 11 -- upported 1 + 2 + 4 from table above
+		EnqueueZWaveMessage("SetLCDFanModeSupported", lcd_node_id, "0x44 0x5 ".. supported, 0)
 
-	local fanModeString = luup.variable_get(SID_FANMODE, FANMODE_VAR, temperatureDevice)
-	if fanModeString ~= nil then
-		local fanMode = 1
-		if 	fanModeString == FANMODE_AUTO then
-			fanMode = 0
+		local fanModeString = luup.variable_get(SID_FANMODE, FANMODE_VAR, temperatureDevice)
+		if fanModeString ~= nil then
+			local fanMode = 3 -- high
+			if fanModeString == FANMODE_AUTO then
+				fanMode = 0
+			elseif fanModeString == FANMODE_CYCLE then
+				fanMode = 1
+			end
+			-- COMMAND_CLASS_THERMOSTAT_FAN_MODE  THERMOSTAT_FAN_MODE_REPORT
+			EnqueueZWaveMessage("SetLCDFanMode", lcd_node_id, "0x44 0x3 ".. fanMode, 100)
 		end
-		-- COMMAND_CLASS_THERMOSTAT_FAN_MODE  THERMOSTAT_FAN_MODE_REPORT
-		EnqueueZWaveMessage("SetDisplayFanMode", lcd_node_id, "0x44 0x3 ".. fanMode, 0)
 	end
 end
 
@@ -3826,154 +4004,38 @@ end
 
 -- This is called by the GUI to change the thermostat associated with this controller.
 function SceneController_UpdateTemperatureDevice(peer_dev_num, screen, temperatureDevice)
+	DEntry()
 	if SCObj.HasThremostatControl and IsVeraPrimaryController() then
-		DEntry()
-		local curTemperatureDevice = luup.variable_get(SID_SCENECONTROLLER, "TemperatureDevice_"  .. screen, peer_dev_num);
-		curTemperatureDevice = tonumber(curTemperatureDevice)
-		luup.variable_set(SID_SCENECONTROLLER, "TemperatureDevice_"  .. screen, temperatureDevice,  peer_dev_num)
-		local currentScreen = luup.variable_get(SID_SCENECONTROLLER, CURRENT_SCREEN, peer_dev_num);
 		temperatureDevice = tonumber(temperatureDevice);
+		local curTemperatureDevice = luup.variable_get(SID_SCENECONTROLLER, "TemperatureDevice_"  .. screen, peer_dev_num);
 		DLog("Previous temperature device = ", curTemperatureDevice);
-		if currentScreen == screen and curTemperatureDevice ~= temperatureDevice then
-			local zwave_node_id, zwave_dev_num = GetZWaveNode(peer_dev_num);
-			if curTemperatureDevice then
-				UnassociateDevice(zwave_dev_num, {[curTemperatureDevice]=true}, 2, 4, 1);
+		curTemperatureDevice = tonumber(curTemperatureDevice)
+		if temperatureDevice ~= curTemperatureDevice then
+			luup.variable_set(SID_SCENECONTROLLER, "TemperatureDevice_"  .. screen, temperatureDevice,  peer_dev_num)
+			local currentScreen = luup.variable_get(SID_SCENECONTROLLER, CURRENT_SCREEN, peer_dev_num);
+			if currentScreen == screen then
+				SetTemperatureLCDParameters(peer_dev_num, temperatureDevice);
 			end
-			SetTemperatureLCDParameters(zwave_dev_num, temperatureDevice);
-			AssociateDevice(zwave_dev_num, {[temperatureDevice]=true}, 2, 4, 1);
-			curTemperatureDevice = temperatureDevice
 		end
 		RunZWaveQueue("UpdateTemperatureDevice", 0);
 	end
 end
 
-RedrawCustomTemperatureScreenRecursion = 0;
-
 -- A work-around for the "bug" which clears rows 1 and 5 of a custom temperature screen
-function TemperatureDeviceChanged(temperatureDevice, service, variable, old_val, new_val)
+function SceneController_TemperatureDeviceChanged(temperatureDevice, service, variable, old_val, new_val, context)
 	DEntry()
-	local peer_dev_num = EvolveSCENE_CTRL_peer_dev_num;
-	if RedrawCustomTemperatureScreenRecursion > 0 then
-		DLog("TemperatureDeviceChanged returning quickly");
+	local peer_dev_num = tonumber(context)
+	local screen = luup.variable_get(SID_SCENECONTROLLER, CURRENT_SCREEN, peer_dev_num)
+	if not screen then
 		return
 	end
-	local screen = luup.variable_get(SID_SCENECONTROLLER, CURRENT_SCREEN, peer_dev_num)
 	local prefix = screen:sub(1,1)
 	if prefix ~= "T" then
 		return
 	end
-	RedrawCustomTemperatureScreenRecursion=1;
-
-	SetScreenTimeout(peer_dev_num, screen, true);
-	TemperatureDeviceChanged2(1, peer_dev_num, temperatureDevice, service, variable, old_val, new_val)
-end
-
--- The second part of the custom temperature redraw hack is done in a
--- deferred task since it calls sendData. It must be called recursively
--- several times with call_delay in order to avoid a luaupnp "Failed to get lock" error.
-function TemperatureDeviceChanged2(part, peer_dev_num, temperatureDevice, service, variable, old_val, new_val)
-	DEntry()
-	local lcd_node_id, lcd_dev_num = GetZWaveNode(peer_dev_num);
-	local redraw = true;
-	local userMode = luup.variable_get(SID_USERMODE, USERMODE_VAR, temperatureDevice)
-	local newHeatSetPoint = nil
-	local newCoolSetPoint = nil
-
-	if service == SID_HEATSETPOINT and variable == SETPOINT_VAR then
-		-- Evolve LCD1 will send HEAT SETPOINT SET commands to the thermostat even though it is a cool
-		-- setpoint. As such, we need to remember the old heat setpoint and set the
-		-- cool setpoint to the "new" heat setpoint.
-		-- If the setpoint is changed using the web GUI, or via a scene, then setpointTarget will equal the cureent heat setpoint
-		-- so we can handle this even if the user changes the heat setpoint in cool mode.
-		-- The user can only change the heat setpoint
-		local target = luup.variable_get(SID_HEATSETPOINT, SETPOINT_TARG, temperatureDevice)
-		local temperatureString = luup.variable_get(SID_TEMPSENSOR, TEMPSENSOR_VAR, temperatureDevice)
-		local temperature = tonumber(temperatureString);
-		local coolSetPointString = luup.variable_get(SID_COOLSETPOINT, SETPOINT_VAR, temperatureDevice)
-		local oldCoolSetPoint = tonumber(coolSetPointString);
-		local oldHeatSetPoint = tonumber(old_val)
-		if target ~= new_val and (userMode == USERMODE_COOL) then
-			EnqueueLuupAction(SID_HEATSETPOINT, temperatureDevice, "SetCurrentSetpoint", {NewCurrentSetpoint = old_val}, 2000)
-			EnqueueLuupAction(SID_COOLSETPOINT, temperatureDevice, "SetCurrentSetpoint", {NewCurrentSetpoint = new_val}, 2000)
-			local lcdSetPoint = math.floor(tonumber(new_val) + 0.5);
-			newCoolSetpoint = lcdSetPoint;
-		else
-			local lcdSetPoint = math.floor(tonumber(new_val) + 0.5);
-			newHeatSetPoint = lcdSetPoint;
-		end
-	end
-
-	if service == SID_USERMODE and variable == USERMODE_VAR then
-		if new_val == USERMODE_COOL then
-			local coolSetpoint_string = luup.variable_get(SID_COOLSETPOINT, SETPOINT_VAR, temperatureDevice)
-			newCoolSetPoint = math.floor(tonumber(coolSetpoint_string) + 0.5);
-		else
-			local heatSetpoint_string = luup.variable_get(SID_HEATSETPOINT, SETPOINT_VAR, temperatureDevice);
-			newHeatSetPoint = math.floor(tonumber(heatSetpoint_string) + 0.5);
-		end
-		redraw = false;
-	end
-
-	if service == SID_TEMPSENSOR and variable == TEMPSENSOR_VAR then
-		local temperature = math.floor(tonumber(new_val) + 0.5);
-		-- COMMAND_CLASS_SENSOR_MULTILEVEL SENSOR_MULTILEVEL_REPORT Sensor Type = Temperature Level = Size=1 | Scale=1 | Precision=0
-		EnqueueZWaveMessage("SetDisplayTemperature", lcd_node_id, "0x31 0x5 0x1 0x9 ".. temperature, 2000)
-	end
-
-	if service == SID_FANMODE and variable == FANMODE_VAR then
-		local fanMode = 1
-		if 	new_val == FANMODE_AUTO then
-			fanMode = 0
-		end
-		-- COMMAND_CLASS_THERMOSTAT_FAN_MODE  THERMOSTAT_FAN_MODE_REPORT
-		EnqueueZWaveMessage("SetDisplayFanMode", lcd_node_id, "0x44 0x3 ".. fanMode, 2000)
-	end
-
-	RedrawCustomTemperatureScreenRecursion = 0;
-
-	if redraw then
-		local screen = luup.variable_get(SID_SCENECONTROLLER, CURRENT_SCREEN, peer_dev_num)
-		local suffix = screen:sub(2)
-		local screenNum = tonumber(suffix)
-		if screenNum > SCObj.NumTemperatureScreens then
-			local labels = {};
-			local fonts = {};
-			local aligns = {};
-			for i = 1, SCObj.NumButtons, SCObj.NumButtons-1 do
-				label = luup.variable_get(SID_SCENECONTROLLER,"Label_"..screen.."_"..i,peer_dev_num)
-				if label == nil then
-					label = ""
-				end
-				labels[i] = label
-				local font = luup.variable_get(SID_SCENECONTROLLER,"Font_"..screen.."_"..i,peer_dev_num)
-				if font == nil then
-					font = "Normal"
-				end
-				fonts[i] = font;
-				local align = luup.variable_get(SID_SCENECONTROLLER,"Align_"..screen.."_"..i,peer_dev_num)
-				if align == nil then
-					font = "Center"
-				end
-				aligns[i] = align;
-			end
-			EVLCDWrapStrings(labels, fonts, aligns, lcd_node_id, lcd_dev_num, 1, SCObj.NumButtons, SCREEN_MD.NoChange)
-		end
-	end
-
-	if newCoolSetPont ~= nil then
-		TemperatureDeviceChanged3(peer_dev_num, newCoolSetPoint, 2, temperatureDevice)
-	elseif newHeatSetPoint ~= nil then
-		TemperatureDeviceChanged3(peer_dev_num, newHeatSetPoint, 1, temperatureDevice)
-	end
-end
-
-function TemperatureDeviceChanged3(peer_dev_num, setpoint, heatOrCool,temperatureDevice)
-	DEntry()
-	local lcd_node_id, lcd_dev_num = GetZWaveNode(peer_dev_num);
-	UnassociateDevice(zwave_dev_num, {[temperatureDevice]=true}, 2, 4, 1);
-	-- COMMAND_CLASS_THERMOSTAT_SETPOINT THERMOSTAT_SETPOINT_REPORT  SetPoint = Heating 1 Level = Size=1 | Scale=1 | Precision=0
-	EnqueueZWaveMessage("SetDisplaySetpoint", lcd_node_id, "0x43 0x03 1 0x9 ".. setpoint, 0)
-	AssociateDevice(zwave_dev_num, {[temperatureDevice]=true}, 2, 4, 1);
+	local screenNum = tonumber(screen:sub(2))
+	SetTemperatureScreen(peer_dev_num, screenNum, false, false, false)
+	RunZWaveQueue("TemperatureDeviceChanged", 0)
 end
 
 function TemperatureDeviceIsSettable(temperatureDevice)
@@ -4012,7 +4074,6 @@ function SetTemperatureScreen(peer_dev_num, screenNum, doTimeout, forceClear, in
 	local lcdPage = SCObj.ScreenPage(screen);
 	local prevScreen = luup.variable_get(SID_SCENECONTROLLER, CURRENT_SCREEN, peer_dev_num)
 	local prevNumLines, prevScrollOffset
-	DEntry()
 	if prevScreen == nil then
 		prevScreen = "";
 		prevNumLines, prevScrollOffset = SCObj.NumButtons, 0
@@ -4020,9 +4081,9 @@ function SetTemperatureScreen(peer_dev_num, screenNum, doTimeout, forceClear, in
 		indicatorOnly = false;
 	else
 		prevNumLines, prevScrollOffset = GetNumLinesAndScrollOffset(peer_dev_num, prevScreen)
-		prevLcdPage = SCObj.ScreenPage(prevScreen);
 	end
-	local prevLcdPage = 0
+	local prevLcdPage = SCObj.ScreenPage(prevScreen);
+	DEntry("SetTemperatureScreen")
 
 	local temperatureDevice = luup.variable_get(SID_SCENECONTROLLER, "TemperatureDevice_"  .. screen, peer_dev_num)
 	if temperatureDevice == nil then
@@ -4031,18 +4092,14 @@ function SetTemperatureScreen(peer_dev_num, screenNum, doTimeout, forceClear, in
 	temperatureDevice = tonumber(temperatureDevice);
 	local settable = TemperatureDeviceIsSettable(temperatureDevice)
 
-	SetTemperatureLCDParameters(zwave_dev_num, temperatureDevice)
-
-	if forceClear or prevLcdPage ~= lcdPage then
-		SetConfigurationOption("SetTemperatureScreen", peer_dev_num, node_id, 17, lcdPage)
-		luup.sleep(500);
-		prevLcdPage = lcdPage
-	end
+	SetTemperatureLCDParameters(peer_dev_num, temperatureDevice)
 
 	if not indicatorOnly then
 		if screenNum > SCObj.NumTemperatureScreens then
 		    SetIndicatorValue(peer_dev_num, 0, forceClear, 0)
-			ClearScreen(peer_dev_num, node_id)
+			if prevScreen:sub(1,1) ~= "T" then
+				ClearScreen(peer_dev_num, node_id)
+			end
 			local labels = {};
 			local fonts = {};
 			local aligns = {};
@@ -4063,13 +4120,7 @@ function SetTemperatureScreen(peer_dev_num, screenNum, doTimeout, forceClear, in
 			for i = 1, SCObj.NumButtons do
 				local prevModeStr = GetModeStr(peer_dev_num, prevScreen, i+prevScrollOffset)
 				SetButtonMode(peer_dev_num, prevModeStr, screen, forceClear, settable, i);
-				if i > 1 and i < SCObj.NumButtons then
-					luup.sleep(300)
-				end
 			end
-
-			-- Enable fan mode control on button 3.
-			SetConfigurationOption("SetTemperatureScreen", peer_dev_num, node_id, 36, 1)
 
 			local temperatureString = luup.variable_get(SID_TEMPSENSOR, TEMPSENSOR_VAR, temperatureDevice)
 			if temperatureString == nil then
@@ -4077,24 +4128,14 @@ function SetTemperatureScreen(peer_dev_num, screenNum, doTimeout, forceClear, in
 			end
 
 			for i = 1, SCObj.NumButtons, SCObj.NumButtons-1 do
-				label = luup.variable_get(SID_SCENECONTROLLER,"Label_"..screen.."_"..i,peer_dev_num)
-				if label == nil then
-					label = ""
-				end
-				labels[i] = label
-				local font = luup.variable_get(SID_SCENECONTROLLER,"Font_"..screen.."_"..i,peer_dev_num)
-				if font == nil then
-					font = "Normal"
-				end
-				fonts[i] = font;
-				local align = luup.variable_get(SID_SCENECONTROLLER,"Align_"..screen.."_"..i,peer_dev_num)
-				if align == nil then
-					font = "Center"
-				end
-				aligns[i] = align;
+				ChooseLabelFontAndAlign(peer_dev_num, screen, i, i, nil, labels, fonts, aligns)
 			end
 			EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, 1, SCObj.NumButtons, SCREEN_MD.NoChange)
-			--luup.sleep(1000);
+		else
+			for i = 1, SCObj.NumButtons do
+				local prevModeStr = GetModeStr(peer_dev_num, prevScreen, i+prevScrollOffset)
+				SetButtonMode(peer_dev_num, prevModeStr, screen, forceClear, settable, i);
+			end
 		end
 
 		if prevLcdPage ~= lcdPage or forceClear then
@@ -4107,25 +4148,15 @@ function SetTemperatureScreen(peer_dev_num, screenNum, doTimeout, forceClear, in
 	luup.variable_set(SID_SCENECONTROLLER, CURRENT_SCREEN, screen, peer_dev_num)
     SetScreenTimeout(peer_dev_num, screen, doTimeout)
 
-	if (curTemperatureDevice ~= temperatureDevice or forceClear) and not indicatorOnly then
-		DLog("screen=", screen, " curTemperatureDevice=", curTemperatureDevice, " temperatureDevice=", temperatureDevice, " forceClear=", forceClear);
-		UnassociateDevice(zwave_dev_num, {[curTemperatureDevice]=true}, 2, 4, 1);
-		AssociateDevice(zwave_dev_num, {[temperatureDevice]=true}, 2, 4, 1);
-		curTemperatureDevice = temperatureDevice
-	end
-
-	if screenNum > SCObj.NumTemperatureScreens and curTemperatureDevice > 0 then
+	if screenNum > SCObj.NumTemperatureScreens and temperatureDevice > 0 then
 		-- Work-around to redisplay the custom labels if they get cleared
-		EvolveSCENE_CTRL_peer_dev_num = peer_dev_num;
-		DLog("Watching temperature variables for temperatureDevice: ", curTemperatureDevice);
-		if WatchedTemperatureDevices[curTemperatureDevice] == nil then
-			WatchedTemperatureDevices[curTemperatureDevice] = true;
-			luup.variable_watch("TemperatureDeviceChanged", SID_TEMPSENSOR,   TEMPSENSOR_VAR,   curTemperatureDevice)
-			luup.variable_watch("TemperatureDeviceChanged", SID_COOLSETPOINT, SETPOINT_VAR,     curTemperatureDevice)
-			luup.variable_watch("TemperatureDeviceChanged", SID_HEATSETPOINT, SETPOINT_VAR,     curTemperatureDevice)
-			luup.variable_watch("TemperatureDeviceChanged", SID_FANMODE,      FANMODE_VAR,      curTemperatureDevice)
-			luup.variable_watch("TemperatureDeviceChanged", SID_USERMODE,     USERMODE_VAR,     curTemperatureDevice)
-		end
+		DLog("Watching temperature variables for temperatureDevice: ", temperatureDevice);
+		VariableWatch("SceneController_TemperatureDeviceChanged", SID_TEMPSENSOR,   TEMPSENSOR_VAR,   temperatureDevice, tostring(peer_dev_num))
+		VariableWatch("SceneController_TemperatureDeviceChanged", SID_COOLSETPOINT, SETPOINT_VAR,     temperatureDevice, tostring(peer_dev_num))
+		VariableWatch("SceneController_TemperatureDeviceChanged", SID_HEATSETPOINT, SETPOINT_VAR,     temperatureDevice, tostring(peer_dev_num))
+		VariableWatch("SceneController_TemperatureDeviceChanged", SID_FANMODE,      FANMODE_VAR,      temperatureDevice, tostring(peer_dev_num))
+		VariableWatch("SceneController_TemperatureDeviceChanged", SID_USERMODE,     USERMODE_VAR,     temperatureDevice, tostring(peer_dev_num))
+		VariableWatch("SceneController_TemperatureDeviceChanged", SID_USERMODE,     ENERGYMODE_VAR,   temperatureDevice, tostring(peer_dev_num))
 	end
 end
 
@@ -4197,14 +4228,6 @@ function SceneController_ConfiguredChanged(lul_device, lul_service, lul_variable
 			local peer_dev_num = tonumber(peer_dev_num_str)
 			local currentScreen = GetCurrentScreen(peer_dev_num)
 			local prefix = currentScreen:sub(1,1)
-			if prefix == "T" then
-				local temperatureDevice = luup.variable_get(SID_SCENECONTROLLER, "TemperatureDevice_"  .. currentScreen, peer_dev_num)
-				if temperatureDevice == nil then
-					temperatureDevice = 0
-				end
-				temperatureDevice = tonumber(temperatureDevice);
-				AssociateDevice(zwave_dev_num, {[temperatureDevice]=true}, 2, 4, 1)
-			end
 			-- Force all scene actuator configurations to be re-sent eventually.
 			-- We gather up a set of all direct associations and then clear
 			-- the actuator configuration cache for each device associated with this controller.
@@ -4218,11 +4241,8 @@ function SceneController_ConfiguredChanged(lul_device, lul_service, lul_variable
 			for k, v in pairs(associateList) do
 				RemoveDeviceActuatorConfForController(zwave_dev_num, k)
 			end
-			DLog("ConfiguredChanged: calling SetButtonMode. peer_dev_num=", peer_dev_num, " currentScreen=", currentScreen)
-			-- Finally, set the modes for the current screen.
-			for i = 1, SCObj.NumButtons do
-				SetButtonMode(peer_dev_num, "", currentScreen, true, false, i);
-			end
+			SCObj.DoDeviceConfiguration(peer_dev_num, node_id)
+			SetScreen(peer_dev_num, currentScreen, true, true, false)
 		end
 		-- If LuaUPnP does not know how to configure the device, we do it for it.
 		-- and then we set configured to 1 ourselves but don't re-trigger this function
@@ -4253,16 +4273,21 @@ local RECEIVE_STATUS_TYPE_MASK = 0x0C
 local RECEIVE_STATUS_TYPE_SINGLE = 0x00
 local RECEIVE_STATUS_TYPE_BROAD = 0x04
 local RECEIVE_STATUS_TYPE_MULTI = 0x08
-local MAX_DUP_TIME = 0.08 -- seconds
+local RECEIVE_STATUS_TYPE_EXPLORE = 0x10
+local MAX_DUP_TIME = 0.125 -- seconds
+local MAX_EXPLORE_DUP_TIME = 0.40
 function CheckDups(peer_dev_num, time, receiveStatus, data)
 	VEntry()
 	local oldTable = DupData[peer_dev_num]
 	receiveStatus = bit.band(receiveStatus, RECEIVE_STATUS_TYPE_MASK);
 	local result = true
-	if oldTable and oldTable.data == data and time-oldTable.time < MAX_DUP_TIME and
-		(oldTable.receiveStatus == receiveStatus or
-		(oldTable.receiveStatus > RECEIVE_STATUS_TYPE_SINGLE and receiveStatus == RECEIVE_STATUS_TYPE_SINGLE)) then
-		DLog("CheckDups: peer_dev_num=", peer_dev_num, " data=", data, " is a dup")
+	if oldTable and oldTable.data == data and 
+	    ((time-oldTable.time < MAX_DUP_TIME and
+		 (oldTable.receiveStatus == receiveStatus or
+		 (oldTable.receiveStatus > RECEIVE_STATUS_TYPE_SINGLE and receiveStatus == RECEIVE_STATUS_TYPE_SINGLE))) or
+		(time-oldTable.time < MAX_EXPLORE_DUP_TIME and receiveStatus >= RECEIVE_STATUS_TYPE_EXPLORE))  then
+		oldTable.time = time
+		log(ANSI_YELLOW, "peer_dev_num=", peer_dev_num, " data=", data, " timestamp=", time, " is a dup", ANSI_RESET)
 		result = false
 	end
 	DupData[peer_dev_num] = {time=time, receiveStatus=receiveStatus, data=data}
@@ -4273,9 +4298,9 @@ function SceneActivatedMonitorCallback(peer_dev_num, result)
 	DEntry()
 	local time = tonumber(result.time)
 	local receiveStatus = tonumber(result.C1, 16)
-	local zWaveSceneId = tonumber(result.C2, 16)
-	local dimminDuration = tonumber(result.C3, 16)
 	if CheckDups(peer_dev_num, time, receiveStatus, "2B"..result.C2..result.C3) then
+		local zWaveSceneId = tonumber(result.C2, 16)
+		local dimminDuration = tonumber(result.C3, 16)
 		SceneChange(peer_dev_num, true, zWaveSceneId, time)
 	end
 end
@@ -4284,8 +4309,8 @@ function BasicSetMonitorCallback(peer_dev_num, result)
 	DEntry()
 	local time = tonumber(result.time)
 	local receiveStatus = tonumber(result.C1, 16)
-	local setValue = tonumber(result.C2, 16)
 	if CheckDups(peer_dev_num, time, receiveStatus, "20"..result.C2) then
+		local setValue = tonumber(result.C2, 16)
 		SceneChange(peer_dev_num, false, setValue, time)
 	end
 end
@@ -4294,12 +4319,92 @@ function MultiLevelSwitchStopLevelChangeMonitorCallback(peer_dev_num, result)
 	DEntry()
 	local time = tonumber(result.time)
 	local receiveStatus = tonumber(result.C1, 16)
-	if CheckDups(peer_dev_num, time, receiveStatus, "2005") then
+	if CheckDups(peer_dev_num, time, receiveStatus, "2605") then
 		local mode = lastChangedModes[peer_dev_num]
 		if mode then
 			for i = 1, #mode do
 				luup.call_action(SID_HADEVICE, "Poll", {}, mode[i].device)
 			end
+		end
+	end
+end
+
+function ThermostatSetPointMonitorCallback(peer_dev_num, result)
+	DEntry()
+	local time = tonumber(result.time)
+	local receiveStatus = tonumber(result.C1, 16)
+	if CheckDups(peer_dev_num, time, receiveStatus, "4301" .. result.C2 .. result.C3 .. result.C4) then
+		local setPointType = tonumber(result.C2, 16)
+		local levelScalePrecision = tonumber(result.C3, 16)
+		local setPoint = tonumber(result.C4, 16)
+		local screen = luup.variable_get(SID_SCENECONTROLLER, CURRENT_SCREEN, peer_dev_num)
+		if not screen then
+			return
+		end
+		SetScreenTimeout(peer_dev_num, screen, true);
+		local prefix = screen:sub(1,1)
+		if prefix ~= "T" then
+			return
+		end
+		local temperatureDevice = luup.variable_get(SID_SCENECONTROLLER, "TemperatureDevice_"  .. screen, peer_dev_num);
+		if not temperatureDevice then
+			temperatureDevice = "0"
+		end
+		temperatureDevice = tonumber(temperatureDevice)
+		local choice = temperatureAutoChoices[peer_dev_num]
+		if not choice then
+			choice = USERMODE_HEAT
+		end
+		if 	temperatureDevice <= 0 then
+			return
+		end
+		local sid
+		if choice == USERMODE_COOL then
+			sid = SID_COOLSETPOINT
+		else
+			sid = SID_HEATSETPOINT
+		end
+		luup.call_action(sid, "SetCurrentSetpoint", {NewCurrentSetpoint = setPoint}, temperatureDevice)
+	end
+end
+
+function ThermostatFanModeMonitorCallback(peer_dev_num, result)
+	DEntry()
+	local time = tonumber(result.time)
+	local receiveStatus = tonumber(result.C1, 16)
+	if CheckDups(peer_dev_num, time, receiveStatus, "4401" .. result.C2) then
+		local fanModeNum = tonumber(result.C2, 16)
+		local screen = luup.variable_get(SID_SCENECONTROLLER, CURRENT_SCREEN, peer_dev_num)
+		if not screen then
+			return
+		end
+		SetScreenTimeout(peer_dev_num, screen, true);
+		local prefix = screen:sub(1,1)
+		if prefix ~= "T" then
+			return
+		end
+		local temperatureDevice = luup.variable_get(SID_SCENECONTROLLER, "TemperatureDevice_"  .. screen, peer_dev_num);
+		if not temperatureDevice then
+			temperatureDevice = "0"
+		end
+		temperatureDevice = tonumber(temperatureDevice)
+		if 	temperatureDevice <= 0 then
+			return
+		end
+		local oldMode = luup.variable_get(SID_FANMODE, FANMODE_VAR, temperatureDevice)
+		local fanMode
+		if fanModeNum == 0 then
+			fanMode = FANMODE_AUTO
+		elseif fanModeNum == 1 then
+			fanMode = FANMODE_CYCLE
+		elseif fanModeNum == 3 then
+			fanMode = FANMODE_ON
+		else
+			ELog("Unexpected fan mode:", fanModeNum)
+			return
+		end 
+		if oldMode ~= fanMode then
+			luup.call_action(SID_FANMODE, "SetMode", {NewMode = fanMode}, temperatureDevice)
 		end
 	end
 end
@@ -4413,7 +4518,31 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
   		luup.variable_set(RFWC5_SID, CURRENT_INDICATOR, tostring(newIndicator), peer_dev_num)
 	end
 
-	if mode.prefix >= "2" and mode.prefix <= "9" then
+	if mode.prefix == "P" or mode.prefix == "E" then
+		activate = true;
+		local temperatureDevice = luup.variable_get(SID_SCENECONTROLLER, "TemperatureDevice_"  .. currentScreen, peer_dev_num);
+		if temperatureDevice then
+			temperatureDevice = tonumber(temperatureDevice)
+			if mode.prefix == "P" then	
+				local userMode = luup.variable_get(SID_USERMODE, USERMODE_VAR, temperatureDevice)
+				if userMode and UserModeMap[userMode] then
+					local nextMode = UserModeMap[userMode].next
+					if nextMode == USERMODE_AUTO then
+						local autoMode = luup.variable_get(SID_USERMODE, "AutoMode", temperatureDevice)
+						if autoMode == "0" then
+							nextMode = UserModeMap[nextMode].next
+						end
+					end
+					luup.call_action(SID_USERMODE, "SetModeTarget", {NewModeTarget=nextMode}, temperatureDevice)
+				end
+			else
+				local energyMode = luup.variable_get(SID_USERMODE, ENERGYMODE_VAR, temperatureDevice)
+				if energyMode and EnergyModeMap[energyMode] then
+					luup.call_action(SID_USERMODE, "SetEnergyModeTarget", {NewModeTarget=EnergyModeMap[energyMode].next}, temperatureDevice)
+				end
+			end
+		end
+	elseif mode.prefix >= "2" and mode.prefix <= "9" then
 		activate = true;
 		local states = tonumber(mode.prefix)
 		state = luup.variable_get(SID_SCENECONTROLLER,"State_"..currentScreen.."_"..virtualButton,peer_dev_num)
@@ -4532,12 +4661,13 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 	end
 	-- Set the indicator here in case any of the other buttons got affected by the changes that we made
 	-- This will typically be a no-op but is important for Exclusive modes
-	SetIndicator(peer_dev_num, currentScreen, false, 0)
+	SetIndicator(peer_dev_num, GetCurrentScreen(peer_dev_num), false, 0)
 end
 
 function IndicatorChanged(peer_dev_num, response)
 	if not response then
 		log("IndicatorChanged: timeout")
+		return
 	end
 	local newIndicator = tonumber(response.C1, 16)
 	local oldindicator_string = luup.variable_get(SID_SCENECONTROLLER, CURRENT_INDICATOR, peer_dev_num)
@@ -4593,7 +4723,7 @@ Device 20=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦
                     Checksum OK --------------------------------------------+
 41      12/18/16 13:37:28.574   ACK: 0x6 (#)
 --]]
-				EnqueueZWaveMessageWithResponse("GetIndicator("..node_id..")", -- label
+				EnqueueZWaveMessageWithResponse("GetIndicator", -- label
 												node_id, 
 												"0x87 0x02", -- sendData
 												0, -- delay

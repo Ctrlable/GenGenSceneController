@@ -1,5 +1,5 @@
-// User interface for GenGeneric Scene Controller Version 1.03
-// Copyright 2016 Gustavo A Fernandez. All Rights Reserved
+// User interface for GenGeneric Scene Controller Version 1.04
+// Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
 
@@ -25,13 +25,13 @@ var EVOLVELCD1 = {
 	ImplementationXml       : "I_EvolveLCD1.xml",
 	NumTemperaturScrens     : 3, // Preset Pages 8, 16, and 40
 	ScreenTypes 			: [
-		{ prefix: "C", name: "Custum",      num: 6 },
-		{ prefix: "T", name: "Temperature", num: 6 },
+		{ prefix: "C", name: "Custum",      num: 9 },
+		{ prefix: "T", name: "Temperature", num: 9 },
 		{ prefix: "P", name: "Preset",      num: 41 }
 		// { prefix: "W", name: "Welcome",     num: 1 },
 	],
 	CustomModeList 			: [
-		"M", "T", "3", "4", "5", "6", "7", "8", "9", "X", "N"
+		"M", "T", "3", "4", "5", "6", "7", "8", "9", "X", "N", "P", "E"
 	],
 	SceneBases              : {
 		C: 1,	// Custom      screen scenes start at base 1
@@ -462,7 +462,9 @@ SceneController_Modes = {
 	"7":"Seven-state",
 	"8":"Eight-state",
 	"9":"Nine-state",
-	S:"Toggle direct",
+	P:"Mode",
+	E:"Energy Mode",
+	S:"Toggle Direct",  // Obsolete
 	X:"Exclusive",
 	N:"Switch Screen",
 	H:"Temperature",
@@ -1173,6 +1175,15 @@ function SceneController_Screens(SCObj, deviceId) {
 				var font = "";
 				var align = "";
 				var custom = false;
+				var modeStr  = SceneController_get_device_state(peerId, SCObj.ServiceId, "Mode_"+curScreen+"_"+button, 0);
+				if (!modeStr || typeof modeStr != "string") {
+					modeStr = SCObj.DefaultModeString;
+				}
+				var modePrefix = modeStr.charAt(0)
+				var states = 1
+				if (modePrefix.match(/[2-9]/)) {
+					states = parseInt(modePrefix)
+				}
 				if (screenType == "C") {
 					label = SceneController_get_device_state(peerId, SCObj.ServiceId, "Label_"+curScreen+"_"+button, 0);
 					font = SceneController_get_device_state(peerId, SCObj.ServiceId, "Font_"+curScreen+"_"+button, 0);
@@ -1185,8 +1196,11 @@ function SceneController_Screens(SCObj, deviceId) {
 					else {
 						if (button >= 2 && button <= 4) {
 							label = SceneController_TemperatureScreens[0][button-1];
-						}
-						else {
+						} else if (modePrefix == "P") {
+							label = "Heat/Cool/Auto/Off";
+						} else if (modePrefix == "E") {
+							label = "Normal/Energy Saving"
+						} else {
 							label = SceneController_get_device_state(peerId, SCObj.ServiceId, "Label_"+curScreen+"_"+button, 0);
 							font = SceneController_get_device_state(peerId, SCObj.ServiceId, "Font_"+curScreen+"_"+button, 0);
 							align = SceneController_get_device_state(peerId, SCObj.ServiceId, "Align_"+curScreen+"_"+button, 0);
@@ -1198,15 +1212,6 @@ function SceneController_Screens(SCObj, deviceId) {
 				}
 				if (!label && label !== 0) {
 					label = "";
-				}
-				var modeStr  = SceneController_get_device_state(peerId, SCObj.ServiceId, "Mode_"+curScreen+"_"+button, 0);
-				if (!modeStr || typeof modeStr != "string") {
-					modeStr = SCObj.DefaultModeString;
-				}
-				var modePrefix = modeStr.charAt(0)
-				var states = 1
-				if (modePrefix.match(/[2-9]/)) {
-					states = parseInt(modePrefix)
 				}
 				for (state = 1; state <= states; ++state) {
 					var stateButton = button + (state-1) * 1000;
@@ -1271,7 +1276,13 @@ function SceneController_Screens(SCObj, deviceId) {
 							for (var j = 0; j < SCObj.CustomModeList.length; ++j) {
 								var optionPrefix = SCObj.CustomModeList[j];
 								var selected = optionPrefix == (mode.newScreen ? "N" : mode.prefix)
-								if (screenType != "P" || !SCObj.HasScreen || optionPrefix < "2" || optionPrefix > "9") { // Preset screens don't have 3+state buttons
+								var enabled = true
+								if (optionPrefix == "P" || optionPrefix == "E") {
+									enabled = screenType == "T" && screenNum > SCObj.NumTemperaturScrens;
+								} else if (screenType == "P") {
+									enabled = !SCObj.HasScreen || optionPrefix < "2" || optionPrefix > "9"; // Preset screens don't have 3+state buttons
+								}
+								if (enabled) {
 									html += '    <option style="height:22px;" value="'+optionPrefix+'" '+(selected ? 'selected' : '')+'>'+SceneController_Modes[SCObj.CustomModeList[j]]+'</option>\n';
 								}
 							}
@@ -1289,7 +1300,7 @@ function SceneController_Screens(SCObj, deviceId) {
 							if (!modeParam) {
 								modeParam = (curScreen == SCObj.DefaultScreen ? "C2" : SCObj.DefaultScreen);
 							}
-							html += '   <select class="styled" style="width:100px; height:22px;" id="SwitchScreen_'+peerId+'_'+curScreen+'_'+button+'" onChange="SceneController_ChangeCustomMode('+SCObj.Id+','+peerId+',\''+curScreen+'\','+button+')" style="width:100px;">\n'
+							html += '   <select class="styled" style="width:120px; height:22px;" id="SwitchScreen_'+peerId+'_'+curScreen+'_'+button+'" onChange="SceneController_ChangeCustomMode('+SCObj.Id+','+peerId+',\''+curScreen+'\','+button+')" style="width:100px;">\n'
 							     +       SceneController_ScreenMenu(SCObj, modeParam, curScreen, lcdVersion)
 							     +  '   </select>\n';
 						}
@@ -1299,8 +1310,10 @@ function SceneController_Screens(SCObj, deviceId) {
 						var enableNonSceneDirect = true;
 						switch (mode.prefix) {
 						   	case "M":	// Momentary
-							case "X":	// Exclusive
-							case "N":   // Switch scene
+							case "X":	// EXclusive
+							case "N":   // Switch sceNe
+							case "P":   // Thermostat oPerating mode
+							case "E":	// Thermostat Energy mode
 							default:
 								html += '   <button type="button" class="btn" '+(disableVeraScene?'disabled ':'')+'style="min-width:10px;'+
 								             (SceneController_FindScene(peerId, sceneNum, 2)?';color:orange;':'')+(disableVeraScene?'background-color:#AAAAAA;':'')+
