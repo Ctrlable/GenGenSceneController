@@ -13,9 +13,14 @@
     <SubCategory_Num>0</SubCategory_Num>
     <serviceList>
       <service>
-        <serviceType>urn:schemas-gengen_mcv-org:service:CooperRFWC5:1</serviceType>
-        <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
+        <serviceType>urn:schemas-gengen_mcv-org:service:SceneController:1</serviceType>
+        <serviceId>urn:gengen_mcv-org:serviceId:SceneController1</serviceId>
         <SCPDURL>S_GenGenSceneController.xml</SCPDURL>
+      </service>
+      <service>
+        <serviceType>urn:schemas-gengen_mcv-org:service:ZWaveMonitor:1</serviceType>
+        <serviceId>urn:gengen_mcv-org:serviceId:ZWaveMonitor1</serviceId>
+        <SCPDURL>S_GenGenZWaveMonitor.xml</SCPDURL>
       </service>
       <service>
         <serviceType>urn:schemas-micasaverde-com:service:SceneController:1</serviceType>

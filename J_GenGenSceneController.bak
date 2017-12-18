@@ -150,7 +150,7 @@ var COOPERRFWC5 = {
 	DefaultScreen           : "P1",
 	DefaultModeString       : "T",
 	DevType                 : "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1",
-	ServiceId               : SID_SCENECONTROLLER,
+	ServiceId               : SID_SCENECONTROLLER
 	DviceXml                : "D_CooperRFWC5.xml",
 	ImplementationXml       : "I_CooperRFWC5.xml",
 	NumTemperaturScrens     : 0,
@@ -195,7 +195,7 @@ var NEXIAONETOUCH = {
 	DefaultScreen           : "C1",
 	DefaultModeString       : "M",
 	DevType                 : "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1",
-    ServiceId               : SID_SCENECONTROLLER,
+    ServiceId               : SID_SCENECONTROLLER
 	DviceXml                : "D_NexiaOneTouch.xml",
 	ImplementationXml       : "I_NexiaOneTouch.xml",
 	NumTemperaturScrens     : 0,

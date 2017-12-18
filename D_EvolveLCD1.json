@@ -57,11 +57,11 @@
 				"Left": 50,
 				"Width": 75,
 				"Height": 20,
-				"Service": "urn:gengen_mcv-org:serviceId:EvolveLCD1",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Variable": "CurrentScreen"
 			},
 			"Command": {
-				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Action": "SetScreen",
 				"Parameters": [{
 					"Name": "Screen",
@@ -83,12 +83,12 @@
 				"Left": 50,
 				"Width": 75,
 				"Height": 20,
-				"Service": "urn:gengen_mcv-org:serviceId:EvolveLCD1",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Variable": "CurrentScreen",
 				"Value": "C2"
 			},
 			"Command": {
-				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Action": "SetScreen",
 				"Parameters": [{
 					"Name": "Screen",
@@ -110,12 +110,12 @@
 				"Left": 50,
 				"Width": 75,
 				"Height": 20,
-				"Service": "urn:gengen_mcv-org:serviceId:EvolveLCD1",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Variable": "CurrentScreen",
 				"Value": "C3"
 			},
 			"Command": {
-				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Action": "SetScreen",
 				"Parameters": [{
 					"Name": "Screen",
@@ -141,12 +141,12 @@
 				"Left": 50,
 				"Width": 75,
 				"Height": 20,
-				"Service": "urn:gengen_mcv-org:serviceId:EvolveLCD1",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Variable": "CurrentScreen",
 				"Value": "C4"
 			},
 			"Command": {
-				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Action": "SetScreen",
 				"Parameters": [{
 					"Name": "Screen",
@@ -168,12 +168,12 @@
 				"Left": 50,
 				"Width": 75,
 				"Height": 20,
-				"Service": "urn:gengen_mcv-org:serviceId:EvolveLCD1",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Variable": "CurrentScreen",
 				"Value": "C5"
 			},
 			"Command": {
-				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Action": "SetScreen",
 				"Parameters": [{
 					"Name": "Screen",
@@ -195,12 +195,12 @@
 				"Left": 50,
 				"Width": 75,
 				"Height": 20,
-				"Service": "urn:gengen_mcv-org:serviceId:EvolveLCD1",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Variable": "CurrentScreen",
 				"Value": "C6"
 			},
 			"Command": {
-				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Action": "SetScreen",
 				"Parameters": [{
 					"Name": "Screen",
@@ -226,12 +226,12 @@
 				"Left": 50,
 				"Width": 75,
 				"Height": 20,
-				"Service": "urn:gengen_mcv-org:serviceId:EvolveLCD1",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Variable": "CurrentScreen",
 				"Value": "P1"
 			},
 			"Command": {
-				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Action": "SetScreen",
 				"Parameters": [{
 					"Name": "Screen",
@@ -253,12 +253,12 @@
 				"Left": 50,
 				"Width": 75,
 				"Height": 20,
-				"Service": "urn:gengen_mcv-org:serviceId:EvolveLCD1",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Variable": "CurrentScreen",
 				"Value": "T1"
 			},
 			"Command": {
-				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Action": "SetScreen",
 				"Parameters": [{
 					"Name": "Screen",
@@ -284,10 +284,10 @@
 				"Left": 50,
 				"Width": 75,
 				"Height": 20,
-				"Service": "urn:gengen_mcv-org:serviceId:EvolveLCD1"
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1"
 			},
 			"Command": {
-				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController1",
 				"Action": "SetBacklight",
 				"Parameters": [{
 					"Name": "Timeout",

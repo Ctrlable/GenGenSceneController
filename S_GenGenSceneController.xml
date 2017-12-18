@@ -6,6 +6,7 @@
   <serviceStateTable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_NumEntries</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>int</dataType>
 	  <allowedValueRange>
         <minimum>1</minimum>
@@ -13,50 +14,61 @@
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_E1</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_E2</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_E3</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_E4</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_E5</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_E6</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_E7</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_E8</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_E9</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_E10</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_Screen</name>
+    <stateVariable sendEvents="yes">
+      <name>CurScreen</name>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Button</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>ui1</dataType>
 	  <allowedValueRange>
         <minimum>1</minimum>
@@ -65,54 +77,65 @@
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Label</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Font</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
-      <defaultValue>Normal</defaultValue> 
-      <allowedValueList> 
-        <allowedValue>Normal</allowedValue> 
-        <allowedValue>Compressed</allowedValue> 
-        <allowedValue>Inverted</allowedValue> 
-      </allowedValueList> 
+      <defaultValue>Normal</defaultValue>
+      <allowedValueList>
+        <allowedValue>Normal</allowedValue>
+        <allowedValue>Compressed</allowedValue>
+        <allowedValue>Inverted</allowedValue>
+      </allowedValueList>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Align</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
-      <defaultValue>Center</defaultValue> 
-      <allowedValueList> 
-        <allowedValue>Left</allowedValue> 
-        <allowedValue>Center</allowedValue> 
-        <allowedValue>Right</allowedValue> 
-      </allowedValueList> 
+      <defaultValue>Center</defaultValue>
+      <allowedValueList>
+        <allowedValue>Left</allowedValue>
+        <allowedValue>Center</allowedValue>
+        <allowedValue>Right</allowedValue>
+      </allowedValueList>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Mode</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Timeout</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>boolean</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_ForceClear</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>boolean</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Timeout_Enable</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>boolean</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Timeout_Screen</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Timeout_Time</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
+      <defaultValue>30</defaultValue>
       <dataType>ui4</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Lines</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>ui1</dataType>
 	  <allowedValueRange>
         <minimum>5</minimum>
@@ -121,10 +144,12 @@
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_TemperatureDevice</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>ui2</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_PresetLanguage</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>ui1</dataType>
     </stateVariable>
   </serviceStateTable>
@@ -195,7 +220,7 @@
         <argument>
           <name>Screen</name>
           <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_Screen</relatedStateVariable>
+          <relatedStateVariable>CurScreen</relatedStateVariable>
         </argument>
         <argument>
           <name>Timeout</name>
@@ -215,7 +240,7 @@
         <argument>
           <name>Screen</name>
           <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_Screen</relatedStateVariable>
+          <relatedStateVariable>CurScreen</relatedStateVariable>
         </argument>
         <argument>
           <name>Button</name>
@@ -260,7 +285,7 @@
         <argument>
           <name>Screen</name>
           <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_Screen</relatedStateVariable>
+          <relatedStateVariable>CurScreen</relatedStateVariable>
         </argument>
         <argument>
           <name>TemperatureDevice</name>
@@ -275,7 +300,7 @@
         <argument>
           <name>Screen</name>
           <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_Screen</relatedStateVariable>
+          <relatedStateVariable>CurScreen</relatedStateVariable>
         </argument>
         <argument>
           <name>Timeout</name>
@@ -290,7 +315,7 @@
         <argument>
           <name>Screen</name>
           <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_Screen</relatedStateVariable>
+          <relatedStateVariable>CurScreen</relatedStateVariable>
         </argument>
         <argument>
           <name>TimeoutEnable</name>
@@ -315,7 +340,7 @@
         <argument>
           <name>Screen</name>
           <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_Screen</relatedStateVariable>
+          <relatedStateVariable>CurScreen</relatedStateVariable>
         </argument>
         <argument>
           <name>Lines</name>

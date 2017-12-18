@@ -3,4 +3,8 @@
     <major>1</major>
     <minor>0</minor>
   </specVersion>
+  <serviceStateTable>
+  </serviceStateTable>
+  <actionList>
+  </actionList>
 </scpd>
