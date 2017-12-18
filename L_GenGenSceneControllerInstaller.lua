@@ -1,4 +1,4 @@
--- Installer for GenGeneric Scene Controller Version 1.18
+-- Installer for GenGeneric Scene Controller Version 1.19d
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 --
 -- Includes installation files for
@@ -13,7 +13,7 @@
 -- VerboseLogging == 2: Includes debug logs:          ELog, log, ILog, DLog, DEntry
 -- VerboseLogging == 3: Include extended ZWave Queue  ELog, log, ILog, DLog, DEntry
 -- VerboseLogging == 4:	Includes verbose logs:        ELog, log, ILog, DLog, DEntry, VLog, VEntry
-VerboseLogging = 0
+VerboseLogging = 4
 
 -- Set UseDebugZWaveInterceptor to true to enable zwint log messages to log.LuaUPnP (Do not confuse with LuaUPnP.log)
 local UseDebugZWaveInterceptor = true
@@ -64,7 +64,7 @@ function UpdateFileWithContent(filename, content, permissions, version, force)
 	if stat then
 		if version > oldversion or (version == oldversion and stat.size ~= #content) or force then
 			log("Backing up ", filename, " to ", backupName, " and replacing with new version.")
-			--VLog("Old ", filename, " size was ", stat.size, " bytes. new size is ", #content, " bytes.")
+			VLog("Old ", filename, " size was ", stat.size, " bytes. new size is ", #content, " bytes.")
 			nixio.fs.rename(backupName, oldName)
 			local result, errno, errmsg =  nixio.fs.rename(filename, backupName)
 			if result then
@@ -75,13 +75,13 @@ function UpdateFileWithContent(filename, content, permissions, version, force)
 			end
 		else
 			if oldversion > version then
-				--VLog("Not updating ", filename, " because the old version is ", oldversion, " and the new version is ", version)
+				VLog("Not updating ", filename, " because the old version is ", oldversion, " and the new version is ", version)
 			else
-				--VLog("Not updating ", filename, " because the new content is ", #content, " bytes and the old is ", stat.size, " bytes.")
+				VLog("Not updating ", filename, " because the new content is ", #content, " bytes and the old is ", stat.size, " bytes.")
 			end
 		end
 	else
-		--VLog("updating ", filename, " because a previous version does not exist")
+		VLog("updating ", filename, " because a previous version does not exist")
 		update = true
 	end
 	if update then
@@ -93,7 +93,7 @@ function UpdateFileWithContent(filename, content, permissions, version, force)
 				if backup then
 					nixio.fs.remove(oldName)
 				end
-				--VLog("Wrote ", filename, " successfully (", #content, " bytes)")
+				VLog("Wrote ", filename, " successfully (", #content, " bytes)")
 				if version > 0 then
 					luup.variable_set(GENGENINSTALLER_SID, filename .. "_version", tostring(version), lul_device)
 				end
@@ -241,7 +241,7 @@ function updateJson(filename, update_func, updated)
 		write_file:close()
 		reload_needed = filename
 	else
-		--VLog("Not updating ", filename)
+		VLog("Not updating ", filename)
 	end
 end
 
@@ -327,6 +327,85 @@ function ScanForNewDevices()
 		luup.variable_set("urn:micasaverde-com:serviceId:ZWaveDevice1", "Documentation", "http://products.z-wavealliance.org/products/1344", device_num)
 	end
 
+    -- This is a hack for the Aeotec Siren which includes "COMMAND_CLASS_SECURITY" in its node info but never actually responds to a Security Nonce Get command
+	local function ApplyAeotecSirenHack()
+		DEntry()
+
+		local function AeotecSirenCallback(dev_num, result)
+			DLog("Aeotec Siren node info intercept: peer_dev_num num=", dev_num," result=",result);
+		end
+
+		MonitorZWaveData(false, -- incoming
+						 luup.device, -- peer_dev_num
+		                 nil, -- No arm_regex
+--[==[
+                                                         C1
+42      12/02/17 21:44:16.481   0x1 0x18 0x0 0x49 0x84 0x27 0x12 0x4 0x10 0x5 0x5e 0x25 0x70 0x85 0x59 0x72 0x2b 0x2c 0x86 0x7a 0x73 0x98 0xef 0x5a 0x82 0x8c 
+           SOF - Start Of Frame --+    ¦   ¦    ¦    ¦    ¦    ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+                    length = 24 -------+   ¦    ¦    ¦    ¦    ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+                        Request -----------+    ¦    ¦    ¦    ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+  FUNC_ID_ZW_APPLICATION_UPDATE ----------------+    ¦    ¦    ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Update state = Node Info received -------------------+    ¦    ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Node ID: 39 Unknown node ID: 39 --------------------------+    ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+          Node info length = 18 -------------------------------+   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+     Basic type = Routing slave -----------------------------------+    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+   Generic type = switch binary ----------------------------------------+   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+          Specific type = Siren --------------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[1] = COMMAND_CLASS_ZWAVEPLUS_INFO ---------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[2] = COMMAND_CLASS_SWITCH_BINARY ---------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[3] = COMMAND_CLASS_CONFIGURATION --------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[4] = COMMAND_CLASS_ASSOCIATION ---------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[5] = COMMAND_CLASS_ASSOCIATION_GRP_INFO -----------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[6] = COMMAND_CLASS_MANUFACTURER_SPECIFIC ---------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[7] = COMMAND_CLASS_SCENE_ACTIVATION -------------------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[8] = COMMAND_CLASS_SCENE_ACTUATOR_CONF ---------------------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[9] = COMMAND_CLASS_VERSION --------------------------------------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[10] = COMMAND_CLASS_FIRMWARE_UPDATE_MD -------------------------------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[11] = COMMAND_CLASS_POWERLEVEL --------------------------------------------------------------------------+    ¦    ¦    ¦    ¦    ¦
+Can receive command class[12] = COMMAND_CLASS_SECURITY ---------------------------------------------------------------------------------+    ¦    ¦    ¦    ¦
+                         Marker -------------------------------------------------------------------------------------------------------------+    ¦    ¦    ¦
+Can send command class[1] = COMMAND_CLASS_DEVICE_RESET_LOCALLY -----------------------------------------------------------------------------------+    ¦    ¦
+Can send command class[2] = COMMAND_CLASS_HAIL --------------------------------------------------------------------------------------------------------+    ¦
+                    Checksum OK ----------------------------------------------------------------------------------------------------------------------------+
+--]==]
+		                 "^01 18 00 49 84 (..) 12 04 10 05 5e 25 70 85 59 72 2b 2c 86 7a 73 98 ef 5a 82 ..", -- Main RegEx
+--[==[
+42      12/02/17 21:44:16.481   0x1 0x17 0x0 0x49 0x84 0x27 0x11 0x4 0x10 0x5 0x5e 0x25 0x70 0x85 0x59 0x72 0x2b 0x2c 0x86 0x7a 0x73 0xef 0x5a 0x82 0x8c
+           SOF - Start Of Frame --+    ¦   ¦    ¦    ¦    ¦    ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+                    length = 23 -------+   ¦    ¦    ¦    ¦    ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+                        Request -----------+    ¦    ¦    ¦    ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+  FUNC_ID_ZW_APPLICATION_UPDATE ----------------+    ¦    ¦    ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Update state = Node Info received -------------------+    ¦    ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Node ID: 39 Unknown node ID: 39 --------------------------+    ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+          Node info length = 17 -------------------------------+   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+     Basic type = Routing slave -----------------------------------+    ¦   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+   Generic type = switch binary ----------------------------------------+   ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+          Specific type = Siren --------------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[1] = COMMAND_CLASS_ZWAVEPLUS_INFO ---------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[2] = COMMAND_CLASS_SWITCH_BINARY ---------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[3] = COMMAND_CLASS_CONFIGURATION --------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[4] = COMMAND_CLASS_ASSOCIATION ---------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[5] = COMMAND_CLASS_ASSOCIATION_GRP_INFO -----------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[6] = COMMAND_CLASS_MANUFACTURER_SPECIFIC ---------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[7] = COMMAND_CLASS_SCENE_ACTIVATION -------------------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[8] = COMMAND_CLASS_SCENE_ACTUATOR_CONF ---------------------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[9] = COMMAND_CLASS_VERSION --------------------------------------------------------------------+    ¦    ¦    ¦    ¦    ¦    ¦
+Can receive command class[10] = COMMAND_CLASS_FIRMWARE_UPDATE_MD -------------------------------------------------------------+    ¦    ¦    ¦    ¦    ¦
+Can receive command class[11] = COMMAND_CLASS_POWERLEVEL --------------------------------------------------------------------------+    ¦    ¦    ¦    ¦
+                         Marker --------------------------------------------------------------------------------------------------------+    ¦    ¦    ¦
+Can send command class[1] = COMMAND_CLASS_DEVICE_RESET_LOCALLY ------------------------------------------------------------------------------+    ¦    ¦
+Can send command class[2] = COMMAND_CLASS_HAIL ---------------------------------------------------------------------------------------------------+    ¦
+                    Checksum OK -----------------------------------------------------------------------------------------------------------------------+
+--]==]
+		                 "01 17 00 49 84 \\1 11 04 10 05 5e 25 70 85 59 72 2b 2c 86 7a 73 ef 5a 82 XX", -- Response
+		                 AeotecSirenCallback,
+		                 false, -- Not OneShot
+		                 0, -- no timeout
+						 "AeotecSirenNodeInfo", -- label
+						 true) -- forward
+	end
+
+
 	-- This is a hack for UI7 1.7.2608 getting confused by inconsistent node info reports from the Kichler 12387 undercabinet light controller.
 	-- Vera also does not like devices that don't support COMMAND_CLASS_VERSION so we add it to the command class list and intercept the expected
 	-- version and command class version queries.
@@ -334,15 +413,15 @@ function ScanForNewDevices()
 		DEntry()
 
 		local function Kichler12387NodeInfoCallback(peer_dev_num, result)
-			--DLog("Kichler 12387 node info intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
+			DLog("Kichler 12387 node info intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
 		end
 
 		local function Kichler12387VersionCallback(peer_dev_num, result)
-			--DLog("Kichler 12387 Version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
+			DLog("Kichler 12387 Version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
 		end
 
 		local function Kichler12387CommandClassVersionCallback(peer_dev_num, result)
-			--DLog("Kichler 12387 Version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
+			DLog("Kichler 12387 Version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
 		end
 
 		MonitorZWaveData(true, -- outgoing,
@@ -664,7 +743,7 @@ Requested Command Class = COMMAND_CLASS_ALARM ---------------------------+    ¦ 
 			luup.devices[device.device_num_parent].device_type == "urn:schemas-micasaverde-com:device:ZWaveNetwork:1" then
 	  		local manufacturer_info = luup.variable_get("urn:micasaverde-com:serviceId:ZWaveDevice1", "ManufacturerInfo", device_num)
 			local capabilities = luup.variable_get("urn:micasaverde-com:serviceId:ZWaveDevice1", "Capabilities", device_num)
-			--DLog("device_num=",device_num," name=",device.description," manufacturer_info=",manufacturer_info," capabilities=",capabilities);
+			DLog("device_num=",device_num," name=",device.description," manufacturer_info=",manufacturer_info," capabilities=",capabilities);
 		  	if manufacturer_info == "275,17750,19506" then
 	        	if device.device_type ~= 'urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1' then
 					AdoptEvolveLCD1(device_num)
@@ -776,6 +855,9 @@ Z-Wave Protocol Sub-Version = 32 -----------------------------------------------
 						 true) -- forward
 	end
 
+	-- Apply the Aeotec Siren hack to anything that responds with that exact node info.
+	ApplyAeotecSirenHack()
+
 	-- UI7 sometimes sends Z-Wave commands twice with xmit option AUTO_ROUTE and then again with ACK | AURO_ROUTE
 	-- Only the second of these is valid.
 	ApplyLuaUPnPAutoRouteNoACKFix()
@@ -862,7 +944,7 @@ function SceneControllerInstaller_Init(lul_device)
   if luup.job_watch then
 	luup.job_watch("SceneController_JobWatchCallBack") -- Watch jobs on all devices.
   else
-	--DLog("luup.job_watch does not exist")
+	DLog("luup.job_watch does not exist")
   end
 
   function b642bin(str)
@@ -2111,7 +2193,7 @@ AXAPASAgPC8psADwAcwJBjwvc2NwZD4NChEAAA==
 		log("Files updated including ",reload_needed,". Reloading LuaUPnP.")
 		luup.call_action(HAG_SID, "Reload", {}, 0)
 	else
-		--VLog("Nothing updated. No need to reload.")
+		VLog("Nothing updated. No need to reload.")
 	end
 end	-- function SceneControllerInstaller_Init
 

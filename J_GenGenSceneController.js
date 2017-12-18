@@ -1,4 +1,4 @@
-// User interface for GenGeneric Scene Controller Version 1.18
+// User interface for GenGeneric Scene Controller Version 1.19
 // Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
@@ -1419,7 +1419,7 @@ function SceneController_Screens(SCObj, deviceId) {
 							case "P":   // Thermostat oPerating mode
 							case "E":	// Thermostat Energy mode
 							default:
-								if (SCObj.HasIndicator && ((mode.prefix >= "2" && mode.prefix <= "9") || mode.prefix == "X"))  {
+								if (SCObj.HasIndicator && ((modePrefix >= "2" && modePrefix <= "9") || mode.prefix == "X"))  {
 									// For multistate and exclusive modes, we look at all of the devices affected by each state
 									// to allow the indicator to automatically track which state is most appropriate.
 									var sceneSet = SceneController_GetSceneSet(veraSceneObjs)

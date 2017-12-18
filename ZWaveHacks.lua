@@ -47,3 +47,52 @@ for i = 1, 5 do
 	luup.sleep(1000)
 end
 
+--Association get
+for i = 1, 50 do
+	luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x85 0x02 "..i}, 1)
+	luup.sleep(200)
+end
+
+--Association specific group get
+	luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x85 0x0B"}, 1)
+
+--Association group info group name, group info get
+for i = 1, 50 do
+	luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x59 0x01 "..i}, 1)
+	luup.sleep(300)
+	luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x59 0x03 0x00 "..i}, 1)
+	luup.sleep(300)
+end
+
+--Configuration get
+for i = 1, 50 do
+	luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x70 0x05 "..i}, 1)
+	luup.sleep(200)
+end
+
+--Association get, Association group group name get, Association group info get, configuration get.
+local delay = 1000
+for i = 1, 16 do
+	luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x59 0x01 "..i}, 1)
+	luup.sleep(delay)
+	luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x85 0x02 "..i}, 1)
+	luup.sleep(delay)
+	luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x85 0x02 "..i+15}, 1)
+	luup.sleep(delay)
+	luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x85 0x02 "..i+30}, 1)
+	luup.sleep(delay)
+	if i > 1 then
+		luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x70 0x05 "..i}, 1)
+		luup.sleep(delay)
+	end
+	luup.sleep(delay)
+end
+
+
+-- Configuration set
+luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x70 0x04 15 1 0"}, 1)
+
+	luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x85 0x01 31 1"}, 1)
+
+-- Central scene supported get
+luup.call_action("urn:micasaverde-com:serviceId:ZWaveNetwork1", "SendData", {Node = 0xdf, Data = "0x5B 0x01"}, 1)
