@@ -1,4 +1,4 @@
--- Installer for GenGeneric Scene Controller Version 1.05
+-- Installer for GenGeneric Scene Controller Version 1.06
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 --
 -- Includes installation files for
@@ -8,22 +8,21 @@
 -- This installs zwave_products_user.xml for UI5 and modifies KitDevice.json for UI7.
 -- It also installs the custom icon in the appropriate places for UI5 or UI7
 
+-- VerboseLogging == 0: important logs and errors:    ELog, log
+-- VerboseLogging == 1: Includes debug logs:          ELog, log, DLog, DEntry
+-- VerboseLogging == 3:	Includes verbose logs:        ELog, log, DLog, DEntry, VLog, VEntry
+VerboseLogging = 0
+
+-- Set UseDebugZWaveInterceptor to true to enable zwint log messages to log.init-LuaUPnP (Do not confuse with LuaUPnP.log)
+local UseDebugZWaveInterceptor = false
+
 local bit = require 'bit'
 local nixio = require "nixio"
 local socket = require "socket"
+require "L_GenGenSceneControllerShared"
 
 local UseDebugZWaveInterceptor = false
-local VerboseLogging = false
-local GenGenInstaller_Version = 19 -- Update this each time we update the installer.
-
-local ANSI_RED     = "\027[31m"
-local ANSI_GREEN   = "\027[32m"
-local ANSI_YELLOW  = "\027[33m"
-local ANSI_BLUE    = "\027[34m"
-local ANSI_MAGENTA = "\027[35m"
-local ANSI_CYAN    = "\027[36m"
-local ANSI_WHITE   = "\027[37m"
-local ANSI_RESET   = "\027[0m"
+local GenGenInstaller_Version = 20 -- Update this each time we update the installer.
 
 local HAG_SID                 = "urn:micasaverde-com:serviceId:HomeAutomationGateway1"
 local ZWN_SID       	      = "urn:micasaverde-com:serviceId:ZWaveNetwork1"
@@ -33,55 +32,9 @@ local GENGENINSTALLER_DEVTYPE = "urn:schemas-gengen_mcv-org:device:SceneControll
 
 local SID_SCENECONTROLLER     = "urn:gengen_mcv-org:serviceId:SceneController1"
 
-function log(msg)
-  luup.log("GenGeneric Scene Controller Installer: " .. msg)
-end
-
-function verbose(msg)
-  if VerboseLogging then
-    luup.log("GenGeneric Scene Controller Installer verbose: " .. msg)
-  end
-end
-
-function error(msg)
-  luup.log(ANSI_RED .. "GenGeneric Scene Controller Installer error: " .. ANSI_RESET .. msg .. debug.traceback(ANSI_CYAN, 2) .. ANSI_RESET)
-end
-
-function tableToString(tab, hash)
-  if type(tab) == "string" then
-	return string.format("%q",tab)
-  elseif type(tab) ~= "table" then
-    return tostring(tab)
-  end
-  if hash == nil then
-	hash = {}
-  elseif hash[tab] then
-    return "recursive"
-  end
-  hash[tab] = true
-  local k,v,s
-  s = "{"
-  for k,v in pairs(tab) do
-      if s ~= "{" then
-	     s = s .. ", "
-	  end
-      if type(k) == "table" then
-	     s = s .. tableToString(k, hash)
-	  else
-	     s = s .. tostring(k)
-	  end
-	  s = s .. "="
-	  if type(v) == "string" then
-		 s = s .. string.format("%q",v)
-      elseif type(v) == "table" then
-	     s = s .. tableToString(v, hash)
-	  else
-	     s = s .. tostring(v)
-	  end
-   end
-   s = s .. "}"
-   hash[tab] = nil
-   return s
+-- Make sure tha all of the log functions work before even the SCObj global is set.
+function GetDeviceName()
+  return "GenGeneric Scene Controller"
 end
 
 local reload_needed = false
@@ -92,7 +45,7 @@ function UpdateFileWithContent(filename, content, permissions, version)
 	local backup = false
 	local oldVersion
 	if not content then
-		error("Missing content for "..filename)
+		ELog("Missing content for ", filename)
 		return false
 	end
 	local stat = nixio.fs.stat(filename)
@@ -109,25 +62,25 @@ function UpdateFileWithContent(filename, content, permissions, version)
 	end
 	if stat then
 		if version > oldversion or (version == oldversion and stat.size ~= #content) then
-			log("Backing up " .. filename .. " to " .. backupName .. " and replacing with new version.")
-			verbose("Old " .. filename .. " size was " .. stat.size .. " bytes. new size is " .. #content .. " bytes.")
+			log("Backing up ", filename, " to ", backupName, " and replacing with new version.")
+			VLog("Old ", filename, " size was ", stat.size, " bytes. new size is ", #content, " bytes.")
 			nixio.fs.rename(backupName, oldName)
 			local result, errno, errmsg =  nixio.fs.rename(filename, backupName)
 			if result then
 				update = true
 				backup = true
 			else
-				error("could not rename " .. filename .. " to" .. backupName .. ": " .. errmsg)
+				ELog("could not rename ", filename, " to", backupName, ": ", errmsg)
 			end
 		else
 			if oldversion > version then
-				verbose("Not updating " .. filename .. " because the old version is " .. oldversion .. " and the new version is " .. version)
+				VLog("Not updating ", filename, " because the old version is ", oldversion, " and the new version is ", version)
 			else
-				verbose("Not updating " .. filename .. " because the new content is " .. #content .. " bytes and the old is " .. stat.size .. " bytes.")
+				VLog("Not updating ", filename, " because the new content is ", #content, " bytes and the old is ", stat.size, " bytes.")
 			end
 		end
 	else
-		verbose("updating " .. filename .. " because a previous version does not exist")
+		VLog("updating ", filename, " because a previous version does not exist")
 		update = true
 	end
 	if update then
@@ -139,14 +92,14 @@ function UpdateFileWithContent(filename, content, permissions, version)
 				if backup then
 					nixio.fs.remove(oldName)
 				end
-				verbose("Wrote " .. filename .. " successfully (" .. #content .. " bytes)")
+				VLog("Wrote ", filename, " successfully (", #content, " bytes)")
 				if version > 0 then
 					luup.variable_set(GENGENINSTALLER_SID, filename .. "_version", tostring(version), lul_device)
 				end
 				reload_needed = true
 				return true
 			else
-				error("could not write " .. #content .. " bytes into " .. filename .. ". only " .. bytesWritten .. " bytes written: " .. errmsg)
+				ELog("could not write ", #content, " bytes into ", filename, ". only ", bytesWritten, " bytes written: ", errmsg)
 				f:close()
 				if backup then
 					nixio.fs.rename(backupName, filename)
@@ -154,7 +107,7 @@ function UpdateFileWithContent(filename, content, permissions, version)
 				end
 			end
 		else
-			error("could not open " .. filename .. " for writing: " .. errmsg)
+			ELog("could not open ", filename, " for writing: ", errmsg)
 			if backup then
 				nixio.fs.rename(backupName, filename)
 				nixio.fs.rename(oldName, backupName)
@@ -178,7 +131,7 @@ function PrepFileForUpdate(base)
 	local base_temp = base .. ".temp"
 	local base_mtime, errno, errmsg = nixio.fs.stat(base,"mtime")
 	if not base_mtime then
-		error("could not stat " .. base .. ": " .. errmsg)
+		ELog("could not stat ", base, ": ", errmsg)
 		return nil
 	end
 	local base_modified_mtime, errno, errmsg = nixio.fs.stat(base_modified,"mtime")
@@ -186,20 +139,20 @@ function PrepFileForUpdate(base)
 		nixio.fs.rename(base_modified, base_old)
 		local result, errno, errmsg = nixio.fs.rename(base, base_save)
 		if not result then
-			error("could not rename " .. base .. " to" .. base_save .. ": " .. errmsg)
+			ELog("could not rename ", base, " to", base_save, ": ", errmsg)
 			nixio.fs.rename(base_old, base_modified)
 			return nil
 		end
 		local read_file, errmsg, errno = io.open(base_save, "r")
 		if not read_file then
-			error("could not open " .. base_save .. " for reading: " .. errmsg)
+			ELog("could not open ", base_save, " for reading: ", errmsg)
 		    nixio.fs.rename(base_save, base)
 			nixio.fs.rename(base_old, base_modified)
 			return nil
 		end
 		local write_file, errmsg, errno = io.open(base_modified, "w", 644)
 		if not write_file then
-			error("could not open " .. base_modified .. " for writing: " .. errmsg)
+			ELog("could not open ", base_modified, " for writing: ", errmsg)
 			read_file:close()
 		    nixio.fs.rename(base_save, base)
 			nixio.fs.rename(base_old, base_modified)
@@ -207,7 +160,7 @@ function PrepFileForUpdate(base)
 		end
 		local result, errno, errmsg = nixio.fs.symlink(base_modified, base)
 		if not result then
-			error("could not symlink " .. base_modified .. " to" .. base .. ": " .. errmsg)
+			ELog("could not symlink ", base_modified, " to", base, ": ", errmsg)
 			write_file:close()
 			read_file:close()
 		    nixio.fs.rename(base_save, base)
@@ -223,7 +176,7 @@ end
 function updateJson(filename, update_func)
 	read_file, write_file = PrepFileForUpdate(filename)
 	if read_file then
-		log("Updating " .. filename)
+		log("Updating ", filename)
 		local str = read_file:read("*a")
 		read_file:close()
 		local obj=json.decode(str);
@@ -234,7 +187,7 @@ function updateJson(filename, update_func)
 		write_file:close()
 		reload_needed = true
 	else
-		verbose("Not updating " .. filename)
+		VLog("Not updating ", filename)
 	end
 end
 
@@ -251,7 +204,7 @@ function ScanForNewDevices()
 		  		if manufacturer_info == "275,17750,19506" then
 					if device_file =="D_SceneController1.xml" then
 			  			reload_needed = true
-			  			log("Found a new Evolve LCD1 controller. Device ID: " .. device.id)
+			  			log("Found a new Evolve LCD1 controller. Device ID: ", device.id)
 						luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1", device_num)
 			  			luup.attr_set("device_file", "D_EvolveLCD1.xml", device_num)
 						luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
@@ -280,7 +233,7 @@ function ScanForNewDevices()
 				elseif manufacturer_info == "26,22349,0" then
 					if device_file =="D_SceneController1.xml" then
 		 				reload_needed = true
-						log("Found a new Cooper RFWC5 controller. Device ID: " .. device.id)
+						log("Found a new Cooper RFWC5 controller. Device ID: ", device.id)
 						luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1", device_num)
 						luup.attr_set("device_file", "D_CooperRFWC5.xml", device_num)
 						luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
@@ -300,7 +253,7 @@ function ScanForNewDevices()
  				if manufacturer_info == "376,21315,18229" then
 					if device_file =="D_GenericIO1.xml" then
 						reload_needed = true
-						log("Found a new Nexia One Touch controller. Device ID: " .. device.id)
+						log("Found a new Nexia One Touch controller. Device ID: ", device.id)
 						luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1", device_num)
 						luup.attr_set("device_file", "D_NexiaOneTouch.xml", device_num)
 						luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
@@ -336,14 +289,14 @@ function ScanForNewDevices()
 			local impl = luup.attr_get("impl_file", device_num)  
 			if impl == "I_EvolveLCD1.xml" then
 			  	reload_needed = true
-			  	log("Updating the implementation file of the existing Evolve LCD1 peer device: "..tostring(device_num))
+			  	log("Updating the implementation file of the existing Evolve LCD1 peer device: ", device_num)
 			  	luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num);
 			end
 		elseif device.device_type == "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1" then
 			local impl = luup.attr_get("impl_file", device_num) 
 			if impl == "I_CooperRFWC5.xml" then
 				reload_needed = true
-			  	log("Updating the implementation file of the existing Cooper RFWC5 peer device: "..tostring(device_num))
+			  	log("Updating the implementation file of the existing Cooper RFWC5 peer device: ", device_num)
 			  	luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num);
 			end
 		end
@@ -392,7 +345,7 @@ function DeleteOldInstallers(our_dev_num)
 		   (v.device_type == "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD1Installer:1" or
 		    v.device_type == "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCDFinder:1" or
 		    v.device_type == "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5Installer:1") then
-			log("Removing older installer: device ID " .. dev_num)
+			log("Removing older installer: device ID ", dev_num)
 			luup.call_action(HAG_SID,"DeleteDevice", {DeviceNum = dev_num}, 0);
 			-- Delete only one at a time. We will reload the luup engine for more.
 			return true
@@ -409,19 +362,25 @@ function SceneControllerInstaller_Init(lul_device)
   -- And if there is more than one of us, that we are the lowest numbered device.
   -- Otherwise delete ourselves.
   if not IsFirstAndLatestInstallerVersion(lul_device, GenGenInstaller_Version) then
-	log("Removing superfluous installer: device ID " .. lul_device)
+	log("Removing superfluous installer: device ID ", lul_device)
 	luup.call_action(HAG_SID,"DeleteDevice", {DeviceNum = lul_device}, 0);
 	return
   end
 
   -- Now look for older installers with different names and delete them one at a time
   if DeleteOldInstallers(lul_device) then
-	log ("Older installer deleted. Reloading LuaUPnP.")
+	log("Older installer deleted. Reloading LuaUPnP.")
 	luup.call_action(HAG_SID, "Reload", {}, 0)
 	return
   end
 
   luup.attr_set("invisible","1",lul_device)
+
+  if luup.job_watch then
+	luup.job_watch("SceneController_JobWatchCallBack") -- Watch jobs on all devices.
+  else
+	DLog("luup.job_watch does not exist")
+  end
 
   function b642bin(str)
   	return nixio.bin.b64decode(string.gsub(str, "%s+", ""))
@@ -1449,10 +1408,10 @@ function SceneControllerInstaller_Init(lul_device)
 	ScanForNewDevices()
 
 	if reload_needed then
-		log ("Files updated. Reloading LuaUPnP.")
+		log("Files updated. Reloading LuaUPnP.")
 		luup.call_action(HAG_SID, "Reload", {}, 0)
 	else
-		verbose("Nothing updated. No need to reload.")
+		VLog("Nothing updated. No need to reload.")
 	end
 end	-- function SceneControllerInstaller_Init
 

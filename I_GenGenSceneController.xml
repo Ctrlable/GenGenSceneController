@@ -4,14 +4,6 @@
   <startup>SceneController_Init</startup>
   <actionList>
     <action>
-      <serviceId>urn:gengen_mcv-org:serviceId:SceneController1</serviceId>
-      <name>RunZWaveQueue</name>
-      <run>
-		SceneController_RunZWaveQueue(lul_device, lul_settings)
-        return true
-      </run>
-    </action>
-    <action>
       <serviceId>urn:gengen_mcv-org:serviceId:ZWaveMonitor1</serviceId>
       <name>Monitor</name>
       <run>

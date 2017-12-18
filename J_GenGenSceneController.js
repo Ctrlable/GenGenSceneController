@@ -1,4 +1,4 @@
-// User interface for GenGeneric Scene Controller Version 1.05
+// User interface for GenGeneric Scene Controller Version 1.06
 // Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
@@ -25,8 +25,8 @@ var EVOLVELCD1 = {
 	ImplementationXml       : "I_EvolveLCD1.xml",
 	NumTemperaturScrens     : 3, // Preset Pages 8, 16, and 40
 	ScreenTypes 			: [
-		{ prefix: "C", name: "Custum",      num: 9 },
-		{ prefix: "T", name: "Temperature", num: 9 },
+		{ prefix: "C", name: "Custum",      num: 6 },
+		{ prefix: "T", name: "Temperature", num: 6 },
 		{ prefix: "P", name: "Preset",      num: 41 }
 		// { prefix: "W", name: "Welcome",     num: 1 },
 	],
@@ -36,8 +36,14 @@ var EVOLVELCD1 = {
 	SceneBases              : {
 		C: 1,	// Custom      screen scenes start at base 1
 		T: 31,	// Temperature screen scenes start at base C + 5 buttons * 6 custom screens
-		W: 61,	// Welcome     screen scenes start at base T + 5 buttons * (2 + 4) temperature screens
+		W: 61,	// Welcome     screen scenes start at base T + 5 buttons * 6 temperature screens
 		P: 66	// Preset      screen scenes start at base W + 5 buttons * 1 welcome screen
+		// 271-300 - Unused	                 start at base P + 5 buttons * 41 preset screens
+		// 301-330 - Lines 6-10 for Custom screens 1
+		// 331-1000 - Unused
+		// 1001-1030 - State 2 for multi-state custom screens. (1031-2000 - Unused)
+		// ...
+		// 8001-8030 - State 9 for multi-state custom screens. (8031 and above - Unused)
 	},
 	// Returns true if the screen/version combination is supported at least in English
 	ScreenIsCompatible		: function(SCObj, screenType, screenNum, version) {
@@ -652,7 +658,7 @@ function SceneController_ParseModeString(SCObj, str) {
 	} else {
 		mode.prefix = str.charAt(0);
 		str = str.slice(1);
-		var matchArray = str.match(/([A-Z][0-9]):+(.*)$/)  // :+ to deal with an old bug
+		var matchArray = str.match(/([A-Z][0-9]+):+(.*)$/)  // :+ to deal with an old bug
 		if (matchArray) {
 			mode.newScreen = matchArray[1];
 			str = matchArray[2];
@@ -1271,7 +1277,7 @@ function SceneController_Screens(SCObj, deviceId) {
 						}
 						// Scene buttons
 						var buttonGroup = Math.floor((button-1)/SCObj.NumButtons)
-						var sceneNum = SCObj.SceneBases[screenType]+((screenNum-1)*SCObj.NumButtons)+((button-1)%SCObj.NumButtons)+(buttonGroup ? (200 + buttonGroup*100):0)+((state-1)*1000);
+						var sceneNum = SCObj.SceneBases[screenType]+((screenNum-1)*SCObj.NumButtons)+((button-1)%SCObj.NumButtons)+(buttonGroup ? (300 + buttonGroup*100):0)+((state-1)*1000);
 					    html += '  <td align="left" style="padding-left:3px;"><div style="width:'+ (SceneController_IsUI7() ? 300 : 150) + 'px;'+(SceneController_IsUI7() ? 'padding-top:2px;padding-bottom:2px;': '')+'">\n';
 						if (mode.newScreen) {
 							var modeParam = mode.newScreen;

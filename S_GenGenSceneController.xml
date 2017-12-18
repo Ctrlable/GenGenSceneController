@@ -4,64 +4,6 @@
     <minor>0</minor>
   </specVersion>
   <serviceStateTable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_NumEntries</name>
-	  <sendEventsAttribute>no</sendEventsAttribute>
-      <dataType>int</dataType>
-	  <allowedValueRange>
-        <minimum>1</minimum>
-      </allowedValueRange>
-    </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_E1</name>
-	  <sendEventsAttribute>no</sendEventsAttribute>
-      <dataType>string</dataType>
-    </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_E2</name>
-	  <sendEventsAttribute>no</sendEventsAttribute>
-      <dataType>string</dataType>
-    </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_E3</name>
-	  <sendEventsAttribute>no</sendEventsAttribute>
-      <dataType>string</dataType>
-    </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_E4</name>
-	  <sendEventsAttribute>no</sendEventsAttribute>
-      <dataType>string</dataType>
-    </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_E5</name>
-	  <sendEventsAttribute>no</sendEventsAttribute>
-      <dataType>string</dataType>
-    </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_E6</name>
-	  <sendEventsAttribute>no</sendEventsAttribute>
-      <dataType>string</dataType>
-    </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_E7</name>
-	  <sendEventsAttribute>no</sendEventsAttribute>
-      <dataType>string</dataType>
-    </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_E8</name>
-	  <sendEventsAttribute>no</sendEventsAttribute>
-      <dataType>string</dataType>
-    </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_E9</name>
-	  <sendEventsAttribute>no</sendEventsAttribute>
-      <dataType>string</dataType>
-    </stateVariable>
-    <stateVariable sendEvents="no">
-      <name>A_ARG_TYPE_E10</name>
-	  <sendEventsAttribute>no</sendEventsAttribute>
-      <dataType>string</dataType>
-    </stateVariable>
     <stateVariable sendEvents="yes">
       <name>CurScreen</name>
       <dataType>string</dataType>
@@ -154,66 +96,6 @@
     </stateVariable>
   </serviceStateTable>
   <actionList>
-    <action>
-      <name>RunZWaveQueue</name>
-      <argumentList>
-        <argument>
-          <name>NumEntries</name>
-          <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_NumEntries</relatedStateVariable>
-        </argument>
-        <argument>
-          <name>E1</name>
-          <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_E1</relatedStateVariable>
-        </argument>
-        <argument>
-          <name>E2</name>
-          <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_E2</relatedStateVariable>
-        </argument>
-        <argument>
-          <name>E3</name>
-          <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_E3</relatedStateVariable>
-        </argument>
-        <argument>
-          <name>E4</name>
-          <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_E4</relatedStateVariable>
-        </argument>
-        <argument>
-          <name>E5</name>
-          <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_E5</relatedStateVariable>
-        </argument>
-        <argument>
-          <name>E6</name>
-          <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_E6</relatedStateVariable>
-        </argument>
-        <argument>
-          <name>E7</name>
-          <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_E7</relatedStateVariable>
-        </argument>
-        <argument>
-          <name>E8</name>
-          <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_E8</relatedStateVariable>
-        </argument>
-        <argument>
-          <name>E9</name>
-          <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_E9</relatedStateVariable>
-        </argument>
-        <argument>
-          <name>E10</name>
-          <direction>in</direction>
-          <relatedStateVariable>A_ARG_TYPE_E10</relatedStateVariable>
-        </argument>
-      </argumentList>
-    </action>
     <action>
       <name>SetScreen</name>
       <argumentList>

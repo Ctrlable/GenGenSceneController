@@ -17,6 +17,11 @@
         <serviceId>urn:gengen_mcv-org:serviceId:SceneControllerInstaller1</serviceId>
         <SCPDURL>S_GenGenSceneControllerInstaller.xml</SCPDURL>
       </service>
+      <service>
+        <serviceType>urn:schemas-gengen_mcv-org:service:ZWaveMonitor:1</serviceType>
+        <serviceId>urn:gengen_mcv-org:serviceId:ZWaveMonitor1</serviceId>
+        <SCPDURL>S_GenGenZWaveMonitor.xml</SCPDURL>
+      </service>
     </serviceList>
     <implementationList>
       <implementationFile>I_GenGenSceneControllerInstaller.xml</implementationFile>

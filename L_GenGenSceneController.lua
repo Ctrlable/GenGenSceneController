@@ -1,25 +1,24 @@
--- GenGeneric Scene Controller Version 1.05
+-- GenGeneric Scene Controller Version 1.06
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
 -- VerboseLogging == 0: important logs and errors:    ELog, log
--- VerboseLogging == 1: Includes debug logs:          ELog, log, DLog, DTableToString
--- VerboseLogging == 2: Include extended ZWave Queue  ELog, log, DLog, DTableToString,
--- VerboseLogging == 3:	Includes verbose logs:        ELog, log, DLog, DTableToString, VLog, VTableToString
-
-local VerboseLogging = 0
+-- VerboseLogging == 1: Includes debug logs:          ELog, log, DLog, DEntry
+-- VerboseLogging == 2: Include extended ZWave Queue  ELog, log, DLog, DEntry
+-- VerboseLogging == 3:	Includes verbose logs:        ELog, log, DLog, DEntry, VLog, VEntry
+VerboseLogging = 0
 
 bit = require "bit"
 posix = require "posix"
 socket = require "socket"
 zwint = require "zwint"
+require "L_GenGenSceneControllerShared"
 
 DEVTYPE_EVOLVELCD1    = "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1"
 DEVTYPE_COOPEREFWC5   = "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1"
 DEVTYPE_NEXIAONETOUCH = "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1"
 
 SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
-SID_ZWAVEMONITOR      = "urn:gengen_mcv-org:serviceId:ZWaveMonitor1"
 
 local SCObj
 
@@ -91,6 +90,7 @@ Devices = {
 				-- This works OK for firmware version 00.00.39
 				GetTuningParameter("BaseDelay"     		, 300 , zwave_dev_num)
 				GetTuningParameter("ClearDelay"    		, 700 , zwave_dev_num)
+				GetTuningParameter("ScrollDelay"    	, 1000 , zwave_dev_num)
 				GetTuningParameter("LineDelay"     		, 35  , zwave_dev_num)
 				GetTuningParameter("CharDelay"     		, 8   , zwave_dev_num)
 				GetTuningParameter("ResponseDelay" 		, 30  , zwave_dev_num)
@@ -102,6 +102,7 @@ Devices = {
 				-- This works OK for firmware version 00.00.37
 				GetTuningParameter("BaseDelay"     		, 100 , zwave_dev_num)
 				GetTuningParameter("ClearDelay"    		, 700 , zwave_dev_num)
+				GetTuningParameter("ScrollDelay"    	, 1000 , zwave_dev_num)
 				GetTuningParameter("LineDelay"     		, 100 , zwave_dev_num)
 				GetTuningParameter("CharDelay"     		, 10  , zwave_dev_num)
 				GetTuningParameter("ResponseDelay" 		, 30  , zwave_dev_num)
@@ -118,6 +119,7 @@ Devices = {
 				--  them, and I'm not re-drawing screens during normal operation, so they're working just fine."
 				GetTuningParameter("BaseDelay"     		, 3000, zwave_dev_num)
 				GetTuningParameter("ClearDelay"    		, 5   , zwave_dev_num)
+				GetTuningParameter("ScrollDelay"    	, 1000 , zwave_dev_num)
 				GetTuningParameter("LineDelay"     		, 5   , zwave_dev_num)
 				GetTuningParameter("CharDelay"     		, 5   , zwave_dev_num)
 				GetTuningParameter("ResponseDelay" 		, 30  , zwave_dev_num)
@@ -180,7 +182,7 @@ Devices = {
 		SetButtonType = function(peer_dev_num, node_id, physicalButton, newType, force, oldType)
 			local delay = 0
 			if physicalButton >= 2 and physicalButton <= 4 and (newType == 3 or oldType == 3 or force) then -- Thermostat mode
-				delay = 300
+				delay = 500
 			end
 			if force or oldType ~= newType then
 				SetConfigurationOption("SetButtonType", peer_dev_num, node_id, physicalButton, newType, delay)
@@ -427,6 +429,7 @@ Devices = {
 		    VEntry()
 			GetTuningParameter("BaseDelay"     		, 300 , zwave_dev_num)
 			GetTuningParameter("ClearDelay"    		, 700 , zwave_dev_num)
+			GetTuningParameter("ScrollDelay"    	, 1000 , zwave_dev_num)
 			GetTuningParameter("LineDelay"     		, 35  , zwave_dev_num)
 			GetTuningParameter("CharDelay"     		, 8   , zwave_dev_num)
 			GetTuningParameter("ResponseDelay" 		, 30  , zwave_dev_num)
@@ -442,6 +445,12 @@ Devices = {
 			GetTuningParameter("AssociationDelay"       , 0   , zwave_dev_num)
 			GetTuningParameter("SceneControllerConfDelay", 0  , zwave_dev_num)
 
+		   	local node_id = GetZWaveNode(zwave_dev_num)
+			local peer_dev_num = GetPeerDevNum(zwave_dev_num)
+
+			-- Set up Wake-Up no-more-information intercepting
+			ChangeBatteryNoMoreInformationMonitor(peer_dev_num, node_id, true)
+
 			-- Here we set up kluges to avoid problems with UI7 with the Nexia One-Touch
 			-- LuaUPnP does not handle the ASSOCIATION_GROUP_INFO_GET command in list mode
 			-- correctly. The device is allowed to send all of its associations in one list
@@ -456,9 +465,9 @@ Devices = {
 			-- The nexia 1-touch for its part is sending the wrong profile for group 1
 			-- It should be 0x0001 (lifeline) rather 0x0000 (N/A) but this is relatively minor
 			-- and we fix that here too. 
-		   	local node_id = GetZWaveNode(zwave_dev_num)
 
 			MonitorZWaveData( true, -- outgoing
+							  peer_dev_num,
 							  nil, -- No arm data
 --[==[
                                               C1                       C2
@@ -516,6 +525,7 @@ Device 45=Nexia One Touch Scene Controller Z-Wave ----+   ¦    ¦   ¦    ¦    ¦
 							  "NexiaBypass1")
 
 			MonitorZWaveData( true, -- outgoing
+							  peer_dev_num,
 							  nil, -- No arm data
 --[==[
                                               C1                                 C2
@@ -679,7 +689,6 @@ DEVTYPE_THERMOSTAT = "urn:schemas-upnp-org:device:HVAC_ZoneThermostat:1"
 SID_HADEVICE       = "urn:micasaverde-com:serviceId:HaDevice1"
 SID_HAG            = "urn:micasaverde-com:serviceId:HomeAutomationGateway1"
 SID_SCTRL          = "urn:micasaverde-com:serviceId:SceneController1"
-SID_ZWN       	   = "urn:micasaverde-com:serviceId:ZWaveNetwork1"
 SID_ZWDEVICE       = "urn:micasaverde-com:serviceId:ZWaveDevice1"
 SID_DIMMING        = "urn:upnp-org:serviceId:Dimming1"
 SID_FANMODE        = "urn:upnp-org:serviceId:HVAC_FanOperatingMode1"
@@ -752,83 +761,9 @@ SCREEN_MD = {
 --
 
 local ZWaveSceneIdCacheList = {}
-local ZWaveQueue = {}
-local ExternalZWaveQueue = {}
-local ActiveZWaveJob = nil
-local ZWaveQueueNext = nil
-local ZWaveQueueNodes = 0
 local param = {}
-local TaskHandleList = {}
-local ResponseContextList = {}
-local ResponseContextNum = 0
 local lastChangedModes = {}
 local temperatureAutoChoices = {}
-
---
--- Debugging functions
---
-
-local ANSI_RED     = "\027[31m"
-local ANSI_GREEN   = "\027[32m"
-local ANSI_YELLOW  = "\027[33m"
-local ANSI_BLUE    = "\027[34m"
-local ANSI_MAGENTA = "\027[35m"
-local ANSI_CYAN    = "\027[36m"
-local ANSI_WHITE   = "\027[37m"
-local ANSI_RESET   = "\027[0m"
-
-function stackDepthIndent()
-	local str = ""
-	local level = 4
-	while debug.getinfo (level, "n") do
-		str = str .. "  "
-		level = level + 1
-	end
-	return str
-end
-
-function getFunctionInfo(level,name)
-    local info = debug.getinfo(level, "n")
-	if not name then
-		if info and info.name then
-			name = info.name
-		else
-			info = debug.getinfo(level)
-			if info then
-			    name = "unknown [line " .. tostring(info.currentline-1).."]"
-				local s2 = string.gsub(info.source,"[^\n]*\n", "", info.currentline-2)
-				if s2 then
-					local s3 = string.match(s2, "[^\n]*")
-					if s3 then
-						local s4 = string.match(s3, "function%s*([%w_]+)")
-						if s4 then
-							name = s4
-						else
-							name = s3
-						end
-					end
-				end
-			else
-				name = "unknown"
-			end
-		end
-	end
-	local str = name.."("
-	local ix = 1
-	while true do
-		local name, value = debug.getlocal(level, ix)
-		if not name then
-			break
-		end
-		if ix > 1 then
-			str = str .. ", "
-		end
-		str = str .. tostring(name) .. "=" .. tableToString(value)
-		ix = ix + 1
-	end
-	str = str .. ")"
-	return str
-end 
 
 -- Make sure tha all of the log functions work before even the SCObj global is set.
 function GetDeviceName()
@@ -839,145 +774,6 @@ function GetDeviceName()
   return name
 end
 
-function logList(...)
-  local s = ""
-  for i = 1, select ("#", ...) do
-  	local x = select(i, ...)
-    if type(x) == "string" then
-	  s = s .. x
-	else
-	  s = s .. tableToString(x)
-	end
-  end 
-  return s
-end
-
-function ELog(...)
-  luup.log(ANSI_RED .. GetDeviceName() .."   Error: " .. ANSI_RESET .. stackDepthIndent() .. logList(...) .. debug.traceback(ANSI_CYAN, 2) .. ANSI_RESET)
-end
-
-function log(...)
-  luup.log(GetDeviceName() ..": " .. stackDepthIndent() .. logList(...))
-end
-
-function DLog(...)
-  if VerboseLogging > 0 then
-    luup.log(GetDeviceName() .. "   debug: " .. stackDepthIndent() .. logList(...))
-  end
-end
-
-function DEntry(name)
-  if VerboseLogging > 0 then
-    luup.log(GetDeviceName() .. "   debug: " .. stackDepthIndent() .. getFunctionInfo(3,name))
-  end
-end
-
-function VLog(...)
-  if VerboseLogging > 2 then
-    luup.log(GetDeviceName() .. " verbose: " .. stackDepthIndent() .. logList(...))
-  end
-end
-
-function VEntry(name)
-  if VerboseLogging > 2 then
-    luup.log(GetDeviceName() .. " verbose: " .. stackDepthIndent() .. getFunctionInfo(3,name))
-  end
-end
-
-function printTable(tab,prefix,hash)
-	local k,v,s,i, top, pref, p, q, r
-	if prefix == nil then
-		prefix = ""
-	end
-	if hash == nil then
-	    top = true
-		hash = {}
-	else
-	    top = false
-	end
-	if hash[tab] ~= nil then
-		log(prefix .. "recursive " .. hash[tab])
-		return
-	end
-	if type(tab) == "string" then
-	  	log(prefix .. " (" .. type(tab) .. ") = " .. string.format("%q", tab))
-	elseif type(tab) ~= "table" then
-	  	log(prefix .. " (" .. type(tab) .. ") = " .. tostring(tab))
-	else
-		hash[tab] = prefix
-		r = {}
-		if top then
-			log(prefix .. "{")
-			pref = prefix
-			prefix = prefix .. "  "
-		end
-		for k,v in pairs(tab) do
-			table.insert(r,{k=k, v=v})
-		end
-		table.sort(r,function(x,y) return tostring(x.k):lower() < tostring(y.k):lower(); end)
-		for p,q in ipairs(r) do
-		 	k = q.k;
-		 	v = q.v;
-		 	if type(k) == "table" then
-		    	log(prefix .. "key-{")
-		     	printTable(k,prefix .. "       ", hash);
-				s = "    }: "
-			else
-		    	s = tostring(k) .. ": "
-			end
-			if type(v) == "table" then
-				log(prefix .. s .. "{")
-				printTable(v,prefix .. string.rep(" ",#s) .. "  ", hash)
-				log(prefix .. string.rep(" ",#s) .. "}")
-			elseif type(v) == "string" then
-		   		log(prefix .. s .. "(" .. type(v) .. ") " .. string.format("%q",v))
-			else
-		   		log(prefix .. s .. "(" .. type(v) .. ") " .. tostring(v))
-			end
-		end
-		if top then
-			log(pref .. "}")
-		end
-		hash[tab] = nil;
-	end
-end
-
-function tableToString(tab, hash)
-  if type(tab) == "string" then
-	return string.format("%q",tab)
-  elseif type(tab) ~= "table" then
-    return tostring(tab)
-  end
-  if hash == nil then
-	hash = {}
-  elseif hash[tab] then
-    return "recursive"
-  end
-  hash[tab] = true
-  local k,v,s
-  s = "{"
-  for k,v in pairs(tab) do
-      if s ~= "{" then
-	     s = s .. ", "
-	  end
-      if type(k) == "table" then
-	     s = s .. tableToString(k, hash)
-	  else
-	     s = s .. tostring(k)
-	  end
-	  s = s .. "="
-	  if type(v) == "string" then
-		 s = s .. string.format("%q",v)
-      elseif type(v) == "table" then
-	     s = s .. tableToString(v, hash)
-	  else
-	     s = s .. tostring(v)
-	  end
-   end
-   s = s .. "}"
-   hash[tab] = nil
-   return s
-end
 
 --
 -- Start benchmark code
@@ -1062,8 +858,8 @@ function SceneController_VerboseLoggingChange(lul_device, lul_service, lul_varia
 	local oldVerboseLogging = VerboseLogging
 	VerboseLogging = tonumber(lul_value_new)
 	log("VerboseLogging changed: Old level was ", oldVerboseLogging, " New level is ", VerboseLogging)
-	local firstPeer = GetFirstPeer();
-	local firstNodeId, firstZWave = GetZWaveNode(firstPeer)
+	local firstInstaller = GetFirstInstaller();
+	local firstNodeId, firstZWave = GetZWaveNode(firstInstaller)
 	if lul_device ~= firstZWave then
 		luup.variable_set(SID_SCENECONTROLLER, "SCENE_CTRL_VerboseLogging", VerboseLogging, firstZWave)
 	end
@@ -1093,12 +889,12 @@ function GetTuningParameter(name, default_value, zwave_dev_num, functionName)
 	luup.variable_watch(functionName, SID_SCENECONTROLLER, "SCENE_CTRL_"..name, zwave_dev_num)
 end
 
+-- 
+-- Z-Wave Queue
 --
--- Z-Wave Queue and job handling
---
+
 function EnqueueActionOrMessage(queueNode)
   VEntry()
-  local first_peer = GetFirstPeer()
   local peer_dev_num = GetPeerDevNum(luup.device)
   local description = ""
   if peer_dev_num then
@@ -1106,63 +902,11 @@ function EnqueueActionOrMessage(queueNode)
 	if not queueNode.responseDevice then
 		queueNode.responseDevice = peer_dev_num
 	end
+	queueNode.HasBattery = SCObj.HasBattery
   end
   queueNode.description = description
-  if first_peer == peer_dev_num then
-	VLog("EnqueueActionOrMessage-Internal: ", queueNode)
-	local node_id = queueNode.node_id
-	if not node_id then
-		node_id = 0
-	end
-	if queueNode.pattern then
-		-- Handle cases where callback was passed as nil.
-		-- Also handles cases where a non-first-peer relays the response to
-		-- the first peer to release the waitingForResponse flag.
-		if not queueNode.context then
-      		ResponseContextNum = ResponseContextNum + 1
-  	  		queueNode.context = "W" .. queueNode.node_id .. "_" .. ResponseContextNum
-		end
-		if not ResponseContextList[queueNode.context] then
-	  		ResponseContextList[queueNode.context] = {incoming=true, oneshot=queueNode.oneshot, releaseNodeId=queueNode.node_id}
-		end 
-	end
-	local newDev = ZWaveQueue[node_id]
-	if not newDev then
-	  newDev = {node_id=node_id}
-	  ZWaveQueue[node_id] = newDev
-	  ZWaveQueueNodes = ZWaveQueueNodes + 1
-	  if not ZWaveQueueNext then
-		newDev.next = newDev
-		newDev.prev = newDev
-		ZWaveQueueNext = newDev
-	  else
-		newDev.next = ZWaveQueueNext
-		newDev.prev = ZWaveQueueNext.prev
-		ZWaveQueueNext.prev.next = newDev
-		ZWaveQueueNext.prev = newDev
-	  end
- 	end
-	if #newDev > 0 and newDev[#newDev].final then
-		if not queueNode.final then -- Ignore final over final
-			table.insert(newDev, #newDev, queueNode) -- Insert non-final before existing final
-		end
-	else
-		table.insert(newDev, queueNode) -- Normal case. Insert at end.
-	end
-	if queueNode.node_id == 0 and ZWaveQueueNext ~= newDev then
-		-- Node 0 entries have priority. Bring them to the front of the queue.
-		newDev.next.prev = newDev.prev
-		newDev.prev.next = newDev.next
-		newDev.next = ZWaveQueueNext
-		newDev.prev = ZWaveQueueNext.prev
-		ZWaveQueueNext.prev.next = newDev
-		ZWaveQueueNext.prev = newDev
-		ZWaveQueueNext = newDev
-	end
-  else
-	VLog("EnqueueActionOrMessage-External: ", queueNode)
-	table.insert(ExternalZWaveQueue, queueNode)
-  end
+  VLog("EnqueueActionOrMessage-External: ", queueNode)
+  table.insert(ExternalZWaveQueue, queueNode)
 end
 
 -- Enqueue a Z-Wave message. No response is expected. Wait <delay> milliseconds
@@ -1175,20 +919,6 @@ function EnqueueZWaveMessage(name, node_id, data, delay)
   	node_id=node_id,
   	data=data,
   	delay=delay})
-end
-
--- Enqueue the last Z-Wave message in a group. 
--- This is used for the "no more information" message for battery devices. 
--- It may be deleted if other items are queued behind it.
-function EnqueueFinalZWaveMessage(name, node_id, data)
-  VEntry()
-  EnqueueActionOrMessage({
-  	type=1,
-  	name=name,
-  	node_id=node_id,
-  	data=data,
-  	delay=0,
-  	final=true})
 end
 
 -- Enqueue a Lua action within the Z-Wave queue
@@ -1222,9 +952,9 @@ function EnqueueZWaveMessageWithResponse(name, node_id, data, delay, pattern, ca
   VEntry()
   local context
   if callback then
-    ResponseContextNum = ResponseContextNum + 1
-  	context = "R_" .. name .. "_" .. node_id .. "_" .. ResponseContextNum
-  	ResponseContextList[context] = {incoming=true, callback=callback, oneshot=oneshot, releaseNodeId=node_id}
+    MonitorContextNum = MonitorContextNum + 1
+  	context = "R_" .. name .. "_" .. node_id .. "_" .. MonitorContextNum
+  	MonitorContextList[context] = {incoming=true, callback=callback, oneshot=oneshot, releaseNodeId=node_id}
   end
   EnqueueActionOrMessage({
   	type=1,
@@ -1239,447 +969,6 @@ function EnqueueZWaveMessageWithResponse(name, node_id, data, delay, pattern, ca
   	armPattern=armPattern,
   	autoResponse=autoResponse})
   return context
-end
-
--- Monitors a Z-Wave message sent by the controller or intercpets a message sent by LuaUPnP
---   and optionally removes the message and sends an expected autoResponse back to to the sender
--- Outgoing is false for monitoring incoming data or true for intercepting outgoing data.
--- Arm_regex is an optional Linux extended regular expression which will be matched
---   against the hexified data in the opposite direction. A match will arm the monitor/intercept.
---   If arm_pattern is nil then the monitor/intercept is always armed.
--- Main_regex is a Linux extended regular expression which will be matched
---   against the hexified outgoing Z-Wave data from LuaUPnP (intercept) or incoming data
---   from the controller (monitor). A match will trigger the monitor/incercept if it is armed.
--- Response (if not nil) is a hex string which will be returned to the sender (after converting into
---   binary) when monitor/intercept is triggered. The data that caused the trigger is not passed through.
---   If autoResponse is nil then the data is passed through.
---   The autoResponse string can also include \1 ... \9 captures from the intercept regex (but not the
---   arm regex) and can also include XX to calculate the Z-Wave checksum.
--- Callback is a function which is passed the peer device number and any captures from
---   the main regex. The capture array is nil if a timeout occurred.
---   Callback can also be a string as a function name in which case the callback will be executed
---     by the "first peer" device which actually dispatches most Z-Wave commands
---   Unlike EnqueueZWaveMessageWithResponse, Callback must not be nil.
--- Oneshot is true if the intercept should be canceled as soon as it matches.
---   If OneShot is false and arm_regex is not nil, then the intercept is disarmed when it triggers.
--- Timeout and delay are in milliseconds.
---   If timeout is 0 then the monitor will be active until canceled with CancelZWaveMonitor
--- Returns a context which can be passed to CancelZWaveMonitor or nil if error.
-function MonitorZWaveData(outgoing, arm_regex, intercept_regex, autoResponse, callback, owneshot, timeout, label)
-	VEntry()
-  	local peer_dev_num
-  	local context
-	peer_dev_num = GetPeerDevNum(luup.device)
-	ResponseContextNum = ResponseContextNum + 1
-	local prefix = "M_"
-	if outgoing then
-  		prefix = "I_"
-	end
-	context = prefix .. label .. "_" .. peer_dev_num.."_"..ResponseContextNum
-	ResponseContextList[context] = {outgoing=outgoing, callback=callback, oneshot=oneshot}
-  	local result, errcode, errmessage
-  	if outgoing then
-    	result, errcode, errmessage = zwint.intercept(peer_dev_num, context, intercept_regex, owneshot, timeout, arm_regex, autoResponse)
-  	else
-    	result, errcode, errmessage = zwint.monitor(peer_dev_num, context, intercept_regex, owneshot, timeout, arm_regex, autoResponse)
-  	end
-  	if not result then
-		ELog("MonitorZWaveData: zwint failed. error code=", errcode, " error message=", errmessage)
-		ResponseContextList[context] = nil;
-		return nil;
-  	end
-  	return context;
-end
-
-function RemoveHeadFromZWaveQueue(job)
-	local queue = ZWaveQueueNext
-	if job then
-	   queue = ZWaveQueue[job.node_id]
-	end
-	if not queue then
-		return false
-	end
-	table.remove(queue,1)
-	if #queue == 0 then
-		ZWaveQueue[queue.node_id] = nil
-		ZWaveQueueNodes = ZWaveQueueNodes - 1
-		if queue.next == queue then
-			ZWaveQueueNext = nil
-			return false
-		else
-			queue.next.prev = queue.prev
-			queue.prev.next = queue.next
-			if queue == ZWaveQueueNext then
-				ZWaveQueueNext = queue.next
-			end
-		end
-	end
-	return true;
-end
-
--- Always run the Z-Wave queue in a delay task to avoid any deadlocks.
-function RunZWaveQueue(fromWhere, delay_ms)
-	DEntry()
-	local delay_sec = math.floor(delay_ms / 1000)
-	local sleep_ms = delay_ms - delay_sec*1000
-	if sleep_ms > 0 then
-		luup.sleep(sleem_ms)
-	end
-	if ZWaveQueueNext then
-		luup.call_delay("RunInternalZWaveQueue", delay_sec, fromWhere, true)
-	end
-	if #ExternalZWaveQueue > 0 then
-		luup.call_delay("RunExternalZWaveQueue", delay_sec, fromWhere, true)
-	end
-end
-
-function RunExternalZWaveQueue(fromWhere)
-	VEntry()
-	if #ExternalZWaveQueue > 0 then
-		local data = {}
-		for i,v in ipairs(ExternalZWaveQueue) do
-			data["E"..i] = tableToString(v);
-		end
-		data.NumEntries = #ExternalZWaveQueue
-		ExternalZWaveQueue = {}
-	  	luup.call_action(SID_SCENECONTROLLER, "RunZWaveQueue", data, GetFirstPeer())
-	end
-end
-
-function SceneController_RunZWaveQueue(device, settings)
-	DEntry()
-	for i = 1, tonumber(settings.NumEntries) do
-		EnqueueActionOrMessage(assert(loadstring("return "..settings["E"..i],"E"..i))())
-	end
-	RunZWaveQueue("External", 0)
-end
-
-function RunInternalZWaveQueue(fromWhere)
-	VEntry()
-  	if not ZWaveQueueNext then
-      VLog("RunInternalZWaveQueue: fromWhere=", fromWhere, " queue is empty")
-	  return
-  	end
-
-  	if ActiveZWaveJob then
-	  VLog("RunInternalZWaveQueue(", fromWhere, ") Job still active: job=", ActiveZWaveJob)
-	  return
-  	end
-
-  	-- If the head of the queue is in a time delay or otherwise blocked.
-  	-- look around the queue array for another queue who's first job we can perform now 
-  	-- or else has the shortest delay.
-   	local now =	socket.gettime()
-    local nextTime = nil
-    local nextQueue = nil
-    local ZWaveQueueFirst = ZWaveQueueNext
-  	while ZWaveQueueNext[1].waitUntil or ZWaveQueueNext[1].waitingForResponse or ZWaveQueueNext[1].batteryWait do
-  		if not (ZWaveQueueNext[1].waitingForResponse or ZWaveQueueNext[1].batteryWait) then
-  			if ZWaveQueueNext[1].waitUntil > now then
-  				if not nextTime or nextTime > ZWaveQueueNext[1].waitUntil then
-  		    		nextTime = ZWaveQueueNext[1].waitUntil
-  		    		nextQueue = ZWaveQueueNext
-  		  		end
-  		  	else
-				VLog("RunInternalZWaveQueue: Removing time wait queu entry which timed out ", (now - ZWaveQueueNext[1].waitUntil), "seconds ago: ", ZWaveQueueNext[1])
-  		  		if RemoveHeadFromZWaveQueue() then
-  		  			RunZWaveQueue(fromWhere.." after timeout", 0)
-  		  		end
-  		  		return
-  		  	end
-  		end
-  		if ZWaveQueueNext.node_id ~= 0 and ZWaveQueueNext.next ~= ZWaveQueueFirst then
-  		    ZWaveQueueNext = ZWaveQueueNext.next
-  		else
-  		  	if not nextQueue then
-				VLog("RunInternalZWaveQueue: No good candidates. quitting: ", ZWaveQueueNext)
-  		  		return
-  		  	end
-  		    ZWaveQueueNext = nextQueue
-  		    local waitTime = nextTime - now
-  		    if waitTime >= 1 then
-			  	VLog("RunInternalZWaveQueue: Delaying for ", waitTime, " seconds using luup.call_delay.")
-  			  	luup.call_delay("RunInternalZWaveQueue", waitTime, fromWhere.." DelayFor ".. waitTime, true)
-  		    else
-			  	VLog("RunInternalZWaveQueue: Delaying for ", waitTime, " seconds using luup.sleep.")
-  			  	luup.sleep(waitTime*1000)
-  		  		if RemoveHeadFromZWaveQueue() then
-  		  			RunZWaveQueue(fromWhere.." after sleep", 0)
-  		  		end
-  		  	end
-  		    return
-  		end
-   	end
-
-    -- At this pont, we know we have something to do.
-    -- Dump the queue to the log in various ways.
-  	if VerboseLogging >= 2 then
-      local curDev = ZWaveQueueNext
-	  local count = 1;
-	  repeat
-		DLog  ("RunInternalZWaveQueue(", fromWhere, ")   Node_id: ", curDev.node_id, "  Next: ", curDev.next.node_id, "  Prev: ", curDev.prev.node_id)
-	    for i = 1, #curDev do
-	      DLog("RunInternalZWaveQueue(", fromWhere, ")     Entry ", count, ": ", curDev[i])
-		  count = count + 1;
-	    end
-	    curDev = curDev.next
-	  until curDev == ZWaveQueueNext
-	elseif VerboseLogging > 0 then
-  	  local count = 0
-  	  local curDev = ZWaveQueueNext
-	  local nodelist = ""
-	  repeat
-	  	nodelist = nodelist .. curDev.node_id .. "("..#curDev..") "
-		curDev = curDev.next;
-		count = count + 1
-	  until curDev == ZWaveQueueNext or count > 10
-	  DLog("RunInternalZWaveQueue(", fromWhere, "): Nodes: ", ZWaveQueueNodes, " ( ", nodelist, ")")
-	end
-
-	local veraZWaveNode, ZWaveNetworkDeviceId = GetVeraIDs()
-    local j = ZWaveQueueNext[1];
-
-	if j.pattern then
-		VLog("RunInternalZWaveQueue(", fromWhere, "): Calling zwint.monitor: ", j)
-		zwint.monitor(j.responseDevice,j.context,j.pattern,j.oneshot,j.timeout, j.armPattern, j.autoResponse);
-		j.waitingForResponse = true
-	end
-
-	-- If the device is battery operated turn on or off the no more information intercept
-	ChangeBatteryNoMoreInformationMonitor(j.responseDevice, not j.final)
-
-    -- This is where we actually perform the action in a queue entry.
-	ActiveZWaveJob = j
-	if j.type == 1 then
-		if j.node_id > 0 then
-		  	VLog("RunInternalZWaveQueue: type=ZWave, Node=Device name=", j.name, ": ", SID_ZWN, " SendData ", {Node = j.node_id, Data = j.data}, " ", ZWaveNetworkDeviceId);
-		  	j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(SID_ZWN, "SendData", {Node = j.node_id, Data = j.data}, ZWaveNetworkDeviceId)
-		else
-		  	VLog("RunInternalZWaveQueue: type=ZWave, Node=Controller name=", j.name, ": ", SID_ZWN, " SendData ", {Data = j.data}, " ", ZWaveNetworkDeviceId);
-		  	j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(SID_ZWN, "SendData", {                  Data = j.data}, ZWaveNetworkDeviceId)
-		end
-	else
-		VLog("RunInternalZWaveQueue: type=LuaAction: name=", j.name)
-		j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(j.service, j.action, j.arguments, j.device)
-	end
-
-    -- Check for an immediate failure and retry in 5 seconds if so.
-	VLog("RunInternalZWaveQueue: call_action returned err_num=", j.err_num, " err_msg=", j.err_msg, " job_num=", j.job_num, " arguments=", j.arguments)
-	if j.err_num ~= 0 or j.job_num == 0 then
-	    log("RunInternalZWaveQueue(", fromWhere, "): call_action failed, retrying in 5 seconds. ", j);
-		ActiveZWaveJob = nil
-	    if j.pattern then
-			j.waitingForResponse = false
-	    	zwint.cancel(j.responseDevice, j.context)
-	    end
-	    RunZWaveQueue(fromWhere.." retry", 5000)
-	    return
-	end
-
-	if luup.job_watch then
-		return
-	end
-
-	-- From here down is for UI5 only
-	j.startTime = socket.gettime()
-    CheckUI5ZWaveQueueHeadStatus("")
-end
-
--- A UI5 substitutwe for the new luup.job_watch in UI7
-function CheckUI5ZWaveQueueHeadStatus(data)
-  	local j = ActiveZWaveJob
-	if not j then
-		return
-	end
-	local slept = socket.gettime() - j.startTime
-	local delay
-	if slept < 0.1 then
-		delay = 0.1
- 	elseif slept < 0.6	then
-		delay = 0.2
-  	elseif slept < 60 then
-		delay = slept / 3
-	else
-		ELog("CheckUI5ZWaveQueueHeadStatus: Giving up after 1 minute: job=", j)
-		ActiveZWaveJob = nil
-  		if RemoveHeadFromZWaveQueue(j) then
-  		  	RunZWaveQueue("1 minute timeout", 0)
-  		end
-  		return
-    end
-    if delay < 1 then
-    	luup.sleep(delay * 1000)
-    	CheckUI5ZWaveQueueHeadStatus2()
-    else
-    	luup.call_delay("CheckUI5ZWaveQueueHeadStatus2", delay, "", true)
-    end
-end
-
-function CheckUI5ZWaveQueueHeadStatus2(data)
-  	local j = ActiveZWaveJob
-	if not j then
-		return
-	end
-	j.err_num, j.err_msg = luup.job.status(j.job_num, 1)
-  	if not j.err_msg then
-		j.err_msg = ""
-  	end
-  	if j.err_num == 0 then
-    	j.err_msg = j.err_msg .. "Waiting to start"
-  	end
-  	if j.err_num ~= j.last_err_num or j.err_msg ~= j.last_err_msg then
-  		j.last_err_num = j.err_num
-  		j.last_err_msg = j.err_msg
-		local lul_job = {}
-		if j.node_id == 0 then
-			lul_job.type = "ZWJob_GenericSendFrame"
-			lul_job.name = "send_code"
-		else
-			lul_job.type = "ZWJob_SendData"
-			lul_job.name = "childcmd node "..j.node_id
-		end
-		lul_job.status = j.err_num
-		lul_job.notes = j.err_msg
-		SceneController_JobWatchCallBack(lul_job)
-		if j.err_num >= 2 and j.err_num  <= 4 then
-			return
-		end
-	end
-	CheckUI5ZWaveQueueHeadStatus("")
-end
-
-function SceneController_JobWatchCallBack(lul_job)
-	VEntry()
-	if not ZWaveQueueNext then
-		VLog("SceneController_JobWatchCallBack: ZWaveQueue is empty.");
-		return
-	end
-	local j = ActiveZWaveJob
-	if not j then
-		VLog("SceneController_JobWatchCallBack: No Active Z-Wave job.");
-		return
-	end
-	local expectedJobType, expectedName
-	if j.node_id == 0 then
-		expectedJobType = "ZWJob_GenericSendFrame"
-		expectedName = "send_code"
-	else
-		expectedJobType = "ZWJob_SendData"
-		expectedName = "childcmd node "..j.node_id
-	end
-	if lul_job.type ~= expectedJobType then
-		VLog("SceneController_JobWatchCallBack: Job type expected ", expectedJobType, " but got ", lul_job.type)
-		return
-	end
-	if lul_job.name ~= expectedName then
-		VLog("SceneController_JobWatchCallBack: Expected ", expectedName, " but got ", lul_job.name)
-		return
-	end
-	if lul_job.status < 2 or lul_job.status > 4 then
-		VLog("SceneController_JobWatchCallBack: status is still ", lul_job.status, ". notes:", lul_job.notes)
-		return
-	end
-	ActiveZWaveJob = nil
-	if lul_job.status == 2 then -- error
-		if not j.retry then
-			j.retry = 1
-		else
-			j.retry = j.retry + 1
-		end
-		ELog("SceneController_JobWatchCallBack: Job failed. retry=", j.retry)
-		if j.retry <= 3 then
-			RunZWaveQueue("Retry_Job", 0)
-			return
-		end
-	end
-	if lul_job.status == 3 and j.responseDevice and not j.final then
-		local device = luup.devices[j.responseDevice]
-		if device then
-			local obj = Devices[device.device_type]
-			if obj then
-				if obj.HasBattery then
-					j.batteryWait = true
-					log(ANSI_YELLOW, device.description, " is now on battery wait", ANSI_RESET)
-					local handle = TaskHandleList[j.responseDevice]
-					if not handle then
-						handle = -1
-					end
-					TaskHandleList[j.responseDevice] = luup.task("Waiting for device to wake up", 1, device.description, handle)
-					RunZWaveQueue("Battery wait", 0)
-					return
-				end
-			end
-		end
-	end
-	if lul_job.status ~= 4 then
-		ELog("SceneController_JobWatchCallBack: Job failed. Skipping to next job. Final status was ", lul_job.status, " notes:", lul_job.notes)
-		j.delay = 0
-		j.waitingForResponse = false
-	end
-	if j.waitingForResponse then
-		return
-	end
-	if j.delay > 0 then
-		local now = socket.gettime()
-		j.waitUntil = now + j.delay / 1000
-		RunZWaveQueue("Delay_Job", 0)
-	elseif RemoveHeadFromZWaveQueue(j) then
-		RunZWaveQueue("Next_Job", 0)
-	end
-end
-
-function SceneController_ZWaveMonitorResponse(device, response, is_intercept, is_timeout)
-	VEntry()
-	local now = socket.gettime()
-	local context = response.key
-	local releaseNodeId
-	local callback
-	if context then
-		local obj = ResponseContextList[context]
-		if obj then
-			if obj.oneshot then
-				ResponseContextList[context] = nil;
-			end
-			callback = obj.callback
-			releaseNodeId = obj.releaseNodeId
-		else
-			ELog("SceneController_ZWaveMonitorResponse: Response context ", context, " not found in context list: ", ResponseContextList)
-		end
-	end
-	if releaseNodeId then
-		if device == GetFirstPeer() then
-			if ZWaveQueue[releaseNodeId] then
-				local j = ZWaveQueue[releaseNodeId][1]
-				if j.waitingForResponse then
-					j.waitingForResponse = false
-					if j ~= ActiveZWaveJob then
-						if j.delay > 0 then
-							j.waitUntil = socket.gettime() + j.delay / 1000
-							RunZWaveQueue("Delay_Job_after_response", 0)
-						elseif RemoveHeadFromZWaveQueue(j) then
-							RunZWaveQueue("Next_Job_after_response", 0)
-						end
-					end
-				end
-			end
-		else
-			-- A non-first-peer receives the response message first but then relays it
-			-- to the first peer so that it can clear the WaitingForResponse flag
-			-- and allow more messages to be sent for that device.
-	  		luup.call_action(SID_ZWAVEMONITOR, "Monitor", response, GetFirstPeer())		
-		end
-	end
-	if callback then
-		if is_timeout then
-			response = nil
-		end
-		callback(device, response)
-	end
-	RunZWaveQueue("ZWaveMonitorResponse", 0)
-end
-
-function SceneController_ZWaveMonitorError(device, errorCode, errorMessage)
-	ELog("SceneController_ZWaveMonitorError: errorCode=", errorCode, " errorMessage=", errorMessage)
 end
 
 --
@@ -1706,8 +995,11 @@ function EVLCDLabel(screenFlags,lineArray, node_id, zwave_dev_num, delay_overrid
 	local data = "146 2 " .. tostring(screenFlags) -- COMMAND_CLASS_SCREEN_META_DATA version 1 REPORT
 	local part = 1
 	local delay = param.SCENE_CTRL_BaseDelay
-	if bit.band(screenFlags,SCREEN_MD.ScreenMask) ~= SCREEN_MD.NoChange then
+	local screenMask = bit.band(screenFlags,SCREEN_MD.ScreenMask)
+	if screedMask == SCREEN_MD.ClearScreen then
 		delay = delay + param.SCENE_CTRL_ClearDelay
+	elseif screedMask ~= SCREEN_MD.NoChange then
+		delay = delay + param.SCENE_CTRL_ScrollDelay
 	end
 	for lnum = 1,#lineArray do
    		local line = lineArray[lnum]
@@ -1982,41 +1274,9 @@ function GetDeviceCounter(our_zwave_dev_num)
 	return count
 end
 
-firstPeer = nil
-function GetFirstPeer()
-	if not firstPeer then
-		local min
-		for dev_num, v in pairs(luup.devices) do
-			if Devices[v.device_type] and v.device_num_parent ~= 1 then
-				if not firstPeer or firstPeer > dev_num then
-					firstPeer = dev_num
-				end
-			end
-		end
-	end
-	return firstPeer
-end
-
 -- A dummy callback used by Z-Wave intercepts where we really don't need the data or the event.
 function DummyCallback(peer_dev_num, captures)
 	VEntry()
-end
-
-function BatteryNoMoreInformationCallback(peer_dev_num, captures)
-	VEntry()
-	local node_id = tonumber(captures.C2, 16)
-	local list = ZWaveQueue[node_id]
-	if list and list[1] then
-		list[1].batteryWait = false
-		local device = luup.devices[peer_dev_num]
-		log(ANSI_YELLOW, "Battery wait released for ", device.description, ANSI_RESET)
-		local handle = TaskHandleList[peer_dev_num]
-		if not handle then
-			handle = -1
-		end
-		TaskHandleList[peer_dev_num] = luup.task("", 4, device.description, handle)
-	end
-    EnqueueFinalZWaveMessage("BatteryNoMoreInformation", node_id, "0x84 0x8");
 end
 
 function SceneController_Init(lul_device)
@@ -2029,13 +1289,6 @@ function SceneController_Init(lul_device)
 	else
 		ConnectPeerDevice(lul_device)
 		local zwave_node, zwave_dev = GetZWaveNode(lul_device)
-		if luup.job_watch then
-			if lul_device == GetFirstPeer() then
-	 			luup.job_watch("SceneController_JobWatchCallBack") -- Watch jobs on all devices.
-			end
-		else
-			DLog("luup.job_watch does not exist")
-		end
 		local veraZWaveNode, ZWaveNetworkDeviceId = GetVeraIDs()
 	    local ComPort = luup.variable_get(SID_ZWN, "ComPort", ZWaveNetworkDeviceId)
 		VLog("SceneController_Init: calling zwint.register(", ComPort, ")");
@@ -2061,6 +1314,7 @@ Device 10=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦   
                     Checksum OK -------------------------------------------------+
 --]==]
 		MonitorZWaveData(false, -- incoming,
+						 lul_device, -- peer_dev_num
 		                 nil, -- No arm_regex
 		                 "^01 .. 00 04 (..) " .. string.format("%02X", zwave_node) .. " .. 2B 01 (..) (..)", -- Main RegEx
 		                 "06", -- ACK response,
@@ -2086,6 +1340,7 @@ Device 10=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦
                     Checksum OK --------------------------------------------+
 --]==]
 		MonitorZWaveData(false, -- incoming,
+						 lul_device, -- peer_dev_num
 		                 nil, -- No arm_regex
 		                 "^01 .. 00 04 (..) " .. string.format("%02X", zwave_node) .. " .. 20 01 (..)", -- Main RegEx
 		                 "06", -- ACK response,
@@ -2109,6 +1364,7 @@ SWITCH_MULTILEVEL_STOP_LEVEL_CHANGE -------------------------------+    ¦
                     Checksum OK ----------------------------------------+
 --]==]
 		MonitorZWaveData(false, -- incoming,
+						 lul_device, -- peer_dev_num
 		                 nil, -- No arm_regex
 		                 "^01 .. 00 04 (..) " .. string.format("%02X", zwave_node) .. " .. 26 05", -- Main RegEx
 		                 "06", -- ACK response,
@@ -2135,6 +1391,7 @@ Level2 = Size=1 | Fahrenheit | Precision=0 --------------------------------+    
                     Checksum OK -----------------------------------------------------+
 --]==]
 		MonitorZWaveData(false, -- incoming,
+						 lul_device, -- peer_dev_num
 		                 nil, -- No arm_regex
 		                 "^01 .. 00 04 (..) " .. string.format("%02X", zwave_node) .. " .. 43 01 (..) (..) (..)", -- Main RegEx
 		                 "06", -- ACK response,
@@ -2159,6 +1416,7 @@ COMMAND_CLASS_THERMOSTAT_FAN_MODE -----------------------------+   ¦   ¦    ¦
                     Checksum OK --------------------------------------------+
 --]==]
 		MonitorZWaveData(false, -- incoming,
+						 lul_device, -- peer_dev_num
 		                 nil, -- No arm_regex
 		                 "^01 .. 00 04 (..) " .. string.format("%02X", zwave_node) .. " .. 44 01 (..)", -- Main RegEx
 		                 "06", -- ACK response,
@@ -2171,88 +1429,6 @@ COMMAND_CLASS_THERMOSTAT_FAN_MODE -----------------------------+   ¦   ¦    ¦
 	RunZWaveQueue("Init", 0)
 	return true, "ok", SCObj.Name
 end
-
-local NoMoreInformationContexts = {}
-function ChangeBatteryNoMoreInformationMonitor(peer_dev_num, enable)
-	local device = luup.devices[peer_dev_num]
-	if device then
-		local obj = Devices[device.device_type]
-		if obj and obj.HasBattery then
-			if enable then
-				if not NoMoreInformationContexts[peer_dev_num] then
-					local zwave_node = GetZWaveNode(peer_dev_num)
-					NoMoreInformationContexts[peer_dev_num] = MonitorZWaveData( true, -- outgoing
---[==[
-42      12/04/16 20:05:26.449   0x1 0x8 0x0 0x4 0x4 0x9 0x2 0x84 0x7 0x7f (##########)
-           SOF - Start Of Frame --+   ¦   ¦   ¦   ¦   ¦   ¦    ¦   ¦    ¦
-                     length = 8 ------+   ¦   ¦   ¦   ¦   ¦    ¦   ¦    ¦
-                        Request ----------+   ¦   ¦   ¦   ¦    ¦   ¦    ¦
-FUNC_ID_APPLICATION_COMMAND_HANDLER ----------+   ¦   ¦   ¦    ¦   ¦    ¦
-           Receive Status BROAD ------------------+   ¦   ¦    ¦   ¦    ¦
-Device 12=Nexia One Touch Scene Controller Z-Wave ----+   ¦    ¦   ¦    ¦
-                Data length = 2 --------------------------+    ¦   ¦    ¦
-          COMMAND_CLASS_WAKE_UP -------------------------------+   ¦    ¦
-           WAKE_UP_NOTIFICATION -----------------------------------+    ¦
-                    Checksum OK ----------------------------------------+
---]==]
-						"^01 .. 00 04 .. " .. string.format("%02X", zwave_node) .. " .. 84 07",
---[==[
-                                              C1  C2                                   C3
-41      12/04/16 20:05:27.515   0x1 0xd 0x0 0x19 0x9 0x2 0x84 0x8 0x5 0x0 0x0 0x0 0x0 0x4 0x6d (#\r############m)
-           SOF - Start Of Frame --+   ¦   ¦    ¦   ¦   ¦    ¦   ¦   ¦ +-------------+   ¦    ¦
-                    length = 13 ------+   ¦    ¦   ¦   ¦    ¦   ¦   ¦        ¦          ¦    ¦
-                        Request ----------+    ¦   ¦   ¦    ¦   ¦   ¦        ¦          ¦    ¦
-   FUNC_ID_ZW_SEND_DATA_GENERIC ---------------+   ¦   ¦    ¦   ¦   ¦        ¦          ¦    ¦
-Device 12=Nexia One Touch Scene Controller Z-Wave -+   ¦    ¦   ¦   ¦        ¦          ¦    ¦
-                Data length = 2 -----------------------+    ¦   ¦   ¦        ¦          ¦    ¦
-          COMMAND_CLASS_WAKE_UP ----------------------------+   ¦   ¦        ¦          ¦    ¦
-    WAKE_UP_NO_MORE_INFORMATION --------------------------------+   ¦        ¦          ¦    ¦
-Xmit options = ACK | AUTO_ROUTE ------------------------------------+        ¦          ¦    ¦
-           Routing data ignored ---------------------------------------------+          ¦    ¦
-                   Callback = 4 --------------------------------------------------------+    ¦
-                    Checksum OK -------------------------------------------------------------+
---]==]
-						"^01 .. 00 (..) (" .. string.format("%02X", zwave_node) .. ") .. 84 08 .+ (..) ..$",
---[==[
-42      12/04/16 20:05:27.538   0x6 0x1 0x4 0x1 0x19 0x1 0xe2 (#######)
-              ACK - Acknowledge --+   ¦   ¦   ¦    ¦   ¦    ¦
-           SOF - Start Of Frame ------+   ¦   ¦    ¦   ¦    ¦
-                     length = 4 ----------+   ¦    ¦   ¦    ¦
-                       Response --------------+    ¦   ¦    ¦
-   FUNC_ID_ZW_SEND_DATA_GENERIC -------------------+   ¦    ¦
-                     RetVal: OK -----------------------+    ¦
-                    Checksum OK ----------------------------+
-42      12/04/16 20:05:27.539   got expected ACK -- removed
-
-        ACK: 0x6 (#)
-
-42      12/04/16 20:05:27.778   0x1 0x5 0x0 0x19 0x4 0x0 0xe7 (#######)
-           SOF - Start Of Frame --+   ¦   ¦    ¦   ¦   ¦    ¦
-                     length = 5 ------+   ¦    ¦   ¦   ¦    ¦
-                        Request ----------+    ¦   ¦   ¦    ¦
-   FUNC_ID_ZW_SEND_DATA_GENERIC ---------------+   ¦   ¦    ¦
-                   Callback = 4 -------------------+   ¦    ¦
-           TRANSMIT_COMPLETE_OK -----------------------+    ¦
-                    Checksum OK ----------------------------+
-41      12/04/16 20:05:27.779   ACK: 0x6 (#) -- removed
---]==]
-						"06 01 04 01 \\1 01 XX 01 05 00 \\1 \\3 00 XX",
-						BatteryNoMoreInformationCallback, 
-						true, -- oneShot
-						0, -- no timeout
-						"BatteryNoMoreInfo")
-				end
-			else
-				local context = NoMoreInformationContexts[peer_dev_num]
-				if context then 
-	    			zwint.cancel(peer_dev_num, context)
-					ResponseContextList[context] = nil
-					NoMoreInformationContexts[peer_dev_num] = nil
-				end -- if context
-			end -- else not enable
-		end -- if obe and obe.hasBattery 
-	end -- if device
-end -- function ChangeBatteryNoMoreInformationMonitor
 
 -- SceneController_InitScreen gets called once for each device a variable delay after initialization.
 function SceneController_InitScreen(peer_dev_num_string)
@@ -2568,31 +1744,6 @@ function IsVeraPrimaryController()
 	return IsPrimaryController
 end
 
-local veraZWaveNode
-local ZWaveNetworkDeviceId
-function GetVeraIDs()
-	if veraZWaveNode == nil then
-		local zwave_device = 1
-		local node_id = "1"
-		for k,v in pairs(luup.devices) do
-			if v.device_type == DEVTYPE_ZWN then
-				local homeID = luup.variable_get(SID_ZWN, "HomeID", k)
-				DLog("GetVeraIDs: Found Z-Wave network Vera device ID=", k, " HomeID=", homeID)
-				local homeNode = tostring(homeID):match("House: %x+ Node (%x+) Suc %x+")
-				if homeNode then
-				   zwave_device = k
-				   node_id = tostring(tonumber(homeNode,16))
-				   DLog("GetVeraIDs: Z-Wave node=0x", homeNode, "=", node_id)
-				   break
-				end
-			end
-		end
-		veraZWaveNode = tonumber(node_id)
-		ZWaveNetworkDeviceId = zwave_device
-	end
-	return veraZWaveNode, ZWaveNetworkDeviceId
-end
-
 function SetConfigurationOption(name, dev_num, node_id, option, value, delay)
 	if not delay then
 		delay = 0
@@ -2633,22 +1784,28 @@ function SceneController_SetScreenTimeout(peer_dev_num, screen, timeoutEnable, t
 	end
 end
 
+-- Update the timeout for the current screen to go to the next screen if enabled
+-- doTimeout is true to enable and override all previous timeouts, 
+-- false to disable and override all previous timeouts,
+-- nil to do nothing
 function SetScreenTimeout(peer_dev_num, screen, doTimeout)
 	DEntry()
-	-- Whatever we do below, always make any previous timer stale
-	timeoutSequenceNumber = timeoutSequenceNumber + 1
-	timeoutList[peer_dev_num] = timeoutSequenceNumber
-	if doTimeout then
-		local enable = luup.variable_get(SID_SCENECONTROLLER, "TimeoutEnable_" .. screen, peer_dev_num)
-		local seconds = luup.variable_get(SID_SCENECONTROLLER, "TimeoutSeconds_" .. screen, peer_dev_num);
-		local timeoutScreen = luup.variable_get(SID_SCENECONTROLLER, "TimeoutScreen_" .. screen, peer_dev_num);
-		if seconds == nil then
-			seconds = 0
-		end
-		seconds = tonumber(seconds)
-		if enable == "true" and seconds > 0 and timeoutScreen then
-			DLog("SetScreenTimeout: Setting timeout timer for ", seconds, " seconds. peer_dev_num=", peer_dev_num, " current screen=", screen, " timeoutScreen=", timeoutScreen, " timeoutSequenceNumber=", timeoutSequenceNumber);
-			luup.call_delay("SceneController_ScreenTimeout", tonumber(seconds), tostring(peer_dev_num)..","..tostring(timeoutSequenceNumber)..","..timeoutScreen, true);
+	if doTimeout ~= nil then
+		-- Whatever we do below, always make any previous timer stale
+		timeoutSequenceNumber = timeoutSequenceNumber + 1
+		timeoutList[peer_dev_num] = timeoutSequenceNumber
+		if doTimeout then
+			local enable = luup.variable_get(SID_SCENECONTROLLER, "TimeoutEnable_" .. screen, peer_dev_num)
+			local seconds = luup.variable_get(SID_SCENECONTROLLER, "TimeoutSeconds_" .. screen, peer_dev_num);
+			local timeoutScreen = luup.variable_get(SID_SCENECONTROLLER, "TimeoutScreen_" .. screen, peer_dev_num);
+			if seconds == nil then
+				seconds = 0
+			end
+			seconds = tonumber(seconds)
+			if enable == "true" and seconds > 0 and timeoutScreen then
+				DLog("SetScreenTimeout: Setting timeout timer for ", seconds, " seconds. peer_dev_num=", peer_dev_num, " current screen=", screen, " timeoutScreen=", timeoutScreen, " timeoutSequenceNumber=", timeoutSequenceNumber);
+				luup.call_delay("SceneController_ScreenTimeout", tonumber(seconds), tostring(peer_dev_num)..","..tostring(timeoutSequenceNumber)..","..timeoutScreen, true);
+			end
 		end
 	end
 end
@@ -2730,15 +1887,15 @@ function ParseModeString(str)
 		str = str .. ";"
 	end
 	while true do
-		local device, level, dimmingDuration, rest = string.match(str, "(%d+),(%d+),(%d+),?;(.*)")
+		local device, level, dimmingDuration, rest = string.match(str, "^(%d+),(%d+),(%d+),?;(.*)")
 		if device then
 	    	mode[i] = {device=tonumber(device), level=tonumber(level), dimmingDuration=tonumber(dimmingDuration)};
 		else
-			device, level, rest = string.match(str, "(%d+),(%d+);(.*)")
+			device, level, rest = string.match(str, "^(%d+),(%d+);(.*)")
 			if device then
 	    		mode[i] = {device=tonumber(device), level=tonumber(level)};
 			else
-				device, rest = string.match(str, "(%d+);(.*)")
+				device, rest = string.match(str, "^(%d+);(.*)")
 				if device then
 	    			mode[i] = {device=tonumber(device)};
 				else
@@ -2882,13 +2039,21 @@ function SetIndicator(peer_dev_num, screen, force, delay)
 		local xsCeneFound = false
 		local numLines, scrollOffset = GetNumLinesAndScrollOffset(peer_dev_num, screen)
 		local node_id, zwave_dev_num = GetZWaveNode(peer_dev_num)
+		local oldIndicator = luup.variable_get(SID_SCENECONTROLLER, CURRENT_INDICATOR, peer_dev_num)
+		if oldIndicator then
+			oldIndicator = tonumber(oldIndicator)
+		else
+			oldIndicator = 0
+		end
 		for physicalButton = 1, SCObj.NumButtons do
 			local virtualButton = physicalButton+scrollOffset
 		    local highlighted = false;
 			if numLines == SCObj.NumButtons or ((physicalButton ~= 1 or scrollOffset == 0) and (physicalButton ~= SCObj.NumButtons or scrollOffset == numLines-SCObj.NumButtons)) then
 				local modeStr = luup.variable_get(SID_SCENECONTROLLER,"Mode_"..screen.."_"..virtualButton,peer_dev_num)
 				local mode  = ParseModeString(modeStr)
-				if mode.prefix >= "2" and mode.prefix <= "9" then
+				if #mode == 0 then
+					highlighted = bit.band(oldIndicator,SCObj.PhysicalButtonToIndicator(physicalButton, true)) ~= 0
+				elseif mode.prefix >= "2" and mode.prefix <= "9" then
 					local oldModeStr = GetModeStr(peer_dev_num, screen, virtualButton)
 					local oldState = luup.variable_get(SID_SCENECONTROLLER,"State_"..screen.."_"..virtualButton,peer_dev_num)
 					if not oldState then
@@ -2947,8 +2112,8 @@ function SetIndicator(peer_dev_num, screen, force, delay)
 						if scene then
 							scene = tonumber(scene)
 							local sceneButton = ((scene-1) % SCObj.NumButtons) + 1
-							if scene >= 200 then
-								sceneButton = sceneButton + math.floor((scene-100)/100) * SCObj.NumButtons
+							if scene >= 300 then
+								sceneButton = sceneButton + math.floor((scene-200)/100) * SCObj.NumButtons
 							end
 							highlighted = sceneButton == virtualButton
 						else
@@ -2991,15 +2156,24 @@ function SceneController_WatchedIndicatorDeviceChanged(device, service, variable
 end
 
 function GetNumLinesAndScrollOffset(peer_dev_num, screen)
-	local numLines = luup.variable_get(SID_SCENECONTROLLER, "NumLines_"  .. screen, peer_dev_num)
+	local numLines = luup.variable_get(SID_SCENECONTROLLER, NUMLINES_VAR .. "_"  .. screen, peer_dev_num)
 	local scrollOffset = 0
 	if numLines then
 		numLines = tonumber(numLines)
-		scrollOffset = luup.variable_get(SID_SCENECONTROLLER, "ScrollOffset_"  .. screen, peer_dev_num)
+		if numLines < SCObj.NumButtons then
+			numLines = SCObj.NumButtons
+		end
+		scrollOffset = luup.variable_get(SID_SCENECONTROLLER, SCROLLOFFSET_VAR .. "_"  .. screen, peer_dev_num)
 		if scrollOffset then
 			scrollOffset = tonumber(scrollOffset)
 		else
 			scrollOffset = 0
+		end
+		local maxScroll = numLines - SCObj.NumButtons
+		if scrollOffset < 0 then
+			scrollOffset = 0
+		elseif scrollOffset > maxScroll then
+			scrollOffset = maxScroll
 		end
 	else
 		numLines = SCObj.NumButtons
@@ -3188,82 +2362,85 @@ end
 function SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton, modeStr)
 	DEntry("SelectZWaveSceneId")
 	local mode = ParseModeString(modeStr)
-	if not mode.sceneControllable or #mode == 0 then
-		return mode
-	end
-	local needSceneId = false;
-	local defaultSceneId = physicalButton;
+	local controller_node_id, controller_dev_num = GetZWaveNode(peer_dev_num)
 	local oldZWaveSceneId = mode.zWaveSceneId
 	local oldOffZWaveSceneId = mode.offZWaveSceneId
-	local sceneSet = {max=SCObj.LastFixedSceneId}
-	local controller_node_id, controller_dev_num = GetZWaveNode(peer_dev_num)
-	-- First mark off all scene IDs used for any screens of this controller
-	ForAllModes(peer_dev_num, function(mode2, screen2, virtualButton2)
-		if screen ~= screen2 or virtualButton ~= virtualButton2 then
-			MarkZWaveSceneIdUsed(mode2.zWaveSceneId, sceneSet)
-			MarkZWaveSceneIdUsed(mode2.offZWaveSceneId, sceneSet)
-			VLog("  SelectZWaveSceneId->ForAllModes: Marked ", mode2.zWaveSceneId, " and ", mode2.offZWaveSceneId, " used. SceneSet now: ", sceneSet)
-		end
-	end )
-	-- Now mark off all scene IDs used by other controllers associated with this target
-	for target = 1, #mode do
-		if mode[target].dimmingDuration then
-			needSceneId = true;
-			local actConfList = ReadDeviceActuatorConfList(mode[target].device)
-			DLog("actConfList for device ", mode[target].device, " is ", actConfList)
-			local changed = false
-			for zWaveSceneId, data in pairs(actConfList) do
-				if not luup.devices[data.controller] then
-					log("Removing Z-Wave Scene ID ", zWaveSceneId, " actuatior configuration for non-existant controller:", data.controller)
-					actConfList[zWaveSceneId] = nil
-					changed = true;
-				elseif data.controller == controller_dev_num and data.button == virtualButton and data.screen == screen then
-					if data.level > 0 or mode.prefix ~= "T" or not SCObj.HasOffSceness then
-						if not mode.zWaveSceneId then
-							mode.zWaveSceneId = zWaveSceneId
-						elseif mode.zWaveSceneId ~= zWaveSceneId then
-							log("Removing Z-Wave Scene ID ", zWaveSceneId, " actuator configuration for duplicate entry:", mode.zWaveSceneId)
-							actConfList[zWaveSceneId] = nil
-							changed = true
+	if #mode == 0 then
+		mode.sceneControllable = false
+		mode.zWaveSceneId = nil
+		mode.offZWaveSceneId = nil
+	elseif mode.sceneControllable then	
+		local needSceneId = false;
+		local defaultSceneId = physicalButton;
+		local sceneSet = {max=SCObj.LastFixedSceneId}
+		-- First mark off all scene IDs used for any screens of this controller
+		ForAllModes(peer_dev_num, function(mode2, screen2, virtualButton2)
+			if screen ~= screen2 or virtualButton ~= virtualButton2 then
+				MarkZWaveSceneIdUsed(mode2.zWaveSceneId, sceneSet)
+				MarkZWaveSceneIdUsed(mode2.offZWaveSceneId, sceneSet)
+				VLog("  SelectZWaveSceneId->ForAllModes: Marked ", mode2.zWaveSceneId, " and ", mode2.offZWaveSceneId, " used. SceneSet now: ", sceneSet)
+			end
+		end )
+		-- Now mark off all scene IDs used by other controllers associated with this target
+		for target = 1, #mode do
+			if mode[target].dimmingDuration then
+				needSceneId = true;
+				local actConfList = ReadDeviceActuatorConfList(mode[target].device)
+				DLog("actConfList for device ", mode[target].device, " is ", actConfList)
+				local changed = false
+				for zWaveSceneId, data in pairs(actConfList) do
+					if not luup.devices[data.controller] then
+						log("Removing Z-Wave Scene ID ", zWaveSceneId, " actuatior configuration for non-existant controller:", data.controller)
+						actConfList[zWaveSceneId] = nil
+						changed = true;
+					elseif data.controller == controller_dev_num and data.button == virtualButton and data.screen == screen then
+						if data.level > 0 or mode.prefix ~= "T" or not SCObj.HasOffSceness then
+							if not mode.zWaveSceneId then
+								mode.zWaveSceneId = zWaveSceneId
+							elseif mode.zWaveSceneId ~= zWaveSceneId then
+								log("Removing Z-Wave Scene ID ", zWaveSceneId, " actuator configuration for duplicate entry:", mode.zWaveSceneId)
+								actConfList[zWaveSceneId] = nil
+								changed = true
+							end
+						else
+							if not mode.offZWaveSceneId then
+								mode.offZWaveSceneId = zWaveSceneId
+							elseif mode.offZWaveSceneId ~= zWaveSceneId then
+								log("Removing Z-Wave Off Scene ID ", zWaveSceneId, " actuator configuration for duplicate entry:", mode.offZWaveSceneId)
+								actConfList[zWaveSceneId] = nil
+								changed = true
+							end
 						end
 					else
-						if not mode.offZWaveSceneId then
-							mode.offZWaveSceneId = zWaveSceneId
-						elseif mode.offZWaveSceneId ~= zWaveSceneId then
-							log("Removing Z-Wave Off Scene ID ", zWaveSceneId, " actuator configuration for duplicate entry:", mode.offZWaveSceneId)
-							actConfList[zWaveSceneId] = nil
-							changed = true
-						end
+						MarkZWaveSceneIdUsed(zWaveSceneId, sceneSet)
+						DLog("  ActConfList: (device=", mode[target].device, ") Marked ", zWaveSceneId, " used. SceneSet now: ", sceneSet)
 					end
-				else
-					MarkZWaveSceneIdUsed(zWaveSceneId, sceneSet)
-					DLog("  ActConfList: (device=", mode[target].device, ") Marked ", zWaveSceneId, " used. SceneSet now: ", sceneSet)
+				end
+				if changed then
+					WriteDeviceActuatorConfList(mode[target].device, actConfList)
 				end
 			end
-			if changed then
-				WriteDeviceActuatorConfList(mode[target].device, actConfList)
-			end
 		end
+		-- The set of available scene IDs is now completed. Pick a new scene ID and perhaps a new off scene ID in case of a toggle.
+		DLog("  oldZWaveSceneId=", oldZWaveSceneId, " oldOffZWaveSceneId=", oldOffZWaveSceneId, " sceneSet=", sceneSet, " defaultSceneId=", defaultSceneId)
+		local newZWaveSceneId =  pickSceneId(mode.zWaveSceneId, sceneSet, needSceneId, defaultSceneId)
+		local newOffZWaveSceneId
+		if mode.prefix == "T" and SCObj.HasOffScenes then
+			newOffZWaveSceneId = pickSceneId(mode.offZWaveSceneId, sceneSet, needSceneId, defaultSceneId+SCObj.NumButtons)
+		end
+		DLog("  newZWaveSceneId=", newZWaveSceneId, " newOffZWaveSceneId=", newOffZWaveSceneId, " sceneSet=", sceneSet)
+		-- If either of the two scene IDs changed, then update all of the target devices
+		mode.zWaveSceneId = newZWaveSceneId
+		mode.offZWaveSceneId = newOffZWaveSceneId
 	end
-	-- The set of available scene IDs is now completed. Pick a new scene ID and perhaps a new off scene ID in case of a toggle.
-	DLog("  oldZWaveSceneId=", oldZWaveSceneId, " oldOffZWaveSceneId=", oldOffZWaveSceneId, " sceneSet=", sceneSet, " defaultSceneId=", defaultSceneId)
-	local newZWaveSceneId =  pickSceneId(mode.zWaveSceneId, sceneSet, needSceneId, defaultSceneId)
-	local newOffZWaveSceneId
-	if mode.prefix == "T" and SCObj.HasOffScenes then
-		newOffZWaveSceneId = pickSceneId(mode.offZWaveSceneId, sceneSet, needSceneId, defaultSceneId+SCObj.NumButtons)
-	end
-	DLog("  newZWaveSceneId=", newZWaveSceneId, " newOffZWaveSceneId=", newOffZWaveSceneId, " sceneSet=", sceneSet)
-	-- If either of the two scene IDs changed, then update all of the target devices
-	mode.zWaveSceneId = newZWaveSceneId
-	mode.offZWaveSceneId = newOffZWaveSceneId
 	local prevModeStr =luup.variable_get(SID_SCENECONTROLLER, "Mode_"..screen.."_"..virtualButton, peer_dev_num)
 	local newModeStr = GenerateModeString(mode)
 	if prevModeStr ~= newModeStr then
 		for i = 1, #mode do
 			if mode[i].dimmingDuration then
 				local actConfList = ReadDeviceActuatorConfList(mode[i].device)
-				UpdateActConfList(actConfList, oldZWaveSceneId, newZWaveSceneId, controller_dev_num, mode[i], virtualButton, mode[i].level, screen, true)
-				UpdateActConfList(actConfList, oldOffZWaveSceneId, newOffZWaveSceneId, controller_dev_num, mode[i], virtualButton+1000, 0, screen, false)
+				UpdateActConfList(actConfList, oldZWaveSceneId, mode.zWaveSceneId, controller_dev_num, mode[i], virtualButton, mode[i].level, screen, true)
+				UpdateActConfList(actConfList, oldOffZWaveSceneId, mode.offZWaveSceneId, controller_dev_num, mode[i], virtualButton+1000, 0, screen, false)
 				WriteDeviceActuatorConfList(mode[i].device, actConfList)
 			end
 		end
@@ -3637,7 +2814,8 @@ function GetModeStr(peer_dev_num, screen, virtualButton)
 end
 
 function SetButtonMode(peer_dev_num, prevModeStr, screen, force, temperatureSettable, physicalButton)
-	local modeStr, state = 1, newType;
+	local modeStr 
+	local state = 1
 	local node_id, zwave_dev_num = GetZWaveNode(peer_dev_num)
 	if not node_id then
 		ELog("SetButtonMode: bad peer_dev_num=", peer_dev_num, "  screen=", screen)
@@ -3668,7 +2846,8 @@ function SetButtonMode(peer_dev_num, prevModeStr, screen, force, temperatureSett
 	else
 		modeStr, state = GetModeStr(peer_dev_num, screen, virtualButton)
 	end
-	newType = SCObj.ModeType(ParseModeString(modeStr))
+	local oldType
+	local newType = SCObj.ModeType(ParseModeString(modeStr))
 	if not force then
 		oldType = SCObj.ModeType(ParseModeString(prevModeStr))
 	end
@@ -3819,13 +2998,13 @@ function SetCustomScreen(peer_dev_num, screenNum, doTimeout, forceClear, indicat
 		prevNumLines, prevScrollOffset = GetNumLinesAndScrollOffset(peer_dev_num, prevScreen)
 	end
 	local numLines, scrollOffset = GetNumLinesAndScrollOffset(peer_dev_num, screen)
-	if not indicatorOnly then
-		scrollOffset = 0
-		if not forceClear and prevScrollOffset ~= scrollOffset then
+	if not indicatorOnly and forceClear then
+		if scrollOffset ~= 0 then
+			scrollOffset = 0
 			luup.variable_set(SID_SCENECONTROLLER, SCROLLOFFSET_VAR.."_"..screen, scrollOffset, peer_dev_num)
 		end
-	    DLog("  SetCustomScreen: numLines=", numLines, " scrollOffset=", scrollOffset)
 	end
+	DLog("  SetCustomScreen: numLines=", numLines, " scrollOffset=", scrollOffset)
 	local earlyButtonConfig = false;
 	if not indicatorOnly then
 		SetIndicatorValue(peer_dev_num, 0, forceClear, 100)
@@ -3840,12 +3019,16 @@ function SetCustomScreen(peer_dev_num, screenNum, doTimeout, forceClear, indicat
 		local fonts = {};
 		local aligns = {};
 		for i = 1,SCObj.NumButtons do
-			if numLines > SCObj.NumButtons and i == SCObj.NumButtons then
+			if numLines > SCObj.NumButtons and i == SCObj.NumButtons and i + scrollOffset < numLines then
 				labels[i] = "\nvvvvvv";
 				fonts[i] = "Inverted";
 				aligns[i] = "Center";
+			elseif numLines > SCObj.NumButtons and i == 1 and scrollOffset > 0 then
+				labels[i] = "^^^^^^";
+				fonts[i] = "Inverted";
+				aligns[i] = "Center";
 			else
-				ChooseLabelFontAndAlign(peer_dev_num, screen, i, i, nil, labels, fonts, aligns)
+				ChooseLabelFontAndAlign(peer_dev_num, screen, i, i+scrollOffset, nil, labels, fonts, aligns)
 			end
 		end
 		if SCObj.HasMultipleScreens then
@@ -4058,7 +3241,7 @@ function SceneController_TemperatureDeviceChanged(temperatureDevice, service, va
 		return
 	end
 	local screenNum = tonumber(screen:sub(2))
-	SetTemperatureScreen(peer_dev_num, screenNum, false, false, false)
+	SetTemperatureScreen(peer_dev_num, screenNum, nil, false, false)
 	RunZWaveQueue("TemperatureDeviceChanged", 0)
 end
 
@@ -4319,7 +3502,7 @@ function CheckDups(peer_dev_num, time, receiveStatus, data)
 end
 
 function SceneActivatedMonitorCallback(peer_dev_num, result)
-	DEntry()
+	DEntry("SceneActivatedMonitorCallback")
 	local time = tonumber(result.time)
 	local receiveStatus = tonumber(result.C1, 16)
 	if CheckDups(peer_dev_num, time, receiveStatus, "2B"..result.C2..result.C3) then
@@ -4330,7 +3513,7 @@ function SceneActivatedMonitorCallback(peer_dev_num, result)
 end
 
 function BasicSetMonitorCallback(peer_dev_num, result)
-	DEntry()
+	DEntry("BasicSetMonitorCallback")
 	local time = tonumber(result.time)
 	local receiveStatus = tonumber(result.C1, 16)
 	if CheckDups(peer_dev_num, time, receiveStatus, "20"..result.C2) then
@@ -4340,7 +3523,7 @@ function BasicSetMonitorCallback(peer_dev_num, result)
 end
 
 function MultiLevelSwitchStopLevelChangeMonitorCallback(peer_dev_num, result)
-	DEntry()
+	DEntry("MultiLevelSwitchStopLevelChangeMonitorCallback")
 	local time = tonumber(result.time)
 	local receiveStatus = tonumber(result.C1, 16)
 	if CheckDups(peer_dev_num, time, receiveStatus, "2605") then
@@ -4354,7 +3537,7 @@ function MultiLevelSwitchStopLevelChangeMonitorCallback(peer_dev_num, result)
 end
 
 function ThermostatSetPointMonitorCallback(peer_dev_num, result)
-	DEntry()
+	DEntry("ThermostatSetPointMonitorCallback")
 	local time = tonumber(result.time)
 	local receiveStatus = tonumber(result.C1, 16)
 	if CheckDups(peer_dev_num, time, receiveStatus, "4301" .. result.C2 .. result.C3 .. result.C4) then
@@ -4393,7 +3576,7 @@ function ThermostatSetPointMonitorCallback(peer_dev_num, result)
 end
 
 function ThermostatFanModeMonitorCallback(peer_dev_num, result)
-	DEntry()
+	DEntry("ThermostatFanModeMonitorCallback")
 	local time = tonumber(result.time)
 	local receiveStatus = tonumber(result.C1, 16)
 	if CheckDups(peer_dev_num, time, receiveStatus, "4401" .. result.C2) then
@@ -4438,7 +3621,7 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 	local currentScreen = GetCurrentScreen(peer_dev_num)
 	local numLines, scrollOffset = GetNumLinesAndScrollOffset(peer_dev_num, currentScreen)
 	local virtualButton = physicalButton + scrollOffset
-	DEntry()
+	DEntry("SceneButtonPressed")
 	-- Handle scroll up and scrolll down events if numLines > SCObj.NumButtons
 	-- Using the ScrollUp and ScrollDown commands, labels, indicators, and button modes all scroll together but not associations.
 	-- We also need to handle to top and bottom ^^^^ and vvvv scrolling indicators which always use momentary buttons.
@@ -4473,7 +3656,7 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 		EVLCDWrapStrings({"\nvvvvvv"}, {"Inverted"}, {"Center"}, node_id, zwave_dev_num, SCObj.NumButtons, SCObj.NumButtons, SCREEN_MD.NoChange)
 		SetIndicator(peer_dev_num, currentScreen, false, 0)
 		luup.sleep(param.SCENE_CTRL_SwitchScreenDelay) -- Avoid a CAN when LCD1 sends the second scene activation message
-		RunZWaveQueue("ScrollDown", 0);
+		SetScreenTimeout(peer_dev_num, currentScreen, true);
 		return
 	elseif numLines > SCObj.NumButtons and physicalButton == SCObj.NumButtons and scrollOffset < numLines - SCObj.NumButtons then
 		local labels = {}
@@ -4506,7 +3689,7 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 		EVLCDWrapStrings({"^^^^^^"}, {"Inverted"}, {"Center"}, node_id, zwave_dev_num, 1, 1, SCREEN_MD.NoChange)
 		SetIndicator(peer_dev_num, currentScreen, false, 0)
 		luup.sleep(param.SCENE_CTRL_SwitchScreenDelay) -- Avoid a CAN when LCD1 sends the second scene activation message
-		RunZWaveQueue("ScrollUp", 0);
+		SetScreenTimeout(peer_dev_num, currentScreen, true);
 		return
 	end
 
@@ -4631,7 +3814,7 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 			local buttonGroup = math.floor((virtualButton - 1) / SCObj.NumButtons)
 			local buttonOffset = 0
 			if buttonGroup > 0 then
-			   buttonOffset = 200 + buttonGroup * 100
+			   buttonOffset = 300 + buttonGroup * 100
 			end
 			peer_scene = ((tonumber(customScreen) - 1) * SCObj.NumButtons) + ((virtualButton - 1) % SCObj.NumButtons) + 1 + (buttonOffset) + (state-1) * 1000
 		else
@@ -4658,7 +3841,7 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
     	if mode.prefix == "X" then -- Exclusive
 			act_deact = "sl_SceneActivated"
 		end
-		if mode.prefix == "X" or mode.newScreen or (ZWaveQueueNodes > 0) then
+		if mode.prefix == "X" or mode.newScreen or (#ExternalZWaveQueue > 0) then
 			luup.sleep(param.SCENE_CTRL_SwitchScreenDelay) -- Avoid a CAN when LCD1 sends the second scene activation message
 		end
 		luup.variable_set(SID_SCTRL, act_deact, tostring(peer_scene), peer_dev_num)
@@ -4713,9 +3896,9 @@ function SceneChange(peer_dev_num, isSceneId, zwave_scene, cur_scene_time)
 			end
 			if not physicalButton then
 				local retry = 0
-				local IndicatorChanged
-				IndicatorChanged = function(peer_dev_num, response)
-					VEntry("IndicatorChanged")
+				local IndicatorReportCallback
+				IndicatorReportCallback = function(peer_dev_num, response)
+					DEntry("IndicatorReportCallback")
 					if response then
 						local time = tonumber(response.time)
 						local receiveStatus = tonumber(response.C1, 16)
@@ -4742,16 +3925,16 @@ function SceneChange(peer_dev_num, isSceneId, zwave_scene, cur_scene_time)
 															"0x87 0x02", -- sendData
 															0, -- delay
 															"^01 .. 00 04 (..) "..string.format("%02x",node_id).." .. 87 03 (..)", -- responsePattern
-															IndicatorChanged, -- callback
+															IndicatorReportCallback, -- callback
 															true, -- oneShot
 															2000, -- timeout
 															nil, -- armPattern
 															"06") -- autoResponse
 						else
-							log("IndicatorChanged: timeout")
+							log("IndicatorReportCallback: timeout")
 						end
 					end
-				end	-- IndicatorChanged
+				end	-- IndicatorReportCallback
 --[[
                                                  C1                   C2
 42      12/18/16 13:37:28.574   0x1 0x9 0x0 0x4 0x0 0xc 0x3 0x87 0x3 0x1 0x78 (##########x)
@@ -4773,7 +3956,7 @@ Device 20=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦
 												"0x87 0x02", -- sendData
 												0, -- delay
 												"^01 .. 00 04 (..) "..string.format("%02x",node_id).." .. 87 03 (..)", -- responsePattern
-												IndicatorChanged, -- callback
+												IndicatorReportCallback, -- callback
 												true, -- oneShot
 												2000, -- timeout
 												nil, -- armPattern
@@ -4812,7 +3995,6 @@ Device 20=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦
 		physicalButton = zwave_scene
 	end
 	SceneButtonPressed(peer_dev_num, activate, physicalButton, false)
-	RunZWaveQueue("SceneChange", 0);
 end
 
 -- Sanitize a string converting all non [a-zA-Z0-9_] characters to _
