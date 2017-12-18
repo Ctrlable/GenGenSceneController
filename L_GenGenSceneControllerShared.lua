@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller shared code Version 1.13
+-- GenGeneric Scene Controller shared code Version 1.14
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 

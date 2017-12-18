@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller Version 1.13
+-- GenGeneric Scene Controller Version 1.14
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -23,6 +23,7 @@ Devices = {
 	[DEVTYPE_EVOLVELCD1] = {
 		Name                    = "Evolve LCD1",
 		HasScreen               = true,
+		MaxLabelSize			= 16,
 		HasMultipleScreens      = true,
 		HasPresetLanguages      = true,
 		HasThremostatControl    = true,
@@ -281,6 +282,7 @@ Devices = {
 	[DEVTYPE_COOPEREFWC5] = {
 		Name                    = "Cooper RFWC5",
 		HasScreen               = false,
+		MaxLabelSize			= 16, -- dummy
 		HasMultipleScreens      = false,
 		HasPresetLanguages      = false,
 		HasThremostatControl    = false,
@@ -358,7 +360,6 @@ Devices = {
 			-- empty if no backlight
 		end,
 
-		-- TODO: Can we get at least toggle vs momentary modes from the Cooper RFWC5
 		-- These modes are bogus. Same as the LCD1 for now.
 		ModeMap = { M=0,  -- Momentary
 		            D=0,  -- Direct	(Deprecated)
@@ -396,6 +397,7 @@ Devices = {
 	[DEVTYPE_NEXIAONETOUCH] = {
 		Name                    = "Nexia One Touch",
 		HasScreen               = true,
+		MaxLabelSize			= 17,
 		HasMultipleScreens      = true,
 		HasPresetLanguages      = false,
 		HasThremostatControl    = true,
@@ -419,19 +421,19 @@ Devices = {
 		-- The "Large" font is actually narrower than the small font and can thus fit more characters per line.
 		-- However two lines of the small font can fit in one line of the large font.
 	    LargeFontWidths         = {
-									3,5,7,9,9,15,11,4,6,7,8,9,4,6,4,8,
-									9,9,10,9,9,9,9,9,9,9,4,4,9,8,9,7,
-									11,9,9,9,9,8,8,10,10,6,6,9,9,11,10,11,
-									9,11,10,9,9,10,9,14,9,10,8,6,8,6,10,11,
-									6,8,8,8,8,8,6,8,8,4,5,8,4,12,8,8,
-									8,8,7,7,6,8,8,12,8,8,7,8,5,9,10,11},
+									3,3,5,11,9,13,11,2,5,5,7,9,2,5,2,6,
+									8,6,8,7,9,8,8,8,8,8,3,3,8,6,8,7,
+									16,10,10,11,11,10,10,11,10,2,7,10,8,12,10,11,
+									10,11,10,10,10,10,10,16,12,10,10,4,5,4,8,9,
+									3,8,8,7,8,8,5,8,7,2,3,8,2,12,7,8,
+									8,8,5,6,5,7,8,12,8,8,8,6,3,6,8,3},
 	    SmallFontWidths         = {
-									3,4,7,11,10,16,13,3,7,7,9,11,5,6,4,10,
-									10,9,10,10,11,10,10,10,10,10,5,6,11,11,11,9,
-									13,11,11,11,11,10,9,11,11,8,8,11,11,13,12,12,
-									10,12,12,10,10,11,11,16,11,11,10,7,9,6,10,11,
-									7,9,10,9,10,9,7,10,10,4,6,9,4,14,10,10,
-									10,10,8,8,7,10,9,14,9,9,8,10,6,10,12,13},
+									3,2,4,7,6,8,7,2,6,5,4,6,3,4,2,4,
+									6,4,6,6,6,6,6,6,6,6,2,3,6,6,6,6,
+									9,6,6,6,6,6,5,6,6,2,5,6,5,8,6,7,
+									6,7,7,6,6,6,6,10,6,8,6,3,4,3,5,6,
+									3,5,5,4,6,5,4,5,5,2,3,5,2,8,5,5,
+									5,5,3,4,4,5,6,8,6,6,4,4,2,4,6,3},
 		ScreenWidth 		    = 65,
 		RightJustifyScreenWidth = 67,
 		SetTuningParameters = function(zwave_dev_num, peer_dev_num)
@@ -769,9 +771,14 @@ SCREEN_MD = {
    MoreData    = 0x80,
 
    -- Line Flags
-   StdFont     = 0x00,
-   Highlighted = 0x20,
-   LargeFont   = 0x40,
+   StdFont     					= 0x00,
+   Highlighted 					= 0x20,
+   LargeFont   					= 0x40,
+   LargeFontHighlighted 		= 0x60,
+   StdFontNoScroll 				= 0x80,
+   HighlightedNoScroll 			= 0xA0,
+   LargeFontNoScroll   			= 0xC0,
+   LargeFontHighlightedNoScroll = 0xE0,   
 
    NoClearLine = 0x00,
    ClearLine   = 0x10,
@@ -1057,8 +1064,8 @@ function EVLCDLabel(screenFlags,lineArray, node_id, zwave_dev_num, delay_overrid
 	   		local line = lineArray[lnum]
 	   		assert(#line == 3,"EVDLCDLabel Line " .. lnum .. ": Each line must have 3 parts: flags, position, label")
 			assert(line[1] >= 0 and line[1] <= 255, "EVDLCDLabel Line " .. lnum .. ": Flags must be 1 byte")
-	   		assert(line[2] >= 0                  ,  "EVDLCDLabel Line " .. lnum .. ": position should be between >= 0")
-	   		assert(#line[3] <= 16,                  "EVDLCDLabel Line " .. lnum .. ": Label too long")
+	   		assert(line[2] >= 0                  ,  "EVDLCDLabel Line " .. lnum .. ": position should >= 0")
+	   		assert(#line[3] <= SCObj.MaxLabelSize,  "EVDLCDLabel Line " .. lnum .. ": Label too long")
 	   		data = data .. " " .. tostring(line[1])
 	        	        .. " " .. tostring(line[2])
 	             	    .. " " .. ExpandString(line[3])
@@ -1119,13 +1126,24 @@ function  EVLCDWrapStrings(stringArray, fontArray, alignArray, node_id, zwave_de
 					align = "Center"
 				end
 				if font == "Normal" then  -- Only the normal font can get 2 lines and thus gets - or \r subsitutions
+					lineFlags = SCREEN_MD.StdFont;
 					displayString = displayString:gsub("\\r",      "\r")
 					displayString = displayString:gsub("-([^\r])", "-\r%1")
-				elseif font == "Compressed" then -- The "Large" font is taller but actually the compressed font
+				elseif font == "Inverted" then
+					lineFlags = SCREEN_MD.Highlighted;
+				elseif font == "Compressed" or font == "Large" then -- The "Large" font is taller but actually the compressed font
 					widths = SCObj.LargeFontWidths
 					lineFlags = SCREEN_MD.LargeFont;
-				else  -- Inverted
-					lineFlags = SCREEN_MD.Highlighted;
+				elseif font == "Compressed, Inverted" then
+					lineFlags = SCREEN_MD.LargeFontHighlighted;
+				elseif font == "No Scroll" then
+					lineFlags = SCREEN_MD.StdFontNoScroll;
+				elseif font == "Inverted, No Scroll" then
+					lineFlags = SCREEN_MD.HighlightedNoScroll;
+				elseif font == "Compressed, No Scroll" then
+					lineFlags = SCREEN_MD.LargeFontNoScroll;
+				elseif font == "Compressed, Inverted, No Scroll" then
+					lineFlags = SCREEN_MD.LargeFontHighlightedNoScroll;
 				end
 
 				if align:sub(1,3) == "Raw" then
@@ -1138,7 +1156,7 @@ function  EVLCDWrapStrings(stringArray, fontArray, alignArray, node_id, zwave_de
 					if screenFlags ~= SCREEN_MD.ClearScreen then
 						flags = bit.bor(flags, SCREEN_MD.ClearLine)
 					end
-					lineArray[entryNum] = { bit.bor(flags,lnum), offset, displayString:sub(1,16) }
+					lineArray[entryNum] = { bit.bor(flags,lnum), offset, displayString:sub(1,SCObj.MaxLabelSize) }
 		    		entryNum = entryNum + 1
 				else
 					local eol;
@@ -1234,7 +1252,7 @@ function  EVLCDWrapStrings(stringArray, fontArray, alignArray, node_id, zwave_de
 								    if spaces < 0 then
 								    	spaces = 0
 								    end
-								    while spaces > 0 and #label < 16 do
+								    while spaces > 0 and #label < SCObj.MaxLabelSize do
 										label = label .. " ";
 								    end
 								elseif align == "Right" then -- Right justify 1 line.
@@ -1243,7 +1261,7 @@ function  EVLCDWrapStrings(stringArray, fontArray, alignArray, node_id, zwave_de
 										offset = 0
 									end
 								end
-								lineArray[entryNum] = { bit.bor(flags,lnum), offset, label:sub(1,16) }
+								lineArray[entryNum] = { bit.bor(flags,lnum), offset, label:sub(1,SCObj.MaxLabelSize) }
 					    		entryNum = entryNum + 1
 								part = 2
 					  		else
@@ -1275,7 +1293,7 @@ function  EVLCDWrapStrings(stringArray, fontArray, alignArray, node_id, zwave_de
 									end
 								end
 								lineArray[entryNum-1][2] = offset;
-						  		lineArray[entryNum-1][3] = (label1 .. "\r" .. label):sub(1,16);
+						  		lineArray[entryNum-1][3] = (label1 .. "\r" .. label):sub(1,SCObj.MaxLabelSize);
 								break
 					  		end
 					  		label = ""
@@ -1399,6 +1417,34 @@ Device 10=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦
 		                 false, -- Not OneShot
 		                 0, -- no timeout
 						 "BasicSet")
+
+--[==[
+                                                 C1      C2          <-----C3---->
+42      10/28/17 16:50:46.391   0x1 0xb 0x0 0x4 0x8 0x2 0x5 0x26 0x4 0x20 0xff 0x6 0x4 (#######&# ###) 
+           SOF - Start Of Frame --+   ¦   ¦   ¦   ¦   ¦   ¦    ¦   ¦    ¦    ¦   ¦   ¦
+                    length = 11 ------+   ¦   ¦   ¦   ¦   ¦    ¦   ¦    ¦    ¦   ¦   ¦
+                        Request ----------+   ¦   ¦   ¦   ¦    ¦   ¦    ¦    ¦   ¦   ¦
+FUNC_ID_APPLICATION_COMMAND_HANDLER ----------+   ¦   ¦   ¦    ¦   ¦    ¦    ¦   ¦   ¦
+           Receive Status MULTI ------------------+   ¦   ¦    ¦   ¦    ¦    ¦   ¦   ¦
+Device 3=Cooper RFWC5 Scene Controller Z-Wave --------+   ¦    ¦   ¦    ¦    ¦   ¦   ¦
+                Data length = 5 --------------------------+    ¦   ¦    ¦    ¦   ¦   ¦
+COMMAND_CLASS_SWITCH_MULTILEVEL -------------------------------+   ¦    ¦    ¦   ¦   ¦
+SWITCH_MULTILEVEL_START_LEVEL_CHANGE ------------------------------+    ¦    ¦   ¦   ¦
+Flags = Up | Ignore StartLevel | Ignored or Increment secondary --------+    ¦   ¦   ¦
+               startLevel = 255 ---------------------------------------------+   ¦   ¦
+                   Duration = 6 -------------------------------------------------+   ¦
+                    Checksum OK -----------------------------------------------------+
+41      10/28/17 16:50:46.391   ACK: 0x6 (#) 
+--]==]
+		MonitorZWaveData(false, -- incoming,
+						 lul_device, -- peer_dev_num
+		                 nil, -- No arm_regex
+		                 "^01 .. 00 04 (..) " .. string.format("%02X", zwave_node) .. " (..) 26 04 (.+) ..", -- Main RegEx
+		                 "06", -- ACK response,
+		                 MultiLevelSwitchStartLevelChangeMonitorCallback,
+		                 false, -- Not OneShot
+		                 0, -- no timeout
+						 "MultilevelStart")
 
 --[==[
                                                  C1
@@ -2913,15 +2959,11 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 			-- First set associations with scene-capable devices (including the controller) but wait for the 5-second timeout.
 			-- Then set association for non-scene-capable devices and set the configuration for that button to the level within the 5 second time-out.
 			local sceneList = {}
-			for k, v in pairs(associateList) do 
-				if v.dimmingDuration then
-					sceneList[k] = true
-				end
-			end
-			AssociateDevice(zwave_dev_num, sceneList, groupId, groupId, 1, 5000)
 			local levels = {}
 			for k, v in pairs(associateList) do
-				if not v.dimmingDuration then
+				if v.dimmingDuration then
+					sceneList[k] = true
+				else
 					if not levels[v.level] then
 						levels[v.level] = true
 						local list = {}
@@ -2933,10 +2975,11 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 							end
 						end
 						AssociateDevice(zwave_dev_num, list, groupId, groupId, 1, 0)
-						SetConfigurationOption("CooperConfiguration", zwave_dev_num, node_id, physicalButton, v.level, param.SCENE_CTRL_AssociationDelay)
+						SetConfigurationOption("CooperConfiguration", zwave_dev_num, node_id, physicalButton, v.level, 5000)
 					end
 				end
 			end
+			AssociateDevice(zwave_dev_num, sceneList, groupId, groupId, 1, 5000)
 		else
 			-- Regular association. Can associate all devices regardless of level
 			AssociateDevice(zwave_dev_num, associateList, groupId, groupId, 1, param.SCENE_CTRL_AssociationDelay)
@@ -3694,6 +3737,34 @@ function BasicSetMonitorCallback(peer_dev_num, result)
 	end
 end
 
+-- Pass through the SWITCH_MULTILEVEL_START to non-scene-capable devices 
+-- for RFWC5
+function MultiLevelSwitchStartLevelChangeMonitorCallback(peer_dev_num, result)
+	DEntry("MultiLevelSwitchStartLevelChangeMonitorCallback")
+	local time = tonumber(result.time)
+	local receiveStatus = tonumber(result.C1, 16)
+	local dupString = "2604" .. result.C2 .. result.C3
+	if result.C2 == "05" then
+		-- Cooper RFWC5 will send the first (multi) message with the dimmind duration
+		-- but the second without. Treat the second as a dup.
+		dupString = "2604" .. "04" .. string.sub(result.C3,1,5)
+	end
+	if SCObj.HasCooperConfiguration and CheckDups(peer_dev_num, time, receiveStatus, dupString) then
+		local mode = lastChangedModes[peer_dev_num]
+		local hexC3 = string.gsub(result.C3," "," 0x")
+		if mode then
+			for i = 1, #mode do
+				if not mode[i].dimmingDuration then
+					local node_id = GetZWaveNode(mode[i].device)
+					EnqueueZWaveMessage("StartLevelChangePassThrough", node_id, "0x26 0x04 0x" .. hexC3, mode[i].device, 0)
+				end
+			end
+		end
+	end
+end
+
+-- Pass through the SWITCH_MULTILEVEL_STOP commands to non-scene-capable devices 
+-- for RFWC5 and then poll the target device to decide if it is on or off.
 function MultiLevelSwitchStopLevelChangeMonitorCallback(peer_dev_num, result)
 	DEntry("MultiLevelSwitchStopLevelChangeMonitorCallback")
 	local time = tonumber(result.time)
@@ -3702,6 +3773,10 @@ function MultiLevelSwitchStopLevelChangeMonitorCallback(peer_dev_num, result)
 		local mode = lastChangedModes[peer_dev_num]
 		if mode then
 			for i = 1, #mode do
+				if SCObj.HasCooperConfiguration and not mode[i].dimmingDuration then
+					local node_id = GetZWaveNode(mode[i].device)
+					EnqueueZWaveMessage("StopLevelChangePassThrough", node_id, "0x26 0x05", mode[i].device, 0)
+				end
 				luup.call_action(SID_HADEVICE, "Poll", {}, mode[i].device)
 			end
 		end

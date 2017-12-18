@@ -1,4 +1,4 @@
-// User interface for GenGeneric Scene Controller Version 1.13
+// User interface for GenGeneric Scene Controller Version 1.14
 // Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
@@ -33,6 +33,19 @@ var EVOLVELCD1 = {
 	],
 	CustomModeList 			: [
 		"M", "T", "3", "4", "5", "6", "7", "8", "9", "X", "N", "P", "E"
+	],
+	CustomFontList          : [
+		"Normal",
+		"Compressed",
+		"Inverted"
+	/* - Screen MD V2 fonts. Not used by any of the supported scene controllets
+		,
+		"Compressed, Inverted",
+		"No Scroll",
+		"Compressed, No Scroll",
+		"Inverted, No Scroll",
+		"Compressed, Inverted, No Scroll"
+	*/
 	],
 	SceneBases              : {
 		C: 1,	// Custom      screen scenes start at base 1
@@ -170,6 +183,7 @@ var COOPERRFWC5 = {
 	CustomModeList 			: [
 		"T", "M", "3", "4", "5", "6", "7", "8", "9"
 	],
+	CustomFontList          : [ ],
 	SceneBases              : {
 		P: 1	// Preset screen scenes start at base 1
 	},
@@ -215,6 +229,19 @@ var NEXIAONETOUCH = {
 	],
 	CustomModeList 			: [
 		"M", "T", "H"
+	],
+	CustomFontList          : [
+		"Normal",
+		"Large",
+		"Inverted"
+	/* - Screen MD V2 fonts. Not used by any of the supported scene controllets
+		,
+		"Large, Inverted",
+		"No Scroll",
+		"Large, No Scroll",
+		"Inverted, No Scroll",
+		"Large, Inverted, No Scroll"
+	*/
 	],
 	SceneBases              : {
 		C: 1	// Custom screen scenes start at base 1
@@ -480,12 +507,6 @@ SceneController_Modes = {
 	W:"Welcome",
 	L:"Scroll"	// Used internally by Lua. Should never be visible at the JS level.
 };
-
-SceneController_CustomFontList = [
-	"Normal",
-	"Compressed",
-	"Inverted"
-];
 
 SceneController_CustomAlignList = [
 	"Left",
@@ -946,7 +967,7 @@ function SceneController_SelectTemperatureDevice(SCObj, peerId, screen)
 	SceneController_set_device_state(peerId, SCObj.ServiceId, "TemperatureDevice_"+screen, temperatureDevice);
 }
 
-function SceneController_ScreenMenu(SCObj, selected, disabled, lcdVersion) {
+function SceneController_ScreenMenu(SCObj, selected, disabled, why, lcdVersion) {
 	var html = "";
 	for (var i = 0; i < SCObj.ScreenTypes.length; ++i) {
 		var screen_type = SCObj.ScreenTypes[i];
@@ -954,7 +975,7 @@ function SceneController_ScreenMenu(SCObj, selected, disabled, lcdVersion) {
 		for (var j = 1; j <= screen_type.num; ++j) {
 			if (SCObj.ScreenIsCompatible(SCObj, screen_type.prefix, j, lcdVersion)) {
 				var short_name = screen_type.prefix + j;
-				html += '     <option value="' + short_name + '"' + (short_name == disabled ? ' disabled' : '') +
+				html += '     <option value="' + short_name + '"' + (short_name == disabled ? ' disabled' + (why ? ' title="' + why + '" ' : '') : '') +
 												 					(short_name == selected ? ' selected' : '') + '>' + screen_type.name + ' ' + j + '</option>';
 			}
 		}
@@ -992,7 +1013,9 @@ function SceneController_DeviceMenu(objectID, selectedValue, extraCode, zeroLabe
                 if(typeof(roomDevices[orderedDevices[i].room])=='undefined'){
                     roomDevices[orderedDevices[i].room] = '';
                 }
-                roomDevices[orderedDevices[i].room] += '<option value="'+orderedDevices[i].id+'" '+((orderedDevices[i].id==selectedValue)?'selected':'')+'>'+orderedDevices[i].name+(filterResult===1?" *":"")+'</option>';
+                roomDevices[orderedDevices[i].room] += '<option value="'+orderedDevices[i].id+'" '+((orderedDevices[i].id==selectedValue)?'selected':'')+
+													   ' title="'+(filterResult>1?'This device is scene-capable':'This device is not scene-capable')+'"'+
+                                                       '>'+orderedDevices[i].name+(filterResult===1?" *":"")+'</option>';
             }
         }
 
@@ -1093,12 +1116,18 @@ function SceneController_EscapeHTML(string) {
          .replace(/>/g, "&gt;")
          .replace(/"/g, "&quot;")
          .replace(/'/g, "&#039;");
- }
+}
 
-
+function SceneControllerStyleSheet() {
+	return "\
+<style> \
+.showdisabledtitle:disabled {pointer-events: auto;}	\
+</style> ";
+}
 // Function to draw the Edit screens tab
 function SceneController_Screens(SCObj, deviceId) {
 	try {
+		var html=SceneControllerStyleSheet();
 		var peerId
 		if(SceneController_IsZWaveChild(deviceId)){
 	    	peerId=parseInt(SceneController_get_device_state(deviceId, SCObj.ServiceId, PEER_ID, 0));
@@ -1107,6 +1136,7 @@ function SceneController_Screens(SCObj, deviceId) {
 	    	peerId = deviceId;
 	    	deviceId=parseInt(SceneController_get_device_state(deviceId, SCObj.ServiceId, PEER_ID, 0));
 		}
+		var deviceName = SceneController_get_device_object(peerId).name
 		var versionInfo = SceneController_get_device_state(deviceId, ZWDEVICE_SID, VERSION_INFO, 0)
 		var lcdVersion = versionInfo ? (parseInt(/,(\d+)$/.exec(versionInfo)[1])) : SCObj.DefaultLcdVersion;
 		var curScreen = SCObj.HasScreen ? SceneController_get_device_state(peerId, SCObj.ServiceId, CURRENT_SCREEN, 0) : SCObj.DefaultScreen;
@@ -1118,7 +1148,6 @@ function SceneController_Screens(SCObj, deviceId) {
 		var presetLanguage = SceneController_GetPresetLanguage(SCObj, peerId);
 		var hasCustomLabels = (screenType == 'C' || (screenType == 'T' && screenNum > 3));
 		var extraLines = 0;
-		var html='';
 		var numLines = SCObj.NumButtons
 		if (SCObj.HasScreen) {
 			html+= '<table style="padding-left:10px;padding-right:10px;" border="0" align="center" class="m_table skinned-form-controls skinned-form-controls-mac">\n'
@@ -1126,7 +1155,7 @@ function SceneController_Screens(SCObj, deviceId) {
 				 + '  <th style="text-align:right;"><b>Screen:</b></th>\n'
 		         + '  <td>\n'
 	             + '   <select class="styled" id="CurScreen_'+peerId+'" onChange="SceneController_SetScreen('+SCObj.Id+','+peerId+')" style="width:120px;">\n'
-		         +       SceneController_ScreenMenu(SCObj, curScreen, null, lcdVersion)
+		         +       SceneController_ScreenMenu(SCObj, curScreen, null, null, lcdVersion)
 		         + '   </select>\n'
 		         + '  </td>\n';
 			if (SCObj.MaxScroll > SCObj.NumButtons) {
@@ -1253,6 +1282,7 @@ function SceneController_Screens(SCObj, deviceId) {
 						var spec = SceneController_DecodeLabel(label, font, align);
 						html += '  <td><input style="text-align:'+spec.align + ';'
 						     +  ' width:120px;'
+							 +  ' font-size: ' + (spec.font=='Large' ? '150%' : '100%') + ';'
 						     +  ' letter-spacing:' + (spec.font=='Compressed' ? '-1px' : '1px') + ';'
 						     +  ' color:' + (spec.font=='Inverted' ? 'white':'black') + ';'
 						     +  ' background-color:' + (spec.font=='Inverted' ? 'black':'white') + ';"'
@@ -1260,8 +1290,8 @@ function SceneController_Screens(SCObj, deviceId) {
 						     +  ' onChange="SceneController_ChangeCustomLabel('+SCObj.Id+','+peerId+',\''+curScreen+'\','+stateButton+')"></td>\n';
 						html += '  <td><select class="styled" align="left" style="width:'+(SceneController_IsUI7() ? 120 : 75)+'px; height:22px;"'
 						     +  ' id="Font_'+peerId+'_'+curScreen+'_'+stateButton+'" onChange="SceneController_ChangeCustomFont('+SCObj.Id+','+peerId+',\''+curScreen+'\','+stateButton+')">\n';
-						for (var j = 0; j < SceneController_CustomFontList.length; ++j) {
-							var fontName = SceneController_CustomFontList[j];
+						for (var j = 0; j < SCObj.CustomFontList.length; ++j) {
+							var fontName = SCObj.CustomFontList[j];
 							html += '   <option style="height:22px;" value="'+fontName+'" '+(fontName == spec.font ? 'selected' : '')+'>'+fontName+'</option>\n';
 						}
 						html += '  </select>\n </td>\n';
@@ -1312,23 +1342,33 @@ function SceneController_Screens(SCObj, deviceId) {
 								modeParam = (curScreen == SCObj.DefaultScreen ? "C2" : SCObj.DefaultScreen);
 							}
 							html += '   <select class="styled" style="width:120px; height:22px;" id="SwitchScreen_'+peerId+'_'+curScreen+'_'+button+'" onChange="SceneController_ChangeCustomMode('+SCObj.Id+','+peerId+',\''+curScreen+'\','+button+')" style="width:100px;">\n'
-							     +       SceneController_ScreenMenu(SCObj, modeParam, curScreen, lcdVersion)
+							     +       SceneController_ScreenMenu(SCObj, modeParam, curScreen, "You cannot switch to the screen that you are  already on", lcdVersion)
 							     +  '   </select>\n';
 						}
 						// Disable Vera scenes if we have already selected a non-scene-capable direct device
 						// or if in toggle mode and there are no "off" scenes (i.e. toggle off is basic set 0)
 						// or if the number of direct devices has reached the number of associations
-						var disableVeraScene = (!SCObj.HasCooperConfiguration && 
-						                        mode.length > 0 && 
-						                        (SceneController_GetDeviceProperties(SceneController_get_device_object(mode[0].device)).basicSetOnly ||
-						                         (mode.prefix == "T" && !SCObj.HasOffScenes))) ||
-						                       mode.length >= SCObj.MaxDirectAssociations;
-						var veraSceneObj = SceneController_FindScene(peerId, sceneNum, -1)
-						var enableMoreDirectScenes = mode.length < SCObj.MaxDirectAssociations &&
-						                             (!veraSceneObj ||
-													  SCObj.HasCooperConfiguration ||
-													  (mode.prefix != "T" || SCObj.HasOffScenes))
-						var enableNonSceneDirect = SCObj.HasCooperConfiguration || (!veraSceneObj && states == 1);
+						var disableVeraScene = false
+						if (mode.length >= SCObj.MaxDirectAssociations) {
+							disableVeraScene = SCObj.MaxDirectAssociations + " devices are already connected to this button"
+						} else if (!SCObj.HasIndicator && mode.length > 0) {
+							if (SceneController_GetDeviceProperties(SceneController_get_device_object(mode[0].device)).basicSetOnly) {
+								disableVeraScene = "The first directly connected device is not scene-capable";
+							} else if  (mode.prefix == "T" && !SCObj.HasOffScenes) {
+								disableVeraScene = "No toggle mode with both Vera scenes and directly connected devices"	
+							}
+						}
+						var veraSceneObjs = SceneController_FindScene(peerId, sceneNum, -1)
+						var disableMoreDirectScenes = false
+						if (mode.length >= SCObj.MaxDirectAssociations) {
+							disableMoreDirectScenes = "Maximum " + SCObj.MaxDirectAssociations + " devices already directly connected";
+						} else if (veraSceneObjs && 
+						           !SCObj.HasIndicator &&
+								   mode.prefix == "T" &&
+								   !SCObj.HasOffScenes) {
+							disableMoreDirectScenes = "No toggle mode with both Vera scenes and directly connected devices"
+						}
+						var enableNonSceneDirect = SCObj.HasCooperConfiguration || (!veraSceneObjs && states == 1);
 						switch (mode.prefix) {
 						   	case "M":	// Momentary
 							case "X":	// EXclusive
@@ -1339,7 +1379,7 @@ function SceneController_Screens(SCObj, deviceId) {
 								if (SCObj.HasIndicator && ((mode.prefix >= "2" && mode.prefix <= "9") || mode.prefix == "X"))  {
 									// For multistate and exclusive modes, we look at all of the devices affected by each state
 									// to allow the indicator to automatically track which state is most appropriate.
-									var sceneSet = SceneController_GetSceneSet(veraSceneObj)
+									var sceneSet = SceneController_GetSceneSet(veraSceneObjs)
 									if (!SceneController_SceneSetsEqual(sceneSet, mode.veraSceneSet)) {
 										mode.veraSceneSet = sceneSet;
 										var newModeStr=SceneController_GenerateModeString(SCObj, mode);
@@ -1351,16 +1391,17 @@ function SceneController_Screens(SCObj, deviceId) {
 										SceneController_set_device_state(peerId, SCObj.ServiceId, modeVar, newModeStr);
 									}
 								}
-								html += '   <button type="button" class="btn" '+(disableVeraScene?'disabled ':'')+'style="min-width:10px;'+
-								             (SceneController_FindScene(peerId, sceneNum, 2)?';color:orange;':'')+(disableVeraScene?'background-color:#AAAAAA;':'')+
-								             '" onClick="SceneController_SetScene('+peerId+','+sceneNum+',2,\''+SceneController_EscapeHTML(label)+'\')">Scene</button>\n';
+								html += '   <button type="button" class="btn showdisabledtitle" '+(disableVeraScene?'disabled ':'')+'style="min-width:10px;'+
+								             (SceneController_FindScene(peerId, sceneNum, 2)?';color:orange;':'')+(disableVeraScene?'background-color:#AAAAAA;':'')+'"' +
+											 ' title="'+(disableVeraScene ? disableVeraScene:'Device trigger:&#xa;   '+deviceName+':&#xa;      Scene number '+sceneNum+' is activated')+'"'+
+								             ' onClick="SceneController_SetScene('+peerId+','+sceneNum+',2,\''+SceneController_EscapeHTML(label)+'\')">Scene</button>\n';
 						      	break;
 						   	case "T":  // Toggle
-								var onScene = SceneController_FindScene(peerId, sceneNum, 1)
+								var onSceneObjs = SceneController_FindScene(peerId, sceneNum, 1)
 								if (SCObj.HasIndicator) {
 									// For toggle modes, we look at all of the devices affected by any Vera "on" scene and used them to
 									// to allow the indicator to automatically track when most of the affected devices are on or off.
-									var onSceneSet = SceneController_GetSceneSet(veraSceneObj)
+									var onSceneSet = SceneController_GetSceneSet(onSceneObjs)
 									if (!SceneController_SceneSetsEqual(onSceneSet, mode.veraSceneSet)) {
 										mode.veraSceneSet = onSceneSet;
 										var newModeStr=SceneController_GenerateModeString(SCObj, mode);
@@ -1372,20 +1413,23 @@ function SceneController_Screens(SCObj, deviceId) {
 										SceneController_set_device_state(peerId, SCObj.ServiceId, modeVar, newModeStr);
 									}
 								}
-								html += '   <button type="button" class="btn" '+(disableVeraScene?'disabled ':'')+'style="min-width:10px;'+
-								             (onScene?';color:orange;':'')+(disableVeraScene?'background-color:#AAAAAA;':'')+
-								             '" onClick="SceneController_SetScene('+peerId+','+sceneNum+',1,\''+SceneController_EscapeHTML(label)+'\')">On</button>\n';
+								html += '   <button type="button" class="btn showdisabledtitle" '+(disableVeraScene?'disabled ':'')+'style="min-width:10px;'+
+								             (onSceneObjs?';color:orange;':'')+(disableVeraScene?'background-color:#AAAAAA;':'')+'"'+
+											 ' title="'+(disableVeraScene ? disableVeraScene:'Device trigger:&#xa;   '+deviceName+':&#xa;      Scene number '+sceneNum+' is activated')+'"'+
+								             ' onClick="SceneController_SetScene('+peerId+','+sceneNum+',1,\''+SceneController_EscapeHTML(label)+'\')">On</button>\n';
 								if (/*SCObj.HasOffScenes*/ true) {
-									html += '    <button type="button" class="btn" '+(disableVeraScene?'disabled ':'')+'style="min-width:10px;'+
-									             (SceneController_FindScene(peerId, sceneNum, 0)?';color:orange;':'')+(disableVeraScene?'background-color:#AAAAAA;':'')+
-									             '" onClick="SceneController_SetScene('+peerId+','+sceneNum+',0,\''+SceneController_EscapeHTML(label)+'\')">Off</button>';
+									html += '    <button type="button" class="btn showdisabledtitle" '+(disableVeraScene?'disabled ':'')+'style="min-width:10px;'+
+									             (SceneController_FindScene(peerId, sceneNum, 0)?';color:orange;':'')+(disableVeraScene?'background-color:#AAAAAA;':'')+'"'+
+											 	 ' title="'+(disableVeraScene ? disableVeraScene:'Device trigger:&#xa;   '+deviceName+':&#xa;      Scene number '+sceneNum+' is deactivated')+'"'+
+									             ' onClick="SceneController_SetScene('+peerId+','+sceneNum+',0,\''+SceneController_EscapeHTML(label)+'\')">Off</button>';
 								}
 								break;
 						}
-						html += '    <button type="button" class="btn" '+(enableMoreDirectScenes?'':"disabled ")+'style="min-width:10px;'+
-							             (mode.length>0?';color:orange;':'')+(enableMoreDirectScenes?'':'background-color:#AAAAAA;')+
-							             '" onClick="SceneController_SetPlaceholder('+SCObj.Id+','+peerId+','+stateButton+')">+Direct</button>\n';
-						if (enableMoreDirectScenes && SceneController_Placeholder == stateButton) {
+						html += '    <button type="button" class="btn showdisabledtitle" '+(disableMoreDirectScenes?'disabled title="'+disableMoreDirectScenes+'" ':'')+'style="min-width:10px;'+
+							             (mode.length>0?';color:orange;':'')+(disableMoreDirectScenes?'background-color:#AAAAAA;':'')+'"'+
+										 (disableMoreDirectScenes?' title="'+disableMoreDirectScenes+'"':'')+
+							             ' onClick="SceneController_SetPlaceholder('+SCObj.Id+','+peerId+','+stateButton+')">+Direct</button>\n';
+						if (!disableMoreDirectScenes && SceneController_Placeholder == stateButton) {
 							mode.push({device:0});
 						}
 						html += '   </div>\n  </td>\n </tr>\n';
@@ -1484,7 +1528,7 @@ function SceneController_Screens(SCObj, deviceId) {
 				 +  '   <input type="checkbox"'+(timeoutEnable?' checked':'')+' id="TimeoutEnable_'+peerId+'_'+curScreen+'" style="min-width:'+(SceneController_IsUI7() ? 20 : 10)+'px;" onChange="SceneController_ChangeTimeout('+SCObj.Id+','+peerId+',\''+curScreen+'\', false)" /><span></span>\n'
 				 +  '   Switch to screen:\n'
 		         +  '   <select class="styled" id="TimeoutScreen_'+peerId+'_'+curScreen+'" onChange="SceneController_ChangeTimeout('+SCObj.Id+','+peerId+',\''+curScreen+'\', true)" style="width:100px;">\n'
-				 +       SceneController_ScreenMenu(SCObj, timeoutScreen, curScreen, lcdVersion)
+				 +       SceneController_ScreenMenu(SCObj, timeoutScreen, curScreen, "You cannot switch to the screen that you are alreayd on", lcdVersion)
 			     +  '   </select>\n'
 			     +  '   if no button pressed after\n'
 			     +  '   <input class="styled" id="TimeoutSeconds_'+peerId+'_'+curScreen+'" type="text" value="'+timeoutSeconds+'" style="width:30px;" onChange="SceneController_ChangeTimeout('+SCObj.Id+','+peerId+',\''+curScreen+'\', true)" />\n'
@@ -1593,48 +1637,56 @@ function SceneController_CreateSceneName(devName, label, action, maxLength) {
 }
 
 // Activate is -1 for any, 0 for deactivate toggle, 1 for activate toggle or 2 for momendary.
-function SceneController_FindScene(deviceID, scenNum, activate) {
+function SceneController_FindScene(deviceID, sceneNum, activate) {
 	var triggerTemplate = activate ? 1 : 2;
     var numScenes=jsonp.ud.scenes.length;
-    var sceneObj;
+	var numFound = 0;
+    var sceneObjs = [];
     for (var i = 0; i < numScenes; i++) {
-        sceneObj = jsonp.ud.scenes[i];
+        var sceneObj = jsonp.ud.scenes[i];
 		if (sceneObj.triggers &&
-			sceneObj.triggers.length >= 1 &&
-			sceneObj.triggers[0].device == deviceID &&
-			(sceneObj.triggers[0].template == triggerTemplate || activate < 0) &&
-			sceneObj.triggers[0].arguments[0].value == scenNum) {
-			return sceneObj;
+			sceneObj.triggers.length > 0) {
+			for (var j = 0; j < sceneObj.triggers.length; j++) {
+				if (sceneObj.triggers[j].device == deviceID &&
+					(sceneObj.triggers[j].template == triggerTemplate || activate < 0) &&
+					 sceneObj.triggers[j].arguments[0].value == sceneNum) {
+					sceneObjs[numFound++] = sceneObj;
+					break;
+				}
+			}
 		}
     }
-	return null;
+	return numFound ? sceneObjs : null;
 }
 
 // Return an object who's keys are the device numbers affected by the given scene object regardless of delay
-function SceneController_GetSceneSet(sceneObj) {
-	if (!sceneObj || !sceneObj.groups) {
+function SceneController_GetSceneSet(sceneObjs) {
+	if (!sceneObjs || sceneObjs.length == 0) {
 		return null;
 	}
 	var result = [];
-	for (var i = 0; i < sceneObj.groups.length; ++i) {
-		var group = sceneObj.groups[i];
-		for (var j = 0; j < group.actions.length; ++j) {
-			var levelSet = false;
-			var action = group.actions[j];
-			if (action.action == "SetLoadLevelTarget") {
-				var arguments = action.arguments;
-				for (var k = 0; k < arguments.length; ++k) {
-					var argument = arguments[k];
-					if (argument.name == "newLoadlevelTarget") {
-						result.push({device: action.device,
-									 level: parseInt(argument.value, 0)})
-					    levelSet = true;
-						break;
+	for (var h = 0; h < sceneObjs.length; ++h) {
+		var sceneObj = sceneObjs[h];
+		for (var i = 0; i < sceneObj.groups.length; ++i) {
+			var group = sceneObj.groups[i];
+			for (var j = 0; j < group.actions.length; ++j) {
+				var levelSet = false;
+				var action = group.actions[j];
+				if (action.action == "SetLoadLevelTarget") {
+					var arguments = action.arguments;
+					for (var k = 0; k < arguments.length; ++k) {
+						var argument = arguments[k];
+						if (argument.name == "newLoadlevelTarget") {
+							result.push({device: action.device,
+										 level: parseInt(argument.value, 0)})
+						    levelSet = true;
+							break;
+						}
 					}
 				}
-			}
-			if (!levelSet) {
-				result.push({device: action.device})
+				if (!levelSet) {
+					result.push({device: action.device})
+				}
 			}
 		}
 	}
@@ -1659,8 +1711,9 @@ function SceneController_SceneSetsEqual(s1, s2) {
 	return true;
 }
 
-function SceneController_GetOrCreateNewScene(deviceID, scenNum, activate, label) {
-    var sceneObj = SceneController_FindScene(deviceID, scenNum, activate)
+function SceneController_GetOrCreateNewScene(deviceID, sceneNum, activate, label) {
+    var sceneObjs = SceneController_FindScene(deviceID, sceneNum, activate)
+	var sceneObj = sceneObjs ? sceneObjs[0] : null;
 	if (sceneObj) {
 		if (sceneObj.groups == undefined) {
 			sceneObj.groups =  [{
@@ -1689,7 +1742,7 @@ function SceneController_GetOrCreateNewScene(deviceID, scenNum, activate, label)
     		device: deviceID,
     		arguments: [{
 				id: 1,
-				value: scenNum
+				value: sceneNum
     		}],
     	}],
 		groups: [{
