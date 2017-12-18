@@ -15,7 +15,7 @@
       <serviceId>urn:gengen_mcv-org:serviceId:ZWaveMonitor1</serviceId>
       <name>Monitor</name>
       <run>
-		SceneController_ZWaveMonitorResponse(lul_device, lul_settings, lul_settings.key, false)
+		SceneController_ZWaveMonitorResponse(lul_device, lul_settings, false)
         return true;
       </run>
     </action>
@@ -23,7 +23,7 @@
       <serviceId>urn:gengen_mcv-org:serviceId:ZWaveMonitor1</serviceId>
       <name>Intercept</name>
       <run>
-		SceneController_ZWaveMonitorResponse(lul_device, lul_settings, lul_settings.key, true)
+		SceneController_ZWaveMonitorResponse(lul_device, lul_settings, true)
         return true;
       </run>
     </action>

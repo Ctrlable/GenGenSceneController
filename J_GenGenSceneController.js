@@ -761,7 +761,7 @@ function SceneController_SelectDirectDevice(SCObj, prefix, peerId, screen, label
 		}
 		if (masterDevice) {
 			var masterObj = SceneController_get_device_object(masterDevice);
-			mode.sceneControllable = SceneController_GetDevicePropertiest(masterObj).scene;
+			mode.sceneControllable = SceneController_GetDeviceProperties(masterObj).scene;
 			if (!mode.sceneControllable && SCObj.HasCooperConfiguration) {
 				mode.cooperConfiguration = true;
 			}
@@ -795,7 +795,7 @@ function SceneController_SelectDirectDevice(SCObj, prefix, peerId, screen, label
 			for (var i = affectStart; i < mode.length; ++i) {
 				if (mode[i]) {
 					var obj = SceneController_get_device_object(mode[i].device);
-					if (SceneController_GetDevicePropertiest(obj).basicSet) {
+					if (SceneController_GetDeviceProperties(obj).basicSet) {
 						numDelete++;
 						lastName = obj.name;
 					}
@@ -811,7 +811,7 @@ function SceneController_SelectDirectDevice(SCObj, prefix, peerId, screen, label
 			for (var i = 0; i < mode.length; ++i) {
 				if (mode[i]) {
 					var obj = SceneController_get_device_object(mode[i].device);
-					if (SceneController_GetDevicePropertiest(obj).basicSet) {
+					if (SceneController_GetDeviceProperties(obj).basicSet) {
 						mode[i] = null;
 					}
 				}
@@ -1009,7 +1009,7 @@ function SceneController_IsZWaveObject(obj) {
 // basicSet: Boolean - Device is not scene controllable but Basic Set contrllable
 // multilevel: Boolean - Device is multilevel
 // binary: Boolean - Device is binary
-function SceneController_GetDevicePropertiest(obj) {
+function SceneController_GetDeviceProperties(obj) {
 	var result = {
 		zWave: false,
 		scene: false,
@@ -1194,12 +1194,13 @@ function SceneController_Screens(SCObj, deviceId) {
 						}
 						var modeStr  = SceneController_get_device_state(peerId, SCObj.ServiceId, "Mode_"+curScreen+"_"+stateButton, 0);
 						if (!modeStr || typeof modeStr != "string") {
-							modeStr = SCObj.DefaultModeString;
+							modeStr = "M";
 						}
 					}
 					var mode = SceneController_ParseModeString(SCObj, modeStr)
 					html += ' <tr>\n';
 					if (states > 1) {
+						mode.prefix = "M"
 						html +=  '  <td>'+(button+state/10)+'</td>\n';
 					}
 					else {
@@ -1264,8 +1265,10 @@ function SceneController_Screens(SCObj, deviceId) {
 							     +       SceneController_ScreenMenu(SCObj, modeParam, curScreen, lcdVersion)
 							     +  '   </select>\n';
 						}
-						var disableVeraScene = mode.length > 0 && SceneController_GetDevicePropertiest(SceneController_get_device_object(mode[0].device)).basicSet;
-						var enableNonSceneDirect = SceneController_FindScene(peerId, sceneNum, -1) == null && states == 1;
+						//var disableVeraScene = mode.length > 0 && SceneController_GetDeviceProperties(SceneController_get_device_object(mode[0].device)).basicSet;
+						var disableVeraScene = false;
+						//var enableNonSceneDirect = SceneController_FindScene(peerId, sceneNum, -1) == null && states == 1;
+						var enableNonSceneDirect = true; 
 						switch (mode.prefix) {
 						   	case "M":	// Momentary
 							case "X":	// Exclusive
@@ -1279,7 +1282,7 @@ function SceneController_Screens(SCObj, deviceId) {
 								html += '   <button type="button" class="btn" '+(disableVeraScene?'disabled ':'')+'style="min-width:10px;'+
 								             (SceneController_FindScene(peerId, sceneNum, 1)?';color:orange;':'')+(disableVeraScene?'background-color:#AAAAAA;':'')+
 								             '" onClick="SceneController_SetScene('+peerId+','+sceneNum+',1,\''+SceneController_EscapeHTML(label)+'\')">On</button>\n';
-								if (SCObj.HasOffScenes) {
+								if (/*SCObj.HasOffScenes*/ true) {
 									html += '    <button type="button" class="btn" '+(disableVeraScene?'disabled ':'')+'style="min-width:10px;'+
 									             (SceneController_FindScene(peerId, sceneNum, 0)?';color:orange;':'')+(disableVeraScene?'background-color:#AAAAAA;':'')+
 									             '" onClick="SceneController_SetScene('+peerId+','+sceneNum+',0,\''+SceneController_EscapeHTML(label)+'\')">Off</button>';
@@ -1310,15 +1313,15 @@ function SceneController_Screens(SCObj, deviceId) {
 											return 0;
 										}
 									}
-									var controllable = SceneController_GetDevicePropertiest(obj);
+									var controllable = SceneController_GetDeviceProperties(obj);
 									if (controllable.basicSet && ((mode.sceneControllable && j > 0) || mode.prefix != "T" || !enableNonSceneDirect)) {
 										// not scene-capable, but allow the first item to change that if in toggle mode and there are no Vera scenes.
 										// There is no basic SET momentary.
 										return 0;
 									}
-									return controllable.scene ? 2 : !controllable.zWave ? 0 : 1;
+									return controllable.scene ? 2 : controllable.zWave ? 1 : 0;
 		  	 					});
-							var controllable = SceneController_GetDevicePropertiest(SceneController_get_device_object(mode[j].device))
+							var controllable = SceneController_GetDeviceProperties(SceneController_get_device_object(mode[j].device))
 							if (mode[j].level != undefined ) {
 								html +=  '    <input type="checkbox"'+(mode[j].level != 255 ?' checked':'')+' id="LevelSelect_'+peerId+'_'+curScreen+'_'+stateButton+'_'+j+'"'
 								     +   ' style="min-width:10px;margin-left:10px;" onChange="SceneController_SelectDirectDevice('+SCObj.Id+',\''+mode.prefix+'\','+peerId+',\''+curScreen+'\',\''+stateButton+'\',\''+j+'\',2)"><span/>\n'

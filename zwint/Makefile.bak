@@ -35,9 +35,9 @@ $(LIBNAME_DEBUG): $(OBJNAME_DEBUG)
 
 output: $(LIBNAME_DEBUG) $(LIBNAME)
 	@echo '  local zwint_so'
-	@echo '  if UseDebugZWaveInterceptor then'
+	@echo '  if not UseDebugZWaveInterceptor then'
 	@echo '    -- zwint debug version'
-	@echo '    zwint_so = b642bin([['
+	@echo '	   zwint_so = b642bin([['
 	@base64 $(LIBNAME_DEBUG) | sed -e ' s/^\(.*\)$$/    \1/'
 	@echo '    ]])'
 	@echo '  else'

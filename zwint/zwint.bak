@@ -411,7 +411,7 @@ static void process_zwave(int input_fd, int output_fd, int send, zwave_state *s)
 															break;
 														case 3: /* \1 - \9 replacement */
 															if (matches[val].rm_so < 0) {
-																monitor_error(m, "Unmatched replacement");
+																monitor_error(m, "More replacements than matches");
 																error = 1;
 															} else {
 																error = addZwaveResponseData(m, s, &s->packet_buff[matches[val].rm_so/3], (2 + matches[val].rm_eo-matches[val].rm_so)/3);
@@ -420,7 +420,7 @@ static void process_zwave(int input_fd, int output_fd, int send, zwave_state *s)
 															break;
 														case 5: /* Checksum */
 															if (s->response_zstate < 2) {
-																monitor_error(m, "Bad Response checksum");
+																monitor_error(m, "Response too short for checksum");
 																error = 1;
 															} else if (addZwaveResponseData(m, s,&s->response_checksum, 1)) {
 																error = 1;
