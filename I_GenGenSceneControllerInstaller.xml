@@ -2,19 +2,4 @@
 <implementation>
   <files>L_GenGenSceneControllerInstaller.lua</files>
   <startup>SceneControllerInstaller_Init</startup>
-  <actionList>
-    <action>
-      <serviceId>urn:gengen_mcv-org:serviceId:SceneControllerInstaller</serviceId>
-      <name>MonitorZWave</name>
-      <run>
-        local device = tonumber(lul_device);
-        local responseDevice = tonumber(lul_settings.responseDevice);
-        local pattern = tostring(lul_settings.pattern);
-        local context = tostring(lul_settings.context);
-        local timeout = tonumber(lul_settings.timeout);
-        SceneControllerInstaller_MonitorZWave(device, responseDevice, pattern, context, timeout);
-        return true;
-      </run>
-    </action>
-  </actionList>
 </implementation>
