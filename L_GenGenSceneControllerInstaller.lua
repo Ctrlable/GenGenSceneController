@@ -12,7 +12,7 @@
 -- VerboseLogging == 1: Includes debug logs:          ELog, log, DLog, DEntry
 -- VerboseLogging == 2: Include extended ZWave Queue  ELog, log, DLog, DEntry
 -- VerboseLogging == 3:	Includes verbose logs:        ELog, log, DLog, DEntry, VLog, VEntry
-VerboseLogging = 3
+VerboseLogging = 0
 
 -- Set UseDebugZWaveInterceptor to true to enable zwint log messages to log.LuaUPnP (Do not confuse with LuaUPnP.log)
 local UseDebugZWaveInterceptor = false

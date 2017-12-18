@@ -16,8 +16,6 @@ DEVTYPE_EVOLVELCD1    = "urn:schemas-gengen_mcv-org:device:SceneControllerEvolve
 DEVTYPE_COOPEREFWC5   = "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1"
 DEVTYPE_NEXIAONETOUCH = "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1"
 
-SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
-
 local SCObj
 
 Devices = {
@@ -225,6 +223,7 @@ Devices = {
 		end,
 
 		SetBacklight = function(peer_dev_num, blackLightOn)
+			DEntry("SetBacklight")
 			local node_id = GetZWaveNode(peer_dev_num)
 			local level = 0
 			if blackLightOn then
@@ -1346,6 +1345,7 @@ function SceneController_Init(lul_device)
 		VLog("SceneController_Init: calling zwint.register(", ComPort, ")");
 		local result, errcode, errmsg = zwint.register(ComPort);
 		VLog("SceneController_Init: zwint.register(", ComPort, ") returned result=", result, " errcode=", errcode, " errmsg=", errmsg);
+		RegisterClientDevice()
 
 		    -- Devices are connected. Perform normal initialization on reload.
 
@@ -3468,6 +3468,7 @@ end
 
 local timeout_count = 0
 function SceneController_SetBacklight(peer_dev_num, timeout)
+	DEntry()
 	if IsVeraPrimaryController() then
 		if not peer_dev_num then
 			ELog("SceneController_SetBacklight: bad peer_dev_num=", peer_dev_num)
@@ -3482,6 +3483,7 @@ function SceneController_SetBacklight(peer_dev_num, timeout)
 end
 
 function SceneController_BacklightTimeout(peer_dev_num_string)
+	DEntry()
 	if IsVeraPrimaryController() then
 		timeout_count = timeout_count - 1
 		if timeout_count <= 0 then
@@ -4100,85 +4102,9 @@ Device 20=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦
 	SetIndicator(peer_dev_num, GetCurrentScreen(peer_dev_num), false)
 end
 
--- Sanitize a string converting all non [a-zA-Z0-9_] characters to _
--- This May return a string beginning with a digit
-function toidentifier(anything)
-  return  string.gsub(tostring(anything),"[^%w_]","_")
-end
-
-function WatchedVarHandler(xfunction_name, ufunction_name, context, device, service, variable, value_old, value_new)
-  VEntry()
-  if WatchedVariables[xfunction_name] then
-    if UnwatchedVariables[ufunction_name] then
-	  local temp = UnwatchedVariables[ufunction_name] - 1
-	  VLog("Skipping Unwatched variable: ", ufunction_name, ". Unwatch count now ", UnwatchedVariables[ufunction_name])
-	  if temp <= 0 then
-	    temp = nil
-	  end
-	  UnwatchedVariables[ufunction_name] = temp
-	  return false -- Temp unwatch
-	end
-    return true -- Normal case
-  end
-  VLog(xfunction_name, " no longer being watched")
-  return false -- Variable no longer watched
-end
-
-WatchedVariables = {}
-UnwatchedVariables = {}
--- An extended version of luup.variable_watch which takes an extra context (string) parameter
--- function_name is passed  lul_device, lul_service, lul_variable, lul_value_old, lul_value_new, context
--- Returns an object which can be passed to CancelVariableWatch
--- Watches created here can also be temporarily unwatched (once) using TempVariableUnwatch
-function VariableWatch(function_name, service, variable, device, context)
-  VEntry()
-  local xfunction_name = "VarWatch_" .. function_name .. toidentifier(context) .. "___" .. toidentifier(service) .. variable .. tostring(device)
-  local ufunction_name = "VarUnwatch_" .. toidentifier(service) .. variable .. tostring(device)
-  if WatchedVariables[xfunction_name] then
-    -- Already being watched with the given context.
-	WatchedVariables[xfunction_name] = WatchedVariables[xfunction_name] + 1
-	return
-  end
-  WatchedVariables[xfunction_name] = 1;
-  if WatchedVariables[ufunction_name] then
-	WatchedVariables[ufunction_name] = WatchedVariables[ufunction_name] + 1
-  else
-	WatchedVariables[ufunction_name] = 1
-  end
-  local qContext = string.format('%q', context)
-  local funcBody="function " .. xfunction_name .. "(device, service, variable, value_old, value_new)\n" ..
-                 "  if WatchedVarHandler ('"..xfunction_name.."', '" .. ufunction_name .. "', '" .. qContext .. "', device, service, variable, value_old, value_new) then\n" ..
-                 "    " .. function_name .. "(device, service, variable, value_old, value_new, " .. qContext .. ")\n" ..
-			     "  end\n" ..
-			     "end\n"
-  assert(loadstring(funcBody))()
-  luup.variable_watch(xfunction_name, service, variable, device)
-  return xfunction_name;
-end
-
--- Temporarily "unwatch" a variable which is expected to trigger
-function TempVariableUnwatch(service, variable, device)
-  VEntry()
-  local ufunction_name = "VarUnwatch_" .. toidentifier(service) .. variable .. tostring(device)
-  local numWatched = WatchedVariables[ufunction_name]
-  if numWatched then
-	if UnwatchedVariables[ufunction_name] then
-	  UnwatchedVariables[ufunction_name] = UnwatchedVariables[ufunction_name] + numWatched
-	else
-	  UnwatchedVariables[ufunction_name] = numWatched
-	end
-  end
-end
-
-function CancelVariableWatch(xfunction_name)
-	VEntry()
-	assert(WatchedVariables[xfunction_name] > 0)
-	WatchedVariables[xfunction_name] = WatchedVariables[xfunction_name] - 1
-
-	ufunction_name = "VarUnwatch_" .. xfunction_name:match("___(.*)$")
-	assert(WatchedVariables[ufunction_name] > 0)
-	WatchedVariables[ufunction_name] = WatchedVariables[ufunction_name] - 1
-end
+---
+--- External device interface
+---
 
 -- Returns on%, lastUpdate, service, variable if the given device is on or off. (In the case of a binary device, retun 0 or 100%
 -- Returns nil if the device does not exist or is not settable

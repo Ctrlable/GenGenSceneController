@@ -195,6 +195,8 @@ function tableToString(tab, hash)
 	  end
       if type(k) == "table" then
 	     s = s .. tableToString(k, hash)
+	  elseif type(k) == "number" then
+		 s = s .. "[" .. k .. "]"
 	  else
 	     s = s .. tostring(k)
 	  end
@@ -242,6 +244,7 @@ zwint = require "zwint"
 
 SID_ZWAVEMONITOR      = "urn:gengen_mcv-org:serviceId:ZWaveMonitor1"
 SID_ZWN       	      = "urn:micasaverde-com:serviceId:ZWaveNetwork1"
+SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
 
 GENGENINSTALLER_SID   = "urn:gengen_mcv-org:serviceId:SceneControllerInstaller1"
 GENGENINSTALLER_DEVTYPE = "urn:schemas-gengen_mcv-org:device:SceneControllerInstaller:1"
@@ -255,6 +258,7 @@ local TaskHandleList = {}
 local OtherJobPending = false
 local ZWaveQueuePendingTime = 0
 local MinOtherJobDelay = 400
+local ZQ_MaxQueueDepth = 3 -- Actually only 2 pending. at least 1 slot always unused.
 
 MonitorContextNum = 0
 MonitorContextList = {}
@@ -364,7 +368,7 @@ local function EnqueueFinalZWaveMessage(name, node_id, data, peer_dev_num)
 	description = luup.devices[peer_dev_num].description,
 	hasBattery = true,
   	final=true}
-  table.insert(ExternalZWaveQueue, queueNode)
+  EnqueueInternalActionOrMessage(queueNode)
 end
 
 
@@ -659,36 +663,50 @@ Device 12=Nexia One Touch Scene Controller Z-Wave ----+   ¦    ¦   ¦    ¦
 end
 
 -- Always run the Z-Wave queue in a delay task to avoid any deadlocks.
-local function RunInternalZWaveQueue(fromWhere, delay_ms)
+function RunInternalZWaveQueue(fromWhere, delay_ms)
 	DEntry()
 	local t1 = socket.gettime()
 	local delayTime = t1 + delay_ms/1000
 	if delayTime > ZWaveQueuePendingTime then
 	   ZWaveQueuePendingTime = delayTime
 	end
-	if not OtherJobPending and not ActiveZWaveJob and not DelayingJob and ZWaveQueueNext then
-		DelayingJob = true;
-		delay_ms = (ZWaveQueuePendingTime - t1) * 1000
-		local delay_sec
-		if delay_ms <= 0 then
-			delay_sec = 0
-		else		 
-			delay_sec = math.floor(delay_ms / 1000)
-			local sleep_ms = math.floor(delay_ms - delay_sec*1000)
-			if sleep_ms > 0 then
-				VLog("RunInternalZWaveQueue: luup.sleep for ",delay_sec," seconds and ", sleep_ms," ms"); 
-				luup.sleep(sleem_ms)
-				local t2 = socket.gettime()
-				if (t2 - t1) * 1000 < sleep_ms then
-					delay_sec = delay_sec + 1
-					VLog("luup.sleep too short. Delaying by an extra second: ", delay_sec)
-				else
-					VLog("luup.sleep done")
-				end
+	if OtherJobPending then
+		DLog("OtherJobPending. Quitting")
+		return
+	end
+	if ActiveZWaveJob then
+		DLog("ActiveZWaveJob. Quitting")
+		return
+	end
+	if DelayingJob then
+		DLog("DelayingJob. Quitting")
+		return
+	end
+	if not ZWaveQueueNext then
+		DLog("Not ZWaveQueueNext. Quitting")
+		return
+	end
+	DelayingJob = true;
+	delay_ms = (ZWaveQueuePendingTime - t1) * 1000
+	local delay_sec
+	if delay_ms <= 0 then
+		delay_sec = 0
+	else		 
+		delay_sec = math.floor(delay_ms / 1000)
+		local sleep_ms = math.floor(delay_ms - delay_sec*1000)
+		if sleep_ms > 0 then
+			VLog("RunInternalZWaveQueue: luup.sleep for ",delay_sec," seconds and ", sleep_ms," ms"); 
+			luup.sleep(sleem_ms)
+			local t2 = socket.gettime()
+			if (t2 - t1) * 1000 < sleep_ms then
+				delay_sec = delay_sec + 1
+				VLog("luup.sleep too short. Delaying by an extra second: ", delay_sec)
+			else
+				VLog("luup.sleep done")
 			end
 		end
-		luup.call_delay("SceneController_RunInternalZWaveQueue", delay_sec, fromWhere, true)
 	end
+	luup.call_delay("SceneController_RunInternalZWaveQueue", delay_sec, fromWhere, true)
 end
 
 function SceneController_RunInternalZWaveQueue(fromWhere)
@@ -891,6 +909,50 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 	end
 end
 
+function RegisterClientDevice()
+	DEntry()
+	luup.variable_set(SID_SCENECONTROLLER, "ZQ_WritePtr", "0", luup.device)
+	-- luup.variable_set(SID_SCENECONTROLLER, "ZQ_ReadPtr", "0", luup.device)
+	local err_num, err_msg, job_num, arguments = luup.call_action(GENGENINSTALLER_SID, "RegisterClientDevice", {DeviceNumber=luup.device}, GetFirstInstaller())
+	if err_num ~= 0 then
+		DLog("RegisterClientDevice: call_action returnd ", err_num, ": ", err_msg,". Trying again.") 
+		local tryAgainSeconds = 3
+		luup.call_delay("RegisterClientDevice", tryAgainSeconds, "", true)
+	end
+end
+
+ZQReadPtrs = {}
+
+function SceneController_RegisterClientDevice(device, target)
+	DEntry()
+	ZQReadPtrs[target] = 0
+	VariableWatch("SceneController_ZQWritePtrChanged", SID_SCENECONTROLLER, "ZQ_WritePtr", target, tostring(target))
+end
+
+function SceneController_ZQWritePtrChanged(lul_device, lul_service, lul_variable, lul_value_old, lul_value_new, context)
+	VEntry()
+	local target = tonumber(context)
+	local writePtr = tonumber(lul_value_new)
+	--local readPtr = luup.variable_get(SID_SCENECONTROLLER, "ZQ_ReadPtr", target)
+	local readPtr = ZQReadPtrs[target]
+	readPtr = tonumber(readPtr)
+	while readPtr ~= writePtr do
+		local data = luup.variable_get(SID_SCENECONTROLLER, "ZQ_Data"..readPtr, target)
+		-- luup.variable_set(SID_SCENECONTROLLER, "ZQ_Data"..readPtr, "", target)
+		local settings = assert(loadstring("return " .. data))()
+		for i,v in ipairs(settings) do
+			EnqueueInternalActionOrMessage(v)
+		end
+		readPtr = (readPtr + 1) % ZQ_MaxQueueDepth
+	end
+	-- VLog("About to Set ZQ_ReadPtr to", readPtr) 
+	-- luup.variable_set(SID_SCENECONTROLLER, "ZQ_ReadPtr", tostring(readPtr), target)
+	ZQReadPtrs[target] = readPtr
+	VLog("Set ZQ_ReadPtr to", readPtr," About to call RunInternalZWaveQueue") 
+	RunInternalZWaveQueue("External ZQ", 0)
+end
+
+
 function SceneController_RunZWaveQueue(device, settings)
 	DEntry()
 	for i = 1, tonumber(settings.NumEntries) do
@@ -904,7 +966,7 @@ function SceneController_NoMoreInformationTimeout(data)
 	peer_dev_num = tonumber(peer_dev_num)
 	zwave_node = tonumber(zwave_node)
 	state = tonumber(state)
-	VEntry()
+	VEntry("SceneController_NoMoreInformationTimeout")
 	if DeviceAwakeStates[zwave_node] == state then
 	   	if  DeviceAwakeList[zwave_node] > 1 then
 	   		DeviceAwakeList[zwave_node] = 0
@@ -1146,18 +1208,18 @@ function RunZWaveQueue(fromWhere)
 		RunInternalZWaveQueue(fromWhere, 0)
 	end
 	if #ExternalZWaveQueue > 0 then
-		local data = {}
-		for i,v in ipairs(ExternalZWaveQueue) do
-			data["E"..i] = tableToString(v);
-		end
-		data.NumEntries = #ExternalZWaveQueue
-		if not take_global_lock() then
-			luup.call_delay("RunZWaveQueue", 1, fromWhere.." spinLock2", true)
-			return
-		end
-		ExternalZWaveQueue = {}
-	  	luup.call_action(GENGENINSTALLER_SID, "RunZWaveQueue", data, GetFirstInstaller())
-		give_global_lock()
+		-- local readPtr = luup.variable_get(SID_SCENECONTROLLER, "ZQ_ReadPtr", luup.device)
+		-- readPtr = tonumber(readPtr)
+		local writePtr = luup.variable_get(SID_SCENECONTROLLER, "ZQ_WritePtr", luup.device)
+		writePtr = tonumber(writePtr)
+		local nextWritePtr = (writePtr + 1) % ZQ_MaxQueueDepth
+		-- if nextWritePtr == readPtr then
+			-- ELog("ZWave Queue full")
+		-- else
+			luup.variable_set(SID_SCENECONTROLLER, "ZQ_Data"..writePtr, tableToString(ExternalZWaveQueue), luup.device)
+			ExternalZWaveQueue = {}
+			luup.variable_set(SID_SCENECONTROLLER, "ZQ_WritePtr", tostring(nextWritePtr), luup.device)
+		-- end
 	end
 end
 
@@ -1174,6 +1236,89 @@ function GetFirstInstaller()
 		end
 	end
 	return firstInstaller
+end
+
+---
+--- Enhanced variable watch support
+---
+-- Sanitize a string converting all non [a-zA-Z0-9_] characters to _
+-- This May return a string beginning with a digit
+local function toidentifier(anything)
+  return  string.gsub(tostring(anything),"[^%w_]","_")
+end
+
+function WatchedVarHandler(xfunction_name, ufunction_name, context, device, service, variable, value_old, value_new)
+  VEntry()
+  if WatchedVariables[xfunction_name] then
+    if UnwatchedVariables[ufunction_name] then
+	  local temp = UnwatchedVariables[ufunction_name] - 1
+	  VLog("Skipping Unwatched variable: ", ufunction_name, ". Unwatch count now ", UnwatchedVariables[ufunction_name])
+	  if temp <= 0 then
+	    temp = nil
+	  end
+	  UnwatchedVariables[ufunction_name] = temp
+	  return false -- Temp unwatch
+	end
+    return true -- Normal case
+  end
+  VLog(xfunction_name, " no longer being watched")
+  return false -- Variable no longer watched
+end
+
+WatchedVariables = {}
+UnwatchedVariables = {}
+-- An extended version of luup.variable_watch which takes an extra context (string) parameter
+-- function_name is passed  lul_device, lul_service, lul_variable, lul_value_old, lul_value_new, context
+-- Returns an object which can be passed to CancelVariableWatch
+-- Watches created here can also be temporarily unwatched (once) using TempVariableUnwatch
+function VariableWatch(function_name, service, variable, device, context)
+  VEntry()
+  local xfunction_name = "VarWatch_" .. function_name .. toidentifier(context) .. "___" .. toidentifier(service) .. variable .. tostring(device)
+  local ufunction_name = "VarUnwatch_" .. toidentifier(service) .. variable .. tostring(device)
+  if WatchedVariables[xfunction_name] then
+    -- Already being watched with the given context.
+	WatchedVariables[xfunction_name] = WatchedVariables[xfunction_name] + 1
+	return
+  end
+  WatchedVariables[xfunction_name] = 1;
+  if WatchedVariables[ufunction_name] then
+	WatchedVariables[ufunction_name] = WatchedVariables[ufunction_name] + 1
+  else
+	WatchedVariables[ufunction_name] = 1
+  end
+  local qContext = string.format('%q', context)
+  local funcBody="function " .. xfunction_name .. "(device, service, variable, value_old, value_new)\n" ..
+                 "  if WatchedVarHandler ('"..xfunction_name.."', '" .. ufunction_name .. "', '" .. qContext .. "', device, service, variable, value_old, value_new) then\n" ..
+                 "    " .. function_name .. "(device, service, variable, value_old, value_new, " .. qContext .. ")\n" ..
+			     "  end\n" ..
+			     "end\n"
+  assert(loadstring(funcBody))()
+  luup.variable_watch(xfunction_name, service, variable, device)
+  return xfunction_name;
+end
+
+-- Temporarily "unwatch" a variable which is expected to trigger
+function TempVariableUnwatch(service, variable, device)
+  VEntry()
+  local ufunction_name = "VarUnwatch_" .. toidentifier(service) .. variable .. tostring(device)
+  local numWatched = WatchedVariables[ufunction_name]
+  if numWatched then
+	if UnwatchedVariables[ufunction_name] then
+	  UnwatchedVariables[ufunction_name] = UnwatchedVariables[ufunction_name] + numWatched
+	else
+	  UnwatchedVariables[ufunction_name] = numWatched
+	end
+  end
+end
+
+function CancelVariableWatch(xfunction_name)
+	VEntry()
+	assert(WatchedVariables[xfunction_name] > 0)
+	WatchedVariables[xfunction_name] = WatchedVariables[xfunction_name] - 1
+
+	ufunction_name = "VarUnwatch_" .. xfunction_name:match("___(.*)$")
+	assert(WatchedVariables[ufunction_name] > 0)
+	WatchedVariables[ufunction_name] = WatchedVariables[ufunction_name] - 1
 end
 
 ---

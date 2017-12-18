@@ -5,6 +5,14 @@
   </specVersion>
   <serviceStateTable>
     <stateVariable sendEvents="no">
+      <name>A_ARG_TYPE_DeviceNumber</name>
+	  <sendEventsAttribute>no</sendEventsAttribute>
+      <dataType>int</dataType>
+	  <allowedValueRange>
+        <minimum>1</minimum>
+      </allowedValueRange>
+    </stateVariable>
+    <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_NumEntries</name>
 	  <sendEventsAttribute>no</sendEventsAttribute>
       <dataType>int</dataType>
@@ -64,6 +72,16 @@
     </stateVariable>
   </serviceStateTable>
   <actionList>
+    <action>
+      <name>RegisterClientDevice</name>
+      <argumentList>
+        <argument>
+          <name>DeviceNumber</name>
+          <direction>in</direction>
+          <relatedStateVariable>A_ARG_TYPE_DeviceNumber</relatedStateVariable>
+        </argument>
+      </argumentList>
+    </action>
     <action>
       <name>RunZWaveQueue</name>
       <argumentList>

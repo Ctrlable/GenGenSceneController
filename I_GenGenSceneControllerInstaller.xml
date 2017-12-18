@@ -5,6 +5,14 @@
   <actionList>
     <action>
       <serviceId>urn:gengen_mcv-org:serviceId:SceneControllerInstaller1</serviceId>
+      <name>RegisterClientDevice</name>
+      <run>
+		SceneController_RegisterClientDevice(lul_device, tonumber(lul_settings.DeviceNumber))
+        return true
+      </run>
+    </action>
+    <action>
+      <serviceId>urn:gengen_mcv-org:serviceId:SceneControllerInstaller1</serviceId>
       <name>RunZWaveQueue</name>
       <run>
 		SceneController_RunZWaveQueue(lul_device, lul_settings)
