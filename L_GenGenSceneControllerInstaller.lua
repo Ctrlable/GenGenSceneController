@@ -1,4 +1,4 @@
--- Installer for GenGeneric Scene Controller Version 1.02
+-- Installer for GenGeneric Scene Controller Version 1.03
 -- Copyright 2016 Gustavo A Fernandez. All Rights Reserved
 --
 -- Includes installation files for

@@ -1,4 +1,4 @@
-// User interface for GenGeneric Scene Controller Version 1.02
+// User interface for GenGeneric Scene Controller Version 1.03
 // Copyright 2016 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
@@ -1342,9 +1342,9 @@ function SceneController_Screens(SCObj, deviceId) {
 										}
 									}
 									var controllable = SceneController_GetDeviceProperties(obj);
-									if (controllable.basicSet && ((mode.sceneControllable && j > 0) || mode.prefix != "T" || !enableNonSceneDirect)) {
-										// not scene-capable, but allow the first item to change that if in toggle mode and there are no Vera scenes.
-										// There is no basic SET momentary.
+									if (controllable.basicSet && ((mode.sceneControllable && j > 0) || (!SCObj.HasCooperConfiguration && mode.prefix != "T") || !enableNonSceneDirect)) {
+										// not scene-capable, but allow the first item to change that if in toggle mode or Cooper Configuration and there are no Vera scenes.
+										// There is no basic SET momentary unless we allow Cooper Configuration..
 										return 0;
 									}
 									return controllable.scene ? 2 : controllable.zWave ? 1 : 0;
