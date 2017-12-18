@@ -3,4 +3,52 @@
     <major>1</major>
     <minor>0</minor>
   </specVersion>
+  <serviceStateTable>
+    <stateVariable sendEvents="no">
+      <name>A_ARG_TYPE_responseDevice</name>
+      <dataType>int</dataType>
+      <allowedValueRange>
+        <minimum>1</minimum>
+      </allowedValueRange>
+    </stateVariable>
+    <stateVariable sendEvents="no">
+      <name>A_ARG_TYPE_filter</name>
+      <dataType>string</dataType>
+    </stateVariable>
+    <stateVariable sendEvents="no">
+      <name>A_ARG_TYPE_context</name>
+      <dataType>string</dataType>
+    </stateVariable>
+    <stateVariable sendEvents="no">
+      <name>A_ARG_TYPE_timeout</name>
+      <dataType>number</dataType>
+    </stateVariable>
+  </serviceStateTable>
+  <actionList>
+    <action>
+      <name>MonitorZWave</name>
+      <argumentList>
+        <argument>
+          <name>responseDevice</name>
+          <direction>in</direction>
+          <relatedStateVariable>A_ARG_TYPE_responseDevice</relatedStateVariable>
+        </argument>
+        <argument>
+          <name>filter</name>
+          <direction>in</direction>
+          <relatedStateVariable>A_ARG_TYPE_filter</relatedStateVariable>
+        </argument>
+        <argument>
+          <name>context</name>
+          <direction>in</direction>
+          <relatedStateVariable>A_ARG_TYPE_context</relatedStateVariable>
+        </argument>
+        <argument>
+          <name>timeout</name>
+          <direction>in</direction>
+          <relatedStateVariable>A_ARG_TYPE_timeout</relatedStateVariable>
+        </argument>
+       </argumentList>
+    </action>
+  </actionList>
 </scpd>

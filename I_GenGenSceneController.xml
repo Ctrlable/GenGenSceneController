@@ -4,11 +4,23 @@
   <startup>SceneController_Init</startup>
   <actionList>
     <action>
-        <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
-        <name>RunZWaveQueue</name>
-        <run>
-			return SceneController_RunZWaveQueue(lul_device, lul_settings)
-        </run>
+      <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
+      <name>RunZWaveQueue</name>
+      <run>
+			   SceneController_RunZWaveQueue(lul_device, lul_settings)
+         return true
+      </run>
+    </action>
+    <action>
+      <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
+      <name>ZWaveMonitorResponse</name>
+      <run>
+        local device = tonumber(lul_device);
+        local response = lul_settings.response;
+        local context = tostring(lul_settings.context);
+        SceneController_ZWaveMonitorResponse(device,response,context);
+        return true;
+      </run>
     </action>
     <action>
         <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
@@ -27,10 +39,10 @@
         <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
         <name>UpdateCustomLabel</name>
         <run>
-		    return SceneController_UpdateCustomLabel(tonumber(lul_settings.DeviceNum), 
+		    return SceneController_UpdateCustomLabel(tonumber(lul_settings.DeviceNum),
 		    						            lul_settings.Screen,
 		    						            tonumber(lul_settings.Button),
-		    						            lul_settings.Label, 
+		    						            lul_settings.Label,
 									            lul_settings.Font,
 									            lul_settings.Align,
 		    						            lul_settings.Mode)
@@ -86,7 +98,7 @@
 
   <incoming>
      <lua>
-		luup.log("I_GenGenSceneController: Incoming: device="..tostring(lul_device).." data="..tostring(lul_data).." settings="..tostring(lul_settings).." Job="..tostring(lul_job))  
+		luup.log("I_GenGenSceneController: Incoming: device="..tostring(lul_device).." data="..tostring(lul_data).." settings="..tostring(lul_settings).." Job="..tostring(lul_job))
      </lua>
   </incoming>
 </implementation>

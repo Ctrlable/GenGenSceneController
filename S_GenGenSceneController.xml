@@ -52,6 +52,14 @@
       <dataType>string</dataType>
     </stateVariable>
     <stateVariable sendEvents="no">
+      <name>A_ARG_TYPE_Response</name>
+      <dataType>string</dataType>
+    </stateVariable>
+    <stateVariable sendEvents="no">
+      <name>A_ARG_TYPE_Context</name>
+      <dataType>string</dataType>
+    </stateVariable>
+    <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Screen</name>
       <dataType>string</dataType>
     </stateVariable>
@@ -70,22 +78,22 @@
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Font</name>
       <dataType>string</dataType>
-      <defaultValue>Normal</defaultValue> 
-      <allowedValueList> 
-        <allowedValue>Normal</allowedValue> 
-        <allowedValue>Compressed</allowedValue> 
-        <allowedValue>Inverted</allowedValue> 
-      </allowedValueList> 
+      <defaultValue>Normal</defaultValue>
+      <allowedValueList>
+        <allowedValue>Normal</allowedValue>
+        <allowedValue>Compressed</allowedValue>
+        <allowedValue>Inverted</allowedValue>
+      </allowedValueList>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Align</name>
       <dataType>string</dataType>
-      <defaultValue>Center</defaultValue> 
-      <allowedValueList> 
-        <allowedValue>Left</allowedValue> 
-        <allowedValue>Center</allowedValue> 
-        <allowedValue>Right</allowedValue> 
-      </allowedValueList> 
+      <defaultValue>Center</defaultValue>
+      <allowedValueList>
+        <allowedValue>Left</allowedValue>
+        <allowedValue>Center</allowedValue>
+        <allowedValue>Right</allowedValue>
+      </allowedValueList>
     </stateVariable>
     <stateVariable sendEvents="no">
       <name>A_ARG_TYPE_Mode</name>
@@ -186,6 +194,21 @@
           <name>E10</name>
           <direction>in</direction>
           <relatedStateVariable>A_ARG_TYPE_E10</relatedStateVariable>
+        </argument>
+      </argumentList>
+    </action>
+    <action>
+      <name>ZWaveMonitorResponse</name>
+      <argumentList>
+        <argument>
+          <name>Response</name>
+          <direction>in</direction>
+          <relatedStateVariable>A_ARG_TYPE_Response</relatedStateVariable>
+        </argument>
+        <argument>
+          <name>Context</name>
+          <direction>in</direction>
+          <relatedStateVariable>A_ARG_TYPE_Context</relatedStateVariable>
         </argument>
       </argumentList>
     </action>
