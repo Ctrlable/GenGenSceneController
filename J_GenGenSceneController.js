@@ -1,4 +1,4 @@
-// User interface for GenGeneric Scene Controller Version 1.16
+// User interface for GenGeneric Scene Controller Version 1.17
 // Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
@@ -8,7 +8,7 @@ var EVOLVELCD1 = {
 	Id						: "EVOLVELCD1",
 	Name                    : "Evolve LCD1",
 	DefaultLcdVersion		: 39,
-	HasScreen               : true,
+	HasScreen               : 2,  // More than 1
 	HasPresetLanguages      : true,
 	HasThremostatControl    : true,
     NumButtons              : 5,
@@ -161,7 +161,7 @@ var COOPERRFWC5 = {
 	Id						: "COOPERRFWC5",
 	Name                    : "Cooper RFWC5",
 	DefaultLcdVersion       : 1,
-	HasScreen               : false,
+	HasScreen               : 0,
 	HasPresetLanguages      : false,
 	HasThremostatControl    : false,
     NumButtons              : 5,
@@ -209,7 +209,7 @@ var NEXIAONETOUCH = {
 	Id						: "NEXIAONETOUCH",
 	Name                    : "Nexia One Touch",
 	DefaultLcdVersion       : 1,
-	HasScreen               : true,
+	HasScreen               : 1,
 	HasPresetLanguages      : false,
 	HasThremostatControl    : true,
     NumButtons              : 15,
@@ -228,7 +228,7 @@ var NEXIAONETOUCH = {
 	ImplementationXml       : "I_NexiaOneTouch.xml",
 	NumTemperaturScrens     : 0,
 	ScreenTypes 			: [
-		{ prefix: "C", name: "Custum",      num: 3 }
+		{ prefix: "C", name: "Custum",      num: 1 }
 	],
 	CustomModeList 			: [
 		"M", "T", "H"
@@ -277,9 +277,10 @@ var SceneController_Scenes_Tab = 1;
 var SceneController_Copy_Tab = 2;
 
 var SceneController_UI7;
+var SceneController_AltUI;
 var SceneController_Placeholder = 0;
 
-// return true for UI7, false for UI5 or UI6
+// return true for UI7, AltUI, false for UI5 or UI6
 function SceneController_IsUI7() {
     if (SceneController_UI7 === undefined) {
         SceneController_UI7 = ( "application" in window)	&&
@@ -289,6 +290,14 @@ function SceneController_IsUI7() {
 		                 typeof(api.cloneObject) == "function";
 	}
 	return SceneController_UI7;
+}
+
+// return true for AltUI
+function SceneController_IsAltUI() {
+    if (SceneController_AltUI === undefined) {
+        SceneController_AltUI = ("VeraBox" in window);
+	}
+	return SceneController_AltUI;
 }
 
 function SceneController_get_device_state(deviceId, service, variable, dynamic) {
@@ -443,7 +452,9 @@ function NexiaOneTouch_device_zwave_options(deviceId) {
 
 // Send an action to the Lua engine
 function SceneController_send_action(deviceID,serviceID,action,parameters) {
-	if (SceneController_IsUI7()) {
+	if (SceneController_IsAltUI()) {
+		api.performActionOnDevice(deviceID, serviceID, action, {actionArguments: parameters});
+	} else if (SceneController_IsUI7()) {
 		// why doesn't api.performActionOnDevice automatically escape the parameters?
 		var encParams = {};
                 var kp = Object.keys(parameters);
@@ -568,7 +579,7 @@ function SceneController_SetPresetLanguage(SCObj, peerId) {
 
 // Called after the user selects an item from the screens pop-up menu
 function SceneController_SetScreen(SCObj, peerId) {
-	if (!SCObj.HasScreen) {
+	if (SCObj.HasScreen < 2) {
 		return;
 	}
 	var curScreen=document.getElementById("CurScreen_"+peerId).value;
@@ -596,7 +607,7 @@ function SceneController_ChangeCustomLabel(SCObj, peerId, screen, labelIndex)
 	var text;
         var font;
         var align;
-	if (SCObj.HasScreen) {
+	if (SCObj.HasScreen > 0) {
 		text  = document.getElementById( "Text_"+peerId+"_"+screen+"_"+labelIndex);
 		font  = document.getElementById( "Font_"+peerId+"_"+screen+"_"+labelIndex);
 		align = document.getElementById("Align_"+peerId+"_"+screen+"_"+labelIndex);
@@ -622,7 +633,7 @@ function SceneController_ChangeCustomLabel(SCObj, peerId, screen, labelIndex)
 		mode.allDevices = anyOrAll.value;
 	} 
 	var newModeStr=SceneController_GenerateModeString(SCObj, mode);
-	if (SCObj.HasScreen) {
+	if (SCObj.HasScreen > 0) {
 		console.log("SceneController_ChangeCustomLabel: text="+text+" font="+font+" align="+align+" nmode="+newModeStr);
 		SceneController_send_action(peerId,SID_SCENECONTROLLER,"UpdateCustomLabel",{Screen:screen,Button:labelIndex,Label:text,Font:font,Align:align,Mode:newModeStr});
 		SceneController_set_device_state(peerId, SCObj.ServiceId, "Label_"+screen+"_"+labelIndex, text);
@@ -972,7 +983,7 @@ function SceneController_SelectDirectDevice(SCObj, prefix, peerId, screen, label
 	mode[parseInt(associationNum)] = {device: assocDevice, level:level, dimmingDuration:dimmingDuration};
 	modeStr = SceneController_GenerateModeString(SCObj, mode);
 
-	if (SCObj.HasScreen) {
+	if (SCObj.HasScreen > 0) {
 		var text  = document.getElementById( "Text_"+peerId+"_"+screen+"_"+labelIndex);
 		var font  = document.getElementById( "Font_"+peerId+"_"+screen+"_"+labelIndex);
 		var align = document.getElementById("Align_"+peerId+"_"+screen+"_"+labelIndex);
@@ -1170,7 +1181,7 @@ function SceneController_Screens(SCObj, deviceId) {
 		var deviceName = SceneController_get_device_object(peerId).name
 		var versionInfo = SceneController_get_device_state(deviceId, ZWDEVICE_SID, VERSION_INFO, 0)
 		var lcdVersion = versionInfo ? (parseInt(/,(\d+)$/.exec(versionInfo)[1])) : SCObj.DefaultLcdVersion;
-		var curScreen = SCObj.HasScreen ? SceneController_get_device_state(peerId, SCObj.ServiceId, CURRENT_SCREEN, 0) : SCObj.DefaultScreen;
+		var curScreen = SCObj.HasScreen > 1 ? SceneController_get_device_state(peerId, SCObj.ServiceId, CURRENT_SCREEN, 0) : SCObj.DefaultScreen;
 		if (!curScreen || typeof curScreen != "string") {
 			curScreen = SCObj.DefaultScreen;
 		}
@@ -1180,7 +1191,7 @@ function SceneController_Screens(SCObj, deviceId) {
 		var hasCustomLabels = (screenType == 'C' || (screenType == 'T' && screenNum > 3));
 		var extraLines = 0;
 		var numLines = SCObj.NumButtons
-		if (SCObj.HasScreen) {
+		if (SCObj.HasScreen > 1) {
 			html+= '<table style="padding-left:10px;padding-right:10px;" border="0" align="center" class="m_table skinned-form-controls skinned-form-controls-mac">\n'
 			     + ' <tr>\n'
 				 + '  <th style="text-align:right;"><b>Screen:</b></th>\n'
@@ -1353,7 +1364,7 @@ function SceneController_Screens(SCObj, deviceId) {
 								if (optionPrefix == "P" || optionPrefix == "E") {
 									enabled = screenType == "T" && screenNum > SCObj.NumTemperaturScrens;
 								} else if (screenType == "P") {
-									enabled = !SCObj.HasScreen || optionPrefix < "2" || optionPrefix > "9"; // Preset screens don't have 3+state buttons
+									enabled = SCObj.HasScreen == 0 || optionPrefix < "2" || optionPrefix > "9"; // Preset screens don't have 3+state buttons
 								}
 								if (enabled) {
 									html += '    <option style="height:22px;" value="'+optionPrefix+'" '+(selected ? 'selected' : '')+'>'+SceneController_Modes[SCObj.CustomModeList[j]]+'</option>\n';
@@ -1415,7 +1426,7 @@ function SceneController_Screens(SCObj, deviceId) {
 									if (!SceneController_SceneSetsEqual(sceneSet, mode.veraSceneSet)) {
 										mode.veraSceneSet = sceneSet;
 										var newModeStr=SceneController_GenerateModeString(SCObj, mode);
-										if (SCObj.HasScreen) {
+										if (SCObj.HasScreen > 0) {
 											SceneController_send_action(peerId,SID_SCENECONTROLLER,"UpdateCustomLabel",{Screen:curScreen,Button:stateButton,Label:label,Font:font,Align:align,Mode:newModeStr});
 										} else {
 											SceneController_send_action(peerId,SID_SCENECONTROLLER,"UpdateCustomLabel",{Screen:curScreen,Button:stateButton,Mode:newModeStr});
@@ -1437,7 +1448,7 @@ function SceneController_Screens(SCObj, deviceId) {
 									if (!SceneController_SceneSetsEqual(onSceneSet, mode.veraSceneSet)) {
 										mode.veraSceneSet = onSceneSet;
 										var newModeStr=SceneController_GenerateModeString(SCObj, mode);
-										if (SCObj.HasScreen) {
+										if (SCObj.HasScreen > 0) {
 											SceneController_send_action(peerId,SID_SCENECONTROLLER,"UpdateCustomLabel",{Screen:curScreen,Button:stateButton,Label:label,Font:font,Align:align,Mode:newModeStr});
 										} else {
 											SceneController_send_action(peerId,SID_SCENECONTROLLER,"UpdateCustomLabel",{Screen:curScreen,Button:stateButton,Mode:newModeStr});
@@ -1569,7 +1580,7 @@ function SceneController_Screens(SCObj, deviceId) {
 			timeoutSeconds = 30;
 			timeoutEnable = false;
 		}
-		if (SCObj.HasScreen) {
+		if (SCObj.HasScreen > 1) {
 			html += ' <tr>\n'
 			     +  '  <td align="left" colspan=' + (hasCustomLabels ? '6>' : '4>\n')
 				 +  '   <input type="checkbox"'+(timeoutEnable?' checked':'')+' id="TimeoutEnable_'+peerId+'_'+curScreen+'" style="min-width:'+(SceneController_IsUI7() ? 20 : 10)+'px;" onChange="SceneController_ChangeTimeout('+SCObj.Id+','+peerId+',\''+curScreen+'\', false)" /><span></span>\n'

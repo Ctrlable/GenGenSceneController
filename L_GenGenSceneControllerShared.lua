@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller shared code Version 1.16
+-- GenGeneric Scene Controller shared code Version 1.17
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -10,13 +10,22 @@ nixFs = require "nixio.fs"
 -- Debugging functions
 --
 
-ANSI_RED     = "\027[31m"
-ANSI_GREEN   = "\027[32m"
-ANSI_YELLOW  = "\027[33m"
-ANSI_BLUE    = "\027[34m"
-ANSI_MAGENTA = "\027[35m"
-ANSI_CYAN    = "\027[36m"
-ANSI_WHITE   = "\027[37m"
+ANSI_BLACK          = "\027[30m"
+ANSI_RED            = "\027[31m"
+ANSI_GREEN          = "\027[32m"
+ANSI_YELLOW         = "\027[33m"
+ANSI_BLUE           = "\027[34m"
+ANSI_MAGENTA        = "\027[35m"
+ANSI_CYAN           = "\027[36m"
+ANSI_WHITE          = "\027[37m"
+ANSI_BRIGHT_BLACK   = "\027[1;30m"
+ANSI_BRIGHT_RED     = "\027[1;31m"
+ANSI_BRIGHT_GREEN   = "\027[1;32m"
+ANSI_BRIGHT_YELLOW  = "\027[1;33m"
+ANSI_BRIGHT_BLUE    = "\027[1;34m"
+ANSI_BRIGHT_MAGENTA = "\027[1;35m"
+ANSI_BRIGHT_CYAN    = "\027[1;36m"
+ANSI_BRIGHT_WHITE   = "\027[1;37m"
 ANSI_RESET   = "\027[0m"
 
 local function stackDepthIndent()
@@ -86,33 +95,45 @@ local function logList(...)
 end
 
 function ELog(...)
-  luup.log(ANSI_RED .. GetDeviceName() .."   Error: " .. ANSI_RESET .. stackDepthIndent() .. logList(...) .. debug.traceback(ANSI_CYAN, 2) .. ANSI_RESET)
+  if VerboseLogging > 0 then
+  	luup.log(ANSI_BRIGHT_RED .. GetDeviceName() .."   Error: " .. ANSI_RESET .. stackDepthIndent() .. logList(...) .. debug.traceback(ANSI_CYAN, 2) .. ANSI_RESET)
+  else
+  	luup.log(ANSI_BRIGHT_RED .. GetDeviceName() .."   Error: " .. ANSI_RESET .. stackDepthIndent() .. logList(...))
+  end
 end
 
 function log(...)
   luup.log(GetDeviceName() ..": " .. stackDepthIndent() .. logList(...))
 end
 
+function ILog(...)
+  if VerboseLogging >= 1 then
+    luup.log(ANSI_BRIGHT_YELLOW .. GetDeviceName() .. "    info: " .. stackDepthIndent() .. logList(...) .. ANSI_RESET)
+  end
+end
+
 function DLog(...)
-  if VerboseLogging > 0 then
+  if VerboseLogging >= 2 then
     luup.log(GetDeviceName() .. "   debug: " .. stackDepthIndent() .. logList(...))
   end
 end
 
 function DEntry(name)
-  if VerboseLogging > 0 then
+  if VerboseLogging >= 2 then
     luup.log(GetDeviceName() .. "   debug: " .. stackDepthIndent() .. getFunctionInfo(3,name))
   end
 end
 
+-- VerboseLogging == 3 shows extended Z-Wave queue but not VLog/VEntry
+
 function VLog(...)
-  if VerboseLogging > 2 then
+  if VerboseLogging >= 4 then
     luup.log(GetDeviceName() .. " verbose: " .. stackDepthIndent() .. logList(...))
   end
 end
 
 function VEntry(name)
-  if VerboseLogging > 2 then
+  if VerboseLogging >= 4 then
     luup.log(GetDeviceName() .. " verbose: " .. stackDepthIndent() .. getFunctionInfo(3,name))
   end
 end
@@ -224,16 +245,16 @@ function take_global_lock()
 	local lockFile = nixio.open(global_lock_name, global_lock_flags, 666)
 	if lockFile then
 		lockFile:close()
-		DLog("Global lock taken")
+		ILog("Global lock taken")
 		return true
 	end
-	DLog("Waiting for global lock")
+	ILog("Waiting for global lock")
 	return false
 end
 
 function give_global_lock()
     nixFs.unlink(global_lock_name)	
-	DLog("Global lock given")
+	ILog("Global lock given")
 end
 
 --
@@ -390,7 +411,7 @@ end
 --   the main regex. The capture array is nil if a timeout occurred.
 --   Callback can also be a string as a function name in which case the callback will be executed
 --     by the installer device which actually dispatches most Z-Wave commands
---   Unlike EnqueueZWaveMessageWithResponse, Callback must not be nil.
+--   Callback can be nil if not needed.
 -- Oneshot is true if the intercept should be canceled as soon as it matches.
 --   If OneShot is false and arm_regex is not nil, then the intercept is disarmed when it triggers.
 -- Timeout and delay are in milliseconds.
@@ -415,6 +436,9 @@ function MonitorZWaveData(outgoing, peer_dev_num, arm_regex, intercept_regex, au
 		forward = false
 	end
 	context = prefix .. label .. "_" .. peer_dev_num.."_"..MonitorContextNum
+	if not callback then
+		context = "*" .. context
+	end
 	MonitorContextList[context] = {outgoing=outgoing, callback=callback, oneshot=oneshot}
   	local result, errcode, errmessage
   	if outgoing then
@@ -768,7 +792,14 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
     local candidate = ZWaveQueueNext
 	repeat
 		if candidate[1].waitingForResponse then
-			VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Skipping candidate due to waitingForResponse:", candidate[1])
+			if candidate[1].type == 0 then
+				VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Stopping seach because waitingForResponse from local controller:", candidate[1])
+				bestCandidate = nil
+				nextQueue = nil
+				break;
+			else
+				VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Skipping candidate due to waitingForResponse:", candidate[1])
+			end
 		elseif candidate[1].hasBattery and DeviceAwakeList[candidate[1].node_id] ~= 1 then
 			VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Skipping candidate due to batteryWait:", candidate[1])
   		else
@@ -823,7 +854,7 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 	    ZWaveQueueNext = bestCandidate
 	    -- At this pont, we know we have something to do.
 	    -- Dump the queue to the log in various ways.
-	  	if VerboseLogging >= 2 then
+	  	if VerboseLogging >= 3 then
 	      local curDev = ZWaveQueueNext
 		  local count = 1;
 		  repeat
@@ -834,7 +865,7 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 		    end
 		    curDev = curDev.next
 		  until curDev == ZWaveQueueNext
-		elseif VerboseLogging > 0 then
+		elseif VerboseLogging >= 2 then
 	  	  local count = 0
 	  	  local curDev = ZWaveQueueNext
 		  local nodelist = ""

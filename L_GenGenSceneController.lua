@@ -1,10 +1,11 @@
--- GenGeneric Scene Controller Version 1.16
+-- GenGeneric Scene Controller Version 1.17
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
 -- VerboseLogging == 0: important logs and errors:    ELog, log
--- VerboseLogging == 1: Includes debug logs:          ELog, log, DLog, DEntry
--- VerboseLogging == 3:	Includes verbose logs:        ELog, log, DLog, DEntry, VLog, VEntry
+-- VerboseLogging == 1: Includes information logs:    ELog, ILog, log
+-- VerboseLogging == 2: Includes debug logs:          ELog, ILog, log, DLog, DEntry
+-- VerboseLogging == 4:	Includes verbose logs:        ELog, ILog, log, DLog, DEntry, VLog, VEntry
 VerboseLogging = 0
 
 posix = require "posix"
@@ -15,6 +16,22 @@ require "L_GenGenSceneControllerShared"
 DEVTYPE_EVOLVELCD1    = "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1"
 DEVTYPE_COOPEREFWC5   = "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1"
 DEVTYPE_NEXIAONETOUCH = "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1"
+
+--
+-- Globals
+--
+
+-- IndicatorLocks is indexed by peer_dev_num
+-- 0 (or nil) no lock
+-- 1 Short term lock with timeout
+-- 2 long term lock without timeout. Should be disabled if unexpected event occurred. 
+-- 3 Indicator change bypassed due to lock
+local IndicatorLocks = {}
+local ZWaveSceneIdCacheList = {}
+local param = {}
+local lastChangedModes = {}
+local temperatureAutoChoices = {}
+local wakeUpIntervals = {}
 
 local SCObj
 
@@ -531,7 +548,7 @@ Device 45=Nexia One Touch Scene Controller Z-Wave ----+   ¦    ¦   ¦    ¦    ¦
 							  DummyCallback, 
 							  false, -- not oneShot
 							  0, -- no timeout
-							  "NexiaBypass1")
+							  "NexiaBypass1");
 
 			MonitorZWaveData( true, -- outgoing
 							  peer_dev_num,
@@ -597,7 +614,69 @@ Flags = List Mode | Group Count=1 ---------------------------------------+   ¦  
 							  DummyCallback, 
 							  false, -- not oneShot,
 							  0, -- no timeout
-							  "NexiaBypass2")
+							  "NexiaBypass2");
+
+			-- The Nexisa One-Touch seems to think that getting a WAKE_UP_INTERVAL_SET command is an excuse to go back
+			-- to sleep even though there is more work to do. This is not Vera's fault. This is a problem with the
+			-- Nexia firmware. We do the intercept to prevent the device from receiving this command until we are done
+			-- configuring it.
+
+			function WakeUpIntervalSetCallback(peer_dev_num, captures)
+				DEntry()
+				if captures and captures.C2 and captures.C3 then
+					wakeUpIntervals[peer_dev_num] = "0x84 0x04 0x" .. string.gsub(captures.C2 .. " " .. captures.C3, " ", " 0x")
+					DLog("WakeUpIntervalSetCallback: wakeUpIntervals[", peer_dev_num,"] set to", wakeUpIntervals[peer_dev_num]) 
+				end
+			end
+
+			MonitorZWaveData( true, -- outgoing
+							  peer_dev_num,
+							  nil, -- No arm data
+--[==[
+											  C1                   ------C2-----  C3	   C4
+41      11/25/17 8:48:44.793    0x1 0xd 0x0 0x13 0xdf 0x6 0x84 0x4 0x0 0x10 0x68 0x1 0x5 0x12 0xd6 (#\r########h####) 
+           SOF - Start Of Frame --+   ¦   ¦    ¦    ¦   ¦    ¦   ¦ +-----------+   ¦   ¦    ¦    ¦
+                    length = 13 ------+   ¦    ¦    ¦   ¦    ¦   ¦       ¦         ¦   ¦    ¦    ¦
+                        Request ----------+    ¦    ¦   ¦    ¦   ¦       ¦         ¦   ¦    ¦    ¦
+           FUNC_ID_ZW_SEND_DATA ---------------+    ¦   ¦    ¦   ¦       ¦         ¦   ¦    ¦    ¦
+Device 900=Nexia One Touch Scene Controller Z-Wave -+   ¦    ¦   ¦       ¦         ¦   ¦    ¦    ¦
+                Data length = 6 ------------------------+    ¦   ¦       ¦         ¦   ¦    ¦    ¦
+          COMMAND_CLASS_WAKE_UP -----------------------------+   ¦       ¦         ¦   ¦    ¦    ¦
+           WAKE_UP_INTERVAL_SET ---------------------------------+       ¦         ¦   ¦    ¦    ¦
+                 Seconds = 4200 -----------------------------------------+         ¦   ¦    ¦    ¦
+nodeid: 1 Device 2=_Scene Controller ----------------------------------------------+   ¦    ¦    ¦
+Xmit options = ACK | AUTO_ROUTE -------------------------------------------------------+    ¦    ¦
+                  Callback = 18 ------------------------------------------------------------+    ¦
+                    Checksum OK -----------------------------------------------------------------+
+--]==]
+							  "^01 .. 00 (..) " .. string.format("%02X", node_id) .. " 06 84 04 (.. .. ..) (..) .. (..) ..",
+--[==[
+42      11/25/17 8:48:44.814    0x6 0x1 0x4 0x1 0x13 0x1 0xe8 (#######) 
+              ACK - Acknowledge --+   ¦   ¦   ¦    ¦   ¦    ¦
+           SOF - Start Of Frame ------+   ¦   ¦    ¦   ¦    ¦
+                     length = 4 ----------+   ¦    ¦   ¦    ¦
+                       Response --------------+    ¦   ¦    ¦
+           FUNC_ID_ZW_SEND_DATA -------------------+   ¦    ¦
+                     RetVal: OK -----------------------+    ¦
+                    Checksum OK ----------------------------+
+42      11/25/17 8:48:44.814    got expected ACK 
+41      11/25/17 8:48:44.815    ACK: 0x6 (#) 
+
+42      11/25/17 8:48:44.892    0x1 0x5 0x0 0x13 0x12 0x0 0xfb (#######) 
+           SOF - Start Of Frame --+   ¦   ¦    ¦    ¦   ¦    ¦
+                     length = 5 ------+   ¦    ¦    ¦   ¦    ¦
+                        Request ----------+    ¦    ¦   ¦    ¦
+           FUNC_ID_ZW_SEND_DATA ---------------+    ¦   ¦    ¦
+                  Callback = 18 --------------------+   ¦    ¦
+           TRANSMIT_COMPLETE_OK ------------------------+    ¦
+                    Checksum OK -----------------------------+
+41      11/25/17 8:48:44.892    ACK: 0x6 (#)
+--]==]
+							  "06 01 04 01 \\1 01 XX 01 05 00 \\1 \\4 00 XX",
+							  WakeUpIntervalSetCallback, 
+							  false, -- not oneShot,
+							  0, -- no timeout
+							  "NexiaWakeupIntervalSet");
 		end,
 
 		DoDeviceConfiguration = function(peer_dev_num, node_id, zwave_dev_num)
@@ -625,6 +704,11 @@ Flags = List Mode | Group Count=1 ---------------------------------------+   ¦  
 			return 0
 		end,
 
+		-- Retuns:
+		--   Association On Group ID
+		--   Association Off Group ID (or nil)
+		--   Scene Controller Configuration On Group ID
+		--   Scene Controller Configuration Off Group ID (or nil)
 		PhysicalButtonToGroupIds = function(button, mode)
 			if mode.prefix == 'H' then 
 			    -- Thermostat
@@ -722,6 +806,7 @@ SID_ZWDEVICE       = "urn:micasaverde-com:serviceId:ZWaveDevice1"
 SID_DIMMING        = "urn:upnp-org:serviceId:Dimming1"
 SID_FANMODE        = "urn:upnp-org:serviceId:HVAC_FanOperatingMode1"
 SID_USERMODE       = "urn:upnp-org:serviceId:HVAC_UserOperatingMode1"
+SID_SECURITYSENSOR = "urn:micasaverde-com:serviceId:SecuritySensor1"
 SID_SWITCHPOWER    = "urn:upnp-org:serviceId:SwitchPower1"
 SID_TEMPSENSOR     = "urn:upnp-org:serviceId:TemperatureSensor1"
 SID_TEMPSETPOINT   = "urn:upnp-org:serviceId:TemperatureSetpoint1"
@@ -790,21 +875,6 @@ SCREEN_MD = {
    Line5       = 0x04
 }
 
---
--- Globals
---
-
-local ZWaveSceneIdCacheList = {}
-local param = {}
-local lastChangedModes = {}
-local temperatureAutoChoices = {}
-
--- IndicatorLocks is indexed by peer_dev_num
--- 0 (or nil) no lock
--- 1 Short term lock with timeout
--- 2 long term lock without timeout. Should be disabled if unexpected event occurred. 
--- 3 Indicator change bypassed due to lock
-local IndicatorLocks = {}
 
 -- Make sure tha all of the log functions work before even the SCObj global is set.
 function GetDeviceName()
@@ -2136,7 +2206,7 @@ function SetIndicatorValue(peer_dev_num, indicator, force, cascadable)
 end
 
 -- Return a score between 0 and 1 indicating how close the devices for this mode match the target levels. Higher is closer.
-function GetDeviceScoreForMode(mode, peer_dev_num, screen)
+function GetDeviceScoreForMode(mode, peer_dev_num, screen, virtualButton)
 	VEntry()
 	local score = 1
 	local count = 0
@@ -2145,7 +2215,7 @@ function GetDeviceScoreForMode(mode, peer_dev_num, screen)
 		VEntry("GetScoreForElement")
 		local device = obj.device
 		local status, lastUpdate, service, variable = GetDeviceStatus(device)
-		if VerboseLogging > 0 then
+		if VerboseLogging >= 2 then
 			DLog("GetDeviceScoreForMode: monitored device=", device, " status=", status, " lastUpdate=", os.date(nil,tonumber(lastUpdate)), " service=", service, " variable=", variable)
 		end
 		if status ~= nil then
@@ -2157,6 +2227,8 @@ function GetDeviceScoreForMode(mode, peer_dev_num, screen)
 			score = score + ((target - status) ^ 2)
 			local context = tostring(peer_dev_num) .. "," .. screen
 			VariableWatch("SceneController_WatchedIndicatorDeviceChanged", service, variable, device, context)
+		else
+			ELog("GetScoreForElement: Device ", device, " is being watched by ", luup.devices[peer_dev_num].description, ", screen: ", screen, ", button: ", virtualButton)
 		end
 	end
 
@@ -2191,7 +2263,7 @@ function ChooseBestFromMultiState(peer_dev_num, screen, virtualButton, mode)
 			end
 			mode = ParseModeString(modeStr)
 		end
-		local score = GetDeviceScoreForMode(mode, peer_dev_num, screen)
+		local score = GetDeviceScoreForMode(mode, peer_dev_num, screen, virtualButton)
 		DLog("  ChooseBestFromMultiState:    state=", state, " curButton=", curButton, " mode=", mode, " score=", score)
 		if score > bestScore then
 			bestState = state
@@ -2252,7 +2324,7 @@ function SetIndicator(peer_dev_num, screen, force, cascadable)
 			if not hidden or mode.prefix == "X" then
 				if mode.prefix == "X" then
 					if #mode > 0 or mode.veraSceneSet then
-						local score = GetDeviceScoreForMode(mode, peer_dev_num, screen)
+						local score = GetDeviceScoreForMode(mode, peer_dev_num, screen, virtualButton)
 						if score > bestXscore then
 							bestXscore = score
 							bestXbutton = virtualButton
@@ -2313,8 +2385,8 @@ function SetIndicator(peer_dev_num, screen, force, cascadable)
 
 					function checkElement(obj) 
 						local status, lastUpdate, service, variable = GetDeviceStatus(obj.device)
-						if VerboseLogging > 0 then
-							DLog("  monitored device=", obj.device, " threshold=", threshold, " status=", status, " lastUpdate=", os.date(nil,tonumber(lastUpdate)), " service=", service, " variable=", variable)
+						if VerboseLogging >= 2 then
+							DLog("monitored device=", obj.device, ": name=", luup.devices[obj.device].description," threshold=", threshold, " status=", status, " lastUpdate=", os.date(nil,tonumber(lastUpdate)), " service=", service, " variable=", variable)
 						end
 						if status ~= nil then
 							if status >= threshold then
@@ -2324,6 +2396,8 @@ function SetIndicator(peer_dev_num, screen, force, cascadable)
 							end
 							local context = tostring(peer_dev_num) .. "," .. screen
 							VariableWatch("SceneController_WatchedIndicatorDeviceChanged", service, variable, obj.device, context)
+						else
+							ELog("checkElement: Device ", obj.device, " is being watched by ", luup.devices[peer_dev_num].description, ", screen: ", screen, ", button: ", virtualButton)
 						end
 					end
 
@@ -3780,6 +3854,14 @@ function SceneController_ConfiguredChanged(lul_device, lul_service, lul_variable
 			SCObj.DoDeviceConfiguration(peer_dev_num, node_id, zwave_dev_num)
 			-- DoTimeout, force, not indicatorOnly
 			SetScreen(peer_dev_num, currentScreen, true, true, false)
+
+			-- We need to move the "Set Wakeup Interval" command for the Nexia One-Touch to the end of the configuration list
+			-- so that it doesn't go to sleep too soon.
+			DLog("SceneController_ConfiguredChanged: wakeUpIntervals[",peer_dev_num,"] is ", wakeUpIntervals[peer_dev_num],", node_id is ",node_id)
+			if wakeUpIntervals[peer_dev_num] then
+				EnqueueZWaveMessage("wakeUpInterval_"..node_id, node_id, wakeUpIntervals[peer_dev_num], peer_dev_num, 0);
+				wakeUpIntervals[peer_dev_num] = nil;
+			end
 		end
 		-- If LuaUPnP does not know how to configure the device, we do it for it.
 		-- and then we set configured to 1 ourselves but don't re-trigger this function
@@ -4417,21 +4499,31 @@ function GetDeviceStatus(device_num)
 		ELog("GetDeviceStatus: device ",device_num," not found") 
     	return nil
   	end
-	local service = SID_DIMMING
-	local variable = "LoadLevelStatus"
+
+	local service = SID_SECURITYSENSOR
+	local variable = "Armed"
 	local result, lastUpdate = luup.variable_get(service, variable, device_num)
+    if result == "1" or result == "0" then
+    	return tonumber(result)*100, lastUpdate, service, variable
+    end
+
+	service = SID_DIMMING
+	variable = "LoadLevelStatus"
+	result, lastUpdate = luup.variable_get(service, variable, device_num)
 	if result then
 		local value = tonumber(result)
 		if value ~= nil then
 			return value, lastUpdate, service, variable
 		end
 	end
+
     service = SID_SWITCHPOWER
 	variable = "Status"
     result, lastUpdate = luup.variable_get(service, variable, device_num)
     if result == "1" or result == "0" then
     	return tonumber(result)*100, lastUpdate, service, variable
     end
+
 	ELog("GetDeviceStatus: device ", device_num, " has neither ",SID_DIMMING," LoadLevelStatus nor ",SID_SWITCHPOWER," Status") 
     return nil
 end

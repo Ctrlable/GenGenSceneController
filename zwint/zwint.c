@@ -37,7 +37,7 @@
 #include <lauxlib.h>
 #include <luaconf.h>
 
-#define VERSION 1.04
+#define VERSION 1.05
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -237,6 +237,9 @@ static void DequeueHTTPData() {
 
 static void send_http(monitor *m, char *command, char *hexbuff, regmatch_t *matches, char *error_message) {
 	char http[1000];
+	if (m->key[0] == '*') {
+		return;
+	}
 	int hlen = snprintf(http, sizeof(http), "GET /data_request?id=action&DeviceNum=%d&serviceId=urn:gengen_mcv-org:serviceId:ZWaveMonitor1&action=%s&key=%s&time=%f",
 						m->device_num, command, m->key, now_fp_seconds());
 	if (matches) {
@@ -918,7 +921,8 @@ static int wwint_monitor_intercept(lua_State *L, int is_intercept) {
  * zwint.monitor(device_num, key, pattern, oneshot, timeout, <arm_pattern>, <response>, <forward>)
  * Monitor for incoming Z-Wave data.
  * device_num: LuaUPnP Device number which is monitoring Z-Wave.
- * key: string - returned through the HTTP server when the monitor matches
+ * key: string - returned through the HTTP server when the monitor matches.
+ *   If the key begins with '*' then HTTP response is suppressed.
  * pattern: string - Posix extended regular expression to match the hexified Z-Wave packet
  *   The packet will consist of space separated hex digit pairs always starting with 01 (SOF) and
  *   ending with the Z-Wave checksum
@@ -949,6 +953,7 @@ static int zwint_monitor(lua_State *L) {
  * Monitor for outgoing Z-Wave data. 
  * device_num: LuaUPnP Device number which is monitoring Z-Wave.
  * key: string - returned through the HTTP server when the monitor matches
+ *   If the key begins with '*' then HTTP response is suppressed.
  * pattern: string - Posix extended regular expression to match the hexified Z-Wave packet
  * oneshot: Boolean - True if the monitor should automatically be canceled when the pattern is matched
  *   if oneshot is false and arm_pattern is not nil then the intercept will be unarmed once pattern is matched.
