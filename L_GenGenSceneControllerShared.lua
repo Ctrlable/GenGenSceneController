@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller shared code Version 1.15
+-- GenGeneric Scene Controller shared code Version 1.16
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -401,6 +401,10 @@ end
 -- Returns a context which can be passed to CancelZWaveMonitor or nil if error.
 function MonitorZWaveData(outgoing, peer_dev_num, arm_regex, intercept_regex, autoResponse, callback, owneshot, timeout, label, forward)
 	VEntry()
+	if not zwint or not zwint.monitor then
+		DLog("MonitorZWaveData returning nil because zwint is not yet installer")
+		return nil
+	end
   	local context
 	MonitorContextNum = MonitorContextNum + 1
 	local prefix = "M_"

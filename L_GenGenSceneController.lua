@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller Version 1.15
+-- GenGeneric Scene Controller Version 1.16
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -1363,13 +1363,17 @@ end
 
 function SceneController_Init(lul_device)
 	DEntry()
-	if zwint.instance then -- Only in debug version
-		log("ZWInt instance is ", zwint.instance())
+	if not zwint or not zwint.register then
+		ELog("ZWInt module not installed")
+		return false, "ZWInt not installed", "Scene Controller";
 	end
 	if lul_device == 1 then
 		CreatePeerDevices()
 	else
 		ConnectPeerDevice(lul_device)
+		if zwint.instance then -- Only in debug version
+			log("ZWInt instance is ", zwint.instance())
+		end
 		local zwave_node, zwave_dev = GetZWaveNode(lul_device)
 		local veraZWaveNode, ZWaveNetworkDeviceId = GetVeraIDs()
 	    local ComPort = luup.variable_get(SID_ZWN, "ComPort", ZWaveNetworkDeviceId)
@@ -1943,15 +1947,16 @@ function SceneController_SetNumLines(peer_dev_num, screen, lines)
 	end
 end
 
--- Mode strings consist or Prefix{newScreen:}?S?{zWaveSceneId@{offZWaveSceneId@}?}|C?{entry}*
+-- Mode strings consist or Prefix {newScreen:+}?[Aa]?{(S|C{SceneId@}?{offSceneId@}?)}? {entry}+
 -- Prefix is M for momentary, T for Toggle, etc.
--- Prefix S is legacy "direct toggle" and should not be confused with S as the second character.
 -- newScreen is a letter/digit such as C3 for Custom 3 or P4 for Preset 4
--- The S flag indicates that all associated devices are scene capable
---   and is optionally followed by zWaveSceneId@ and offZWaveSceneId@
--- The C flag indicats Cooper RFWC5-style Scen/Config pair setting
+-- The A (All) flag or a(any) is present if all or any device matching "on" state should turn LED on.
+--   If the A or a flag is not present then at least half of the devices must be in the "on" state to turn the LED on.
+-- The S or C flags indicates that all subsequent associated devices are scene capable
+--   and is optinally followed by a sceneId @ which is optional followed by an offSceneId @
+-- The C flag indicates to use Cooper configuration for non-secene capable devices
 -- Scene-capable modes are a ; separated list of 0 or more deviceNum,level,dimmingDuration triplets
--- Cooper configuration modes are a ; separated list of 0 or more deviceNum,level pairs
+-- Cooper condiguration modes are a ; separate list of 0 or more deviceNum,level pairs
 -- Non-scene capabile modes are a ; separated list of 0 or more deviceNums
 -- DeviceNums can be negative if they should only be monitored but not controlled, to set the indicator
 function ParseModeString(str)
@@ -1978,6 +1983,17 @@ function ParseModeString(str)
 	end
 	local i = 1;
 	local char2 = str:sub(1,1)
+	if char2 == "A" then
+		mode.allDevices = "All"
+		str = str:sub(2)
+		char2 = str:sub(1,1)
+	elseif char2 == "a" then
+		mode.allDevices = "Any"
+		str = str:sub(2)
+		char2 = str:sub(1,1)
+	else
+		mode.allDevices = "Most"
+	end
 	if char2 == "S" or char2 == "C" then
 		mode.sceneControllable = true
 		str = str:sub(2)
@@ -2033,7 +2049,7 @@ function GenerateModeString(mode)
 		mode = {}
 	end
 	if not mode.prefix then
-		mode.prefix = "M"
+		mode.prefix = SCObj.DefaultModeString
 	end
 	local str=mode.prefix
 	if mode.newScreen then
@@ -2061,18 +2077,21 @@ function GenerateModeString(mode)
 		end
 	end
 
-	if #mode > 0 then
-		if mode.sceneControllable then
-			str = str .. "S"
-			if mode.zWaveSceneId then
-				str = str .. mode.zWaveSceneId .. "@"
-				if mode.offZWaveSceneId then
-					str = str .. mode.offZWaveSceneId .. "@"
-				end
+	if mode.allDevices == "All" then
+		str = str .. "A"
+	elseif mode.allDevices == "Any" then
+		str = str .. "a"
+	end
+	if mode.sceneControllable then
+		str = str .. "S"
+		if mode.zWaveSceneId then
+			str = str .. mode.zWaveSceneId .. "@"
+			if mode.offZWaveSceneId then
+				str = str .. mode.offZWaveSceneId .. "@"
 			end
 		end
-		generateArray(mode, 1)
 	end
+	generateArray(mode, 1)
 	generateArray(mode.veraSceneSet, -1)
 	return str;
 end
@@ -2316,10 +2335,16 @@ function SetIndicator(peer_dev_num, screen, force, cascadable)
 							checkElement(mode.veraSceneSet[i])
 						end
 					end
-					if num_on >= num_off and num_on > 0 then
-						highlighted = true
+					if num_on > 0 then 
+						if mode.allDevices == "All" then
+							highlighted = num_off == 0;
+						elseif mode.allDevices == "Any" then
+							highlighted = true;		
+						else -- Most
+							highlighted = num_on >= num_off;
+						end
 					end
-				    DLog("  button=", physicalButton, " mode=", modeStr, " num_on=", num_on, " num_off=", num_off, " highlighted=", highlighted)
+				    DLog("  button=", physicalButton, " mode=", modeStr, "mode.allDevices=", mode.allDevice, " num_on=", num_on, " num_off=", num_off, " highlighted=", highlighted)
 				end
 			end
 			if highlighted then
@@ -3169,6 +3194,7 @@ function SceneController_UpdateCustomLabel(peer_dev_num, screen, virtualButton, 
 				end
 				SetButtonMode(peer_dev_num, prevModeStr, screen, false, true, physicalButton)
 			end
+			SetIndicator(peer_dev_num, screen, false, false) -- No force, not cascadable 
 		else
 		    -- not dotimeout, no force, not indicatorOnly
 			SetScreen(peer_dev_num,screen,false,false,false);
@@ -3853,7 +3879,13 @@ function MultiLevelSwitchStopLevelChangeMonitorCallback(peer_dev_num, result)
 					local node_id = GetZWaveNode(mode[i].device)
 					EnqueueZWaveMessage("StopLevelChangePassThrough", node_id, "0x26 0x05", mode[i].device, 0)
 				end
-				EnqueueLuupAction("ZWJob_PollNode", SID_HADEVICE, "Poll", {}, mode[i].device, 0);
+				-- Check whether polling is enabled for this particulat device (i.e. black or a non-zero value)
+				-- Skip polling only if set to 0 explicitly
+				local pollSettings = luup.variable_get(SID_ZWDEVICE, "PollSettings", mode[i].device)
+				pollSettings = tonumber(pollSettings) -- may be nil
+				if pollSettings ~= 0 then
+					EnqueueLuupAction("ZWJob_PollNode", SID_HADEVICE, "Poll", {}, mode[i].device, 0);
+				end
 			end
 		end
 		local lock = IndicatorLocks[peer_dev_num]

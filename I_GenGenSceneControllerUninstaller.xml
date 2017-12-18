@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<implementation>
+  <files>L_GenGenSceneControllerUninstaller.lua</files>
+  <startup>SceneControllerUninstaller_Init</startup>
+  <actionList>
+    <action>
+      <serviceId>urn:gengen_mcv-org:serviceId:SceneControllerUninstaller1</serviceId>
+      <name>Uninstall</name>
+      <run>
+		SceneControllerUninstaller_Uninstall(lul_device)
+        return true
+      </run>
+    </action>
+  </actionList>
+</implementation>

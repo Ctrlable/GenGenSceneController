@@ -1,0 +1,104 @@
+{
+	"default_icon": "scene_controller_default.png",
+	"flashicon": "icons/devices.swf",
+	"imgIconBody": "",
+	"imgIconDimmable": "",
+	"imgIconTurnable": "",
+	"imgIconMin": "",
+	"imgIconMax": "",
+	"halloIconsDir": "pics/hallo",
+	"inScene": "0",
+	"DisplayStatus": {},
+	"doc_url": {
+		"doc_language": 1,
+		"doc_manual": 1,
+		"doc_version": 1,
+		"doc_platform": 0,
+		"doc_page": "devices"
+	},
+	"Tabs": [{
+			"Label": {
+				"lang_tag": "uninstaller",
+				"text": "Uninstaller"
+			},
+			"Position": "0",
+			"TabType": "flash",
+			"TopNavigationTab": 1,
+			"top_navigation_tab": 1,
+			"ConfigFunction": "1",
+			"SceneGroup": [{
+				"id": "1",
+				"top": "1",
+				"left": "0",
+				"x": "2",
+				"y": "2"
+			}],
+			"ControlGroup": [{
+				"id": "1",
+				"scenegroup": "1"
+			}],
+			"Control": [{
+				"ControlGroup": "1",
+				"HorizontalMultiplier": "2",
+				"ControlType": "button",
+				"ControlCode": "Test1",
+				"Label": {
+					"text": "Uninstall"
+				},
+				"Display": {
+					"Top": 20,
+					"Left": 50,
+					"Width": 150,
+					"Height": 20
+				},
+				"Command": {
+					"Service": "urn:gengen_mcv-org:serviceId:SceneControllerUninstaller1",
+					"Action": "Uninstall"
+				}
+			}]
+		},
+		{
+			"Label": {
+				"lang_tag": "settings",
+				"text": "Settings"
+			},
+			"Position": "0",
+			"TabType": "javascript",
+			"ScriptName": "shared.js",
+			"Function": "simple_device"
+		},
+		{
+			"Label": {
+				"lang_tag": "advanced",
+				"text": "Advanced"
+			},
+			"Position": "1",
+			"TabType": "javascript",
+			"ScriptName": "shared.js",
+			"Function": "advanced_device"
+		},
+		{
+			"Label": {
+				"lang_tag": "device_options",
+				"text": "Device Options"
+			},
+			"Position": "2",
+			"TabType": "javascript",
+			"ScriptName": "shared.js",
+			"Function": "device_zwave_options"
+		},
+		{
+			"Label": {
+				"lang_tag": "notifications",
+				"text": "Notifications"
+			},
+			"Position": "3",
+			"TabType": "javascript",
+			"ScriptName": "shared.js",
+			"Function": "device_notifications"
+		}
+	],
+	"eventList2": [],
+	"DeviceType": "urn:schemas-gengen_mcv-org:device:SceneControllerUninstaller:1",
+	"device_type": "urn:schemas-gengen_mcv-org:device:SceneControllerUninstaller:1"
+}

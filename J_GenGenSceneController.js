@@ -1,4 +1,4 @@
-// User interface for GenGeneric Scene Controller Version 1.15
+// User interface for GenGeneric Scene Controller Version 1.16
 // Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
@@ -16,6 +16,7 @@ var EVOLVELCD1 = {
     LastFixedSceneId        : 10,
 	HasOffScenes            : true,
 	HasIndicator			: true,
+	IndicatorHighlighting   : "Highlight line",
 	HasCooperConfiguration  : false,
 	MaxDirectAssociations   : 30,
 	DefaultScreen           : "C1",
@@ -168,6 +169,7 @@ var COOPERRFWC5 = {
     LastFixedSceneId        : 5,
 	HasOffScenes            : false,
 	HasIndicator			: true,
+	IndicatorHighlighting   : "Turn on L.E.D.",
 	HasCooperConfiguration  : true,
 	MaxDirectAssociations   : 5,
 	DefaultScreen           : "P1",
@@ -215,6 +217,7 @@ var NEXIAONETOUCH = {
     LastFixedSceneId        : 46,
 	HasOffScenes            : false,
 	HasIndicator			: false,
+	IndicatorHighlighting   : "",
 	HasCooperConfiguration  : false,
 	MaxDirectAssociations   : 2,
 	DefaultScreen           : "C1",
@@ -614,6 +617,10 @@ function SceneController_ChangeCustomLabel(SCObj, peerId, screen, labelIndex)
 		mode.newScreen=null;
 		mode.prefix = modePrefix;
 	}
+	var anyOrAll = document.getElementById("AnyOrAll_"+peerId+"_"+screen+"_"+labelIndex);
+	if (anyOrAll) {
+		mode.allDevices = anyOrAll.value;
+	} 
 	var newModeStr=SceneController_GenerateModeString(SCObj, mode);
 	if (SCObj.HasScreen) {
 		console.log("SceneController_ChangeCustomLabel: text="+text+" font="+font+" align="+align+" nmode="+newModeStr);
@@ -649,6 +656,13 @@ function SceneController_ChangeCustomAlign(SCObj, peerId, screen, labelIndex)
 	SceneController_Screens(SCObj, peerId);
 }
 
+function SceneController_ChangeAnyOrAll(SCObj, peerId, screen, labelIndex)
+{
+    console.log("SceneController_ChangeAnyOrAll: peerId="+peerId+" screen="+screen+" labelIndex="+labelIndex);
+	SceneController_ChangeCustomLabel(SCObj, peerId, screen, labelIndex);
+	SceneController_Screens(SCObj, peerId);
+}
+
 function SceneController_SetPlaceholder(SCObj, peerId, button)
 {
 	SceneController_Placeholder = button;
@@ -666,9 +680,11 @@ function SceneController_GetDevice(id)
 	return null
 }
 
-// Mode strings consist or Prefix {newScreen:+}? {(S|C{SceneId@}?{offSceneId@}?)}? {entry}+
+// Mode strings consist or Prefix {newScreen:+}? A?{(S|C{SceneId@}?{offSceneId@}?)}? {entry}+
 // Prefix is M for momentary, T for Toggle, etc.
 // newScreen is a letter/digit such as C3 for Custom 3 or P4 for Preset 4
+// The A (All) flag is present if all device matching "on" state should turn LED on.
+//   If the A flag is not present then any devices can match the "on" state to turn the LED on.
 // The S or C flags indicates that all subsequent associated devices are scene capable
 //   and is optinally followed by a sceneId @ which is optional followed by an offSceneId @
 // The C flag indicates to use Cooper configuration for non-secene capable devices
@@ -692,6 +708,15 @@ function SceneController_ParseModeString(SCObj, str) {
 			// Legacy switch screen.
 			mode.newScreen = str;
 			return mode;
+		}
+		if (str.charAt(0) == "A") {
+			mode.allDevices = "All"
+			str = str.slice(1);	
+		} else if (str.charAt(0) == "a") {
+			mode.allDevices = "Any"
+			str = str.slice(1);	
+		} else {
+			mode.allDevices = "Most"
 		}
 		if (str.charAt(0) == "S" || str.charAt(0) == "C") {
 			mode.sceneControllable = true;
@@ -735,6 +760,18 @@ function SceneController_ParseModeString(SCObj, str) {
 }
 
 function SceneController_GenerateModeString(SCObj, mode) {
+	if (!mode) {
+		mode = [];
+	}
+	if (!mode.prefix) {
+		mode.prefix = SCObj.DefaultModeString;
+	}
+	var str=mode.prefix;
+	if (mode.newScreen) {
+		str += mode.newScreen + ":"
+	}
+	var first = true;
+
 	function generateArray(array, sign) {
 		if (array) {
 			for (var i = 0; i < array.length; ++i) {
@@ -756,17 +793,11 @@ function SceneController_GenerateModeString(SCObj, mode) {
 		}
 	}
 
-	if (!mode) {
-		mode = [];
+	if (mode.allDevices == "All") {
+		str += "A"
+	} else if (mode.allDevices == "Any") {
+		str += "a"
 	}
-	if (!mode.prefix) {
-		mode.prefix = SCObj.DefaultModeString;
-	}
-	var str=mode.prefix;
-	if (mode.newScreen) {
-		str += mode.newScreen + ":"
-	}
-	var first = true;
 	if (mode.sceneControllable) {
 		str += "S";
 		if (mode.sceneId) {
@@ -1287,6 +1318,7 @@ function SceneController_Screens(SCObj, deviceId) {
 						     +  ' color:' + (spec.font=='Inverted' ? 'white':'black') + ';'
 						     +  ' background-color:' + (spec.font=='Inverted' ? 'black':'white') + ';"'
 						     +  ' type="text" id="Text_'+peerId+'_'+curScreen+'_'+stateButton+'" value="'+spec.text/*.replace(/\\/g,'\\\\')*/+'"'
+							 +  ' title=' + (spec.font == 'Normal' ? '"Use a - or \\r for a two-line label in normal text"' : '"Only one line per lable in ' + spec.font.toLowerCase() + ' text"') 
 						     +  ' onChange="SceneController_ChangeCustomLabel('+SCObj.Id+','+peerId+',\''+curScreen+'\','+stateButton+')"></td>\n';
 						html += '  <td><select class="styled" align="left" style="width:'+(SceneController_IsUI7() ? 120 : 75)+'px; height:22px;"'
 						     +  ' id="Font_'+peerId+'_'+curScreen+'_'+stateButton+'" onChange="SceneController_ChangeCustomFont('+SCObj.Id+','+peerId+',\''+curScreen+'\','+stateButton+')">\n';
@@ -1486,12 +1518,27 @@ function SceneController_Screens(SCObj, deviceId) {
 								     +   ' value="'+((!(mode[j].dimmingDuration || mode[j].dimmingDuration == 0) || mode[j].dimmingDuration == 255)?"":mode[j].dimmingDuration)+'" style="width:40px;" onChange="SceneController_SelectDirectDevice('+SCObj.Id+',\''+mode.prefix+'\','+peerId+',\''+curScreen+'\',\''+stateButton+'\',\''+j+'\',5)">\n';
 							}
 						}
+						var anyOrAllNumDevices = mode.length + (mode.veraSceneSet ? mode.veraSceneSet.length : 0)
+						if (SCObj.HasIndicator && mode.prefix == "T" && anyOrAllNumDevices > 1) {
+							if (anyOrAllNumDevices == 2 & mode.allDevices == "Most") {
+								mode.allDevices = "Any"
+							} 
+							// If toggling more than one device, choose "Any" or "All"
+							html += 	' <tr><td/><td colspan=' + (hasCustomLabels ? '5' : '3') + ' align="left">'
+							     +  	SCObj.IndicatorHighlighting + ' ' + button + ' if \n'
+			             		 +  	'<select class="styled" id="AnyOrAll_'+peerId+'_'+curScreen+'_'+button+'" onChange="SceneController_ChangeAnyOrAll('+SCObj.Id+','+peerId+',\''+curScreen+'\','+button+')" style="width:' + (anyOrAllNumDevices > 2 ? '100' : '70') + 'px;">\n'
+						         +  	'  <option value="Any"' + (mode.allDevices=="Any"  ? ' selected' : '') + '>Any</option>\n';
+							if (anyOrAllNumDevices > 2) {
+								html += '  <option value="Most"'+ (mode.allDevices=="Most" ? ' selected' : '') + '>At least ' + Math.round(anyOrAllNumDevices / 2) + '</option>\n';
+							}
+						    html +=  	'  <option value="All"' + (mode.allDevices=="All"  ? ' selected' : '') + '>' + (anyOrAllNumDevices == 2 ? 'Both' : 'All ' + anyOrAllNumDevices) + '</option>\n'
+								 +  	'</select>\n'
+								 +  	' devices are on.\n'
+								 +  	'</td></tr>';
+						}
 					} // ScreenType != T or button == 1 or button == 5
 				} // for state
 			} // for button
-			if (hasCustomLabels) {
-				html += ' <tr><td colspan=5>Use a - or \\r for a 2-line label in the normal font</td></tr>\n'
-			}
 			if (extraLines < 2) {
 				html += " <tr><td>&nbsp;</td></tr>\n";
 			}
@@ -1690,7 +1737,16 @@ function SceneController_GetSceneSet(sceneObjs) {
 			}
 		}
 	}
-	return result;
+	// remove duplicates. Keep the one with the highest level or where level exists.
+	return result.sort(function(a, b) {
+		var cmp = a.device - b.device;
+		if (cmp == 0) {
+			return (b.level ? b.level : 0) - (a.level ? a.level : 0);
+		}
+  		return cmp;
+	}).filter(function(item, pos, ary) {
+        return !pos || item.device != ary[pos - 1].device;
+    });
 }
 
 function SceneController_SceneSetsEqual(s1, s2) {
@@ -1724,7 +1780,7 @@ function SceneController_GetOrCreateNewScene(deviceID, sceneNum, activate, label
         return [false, sceneObj, sceneObj.name];
     }
 	// The scene was not found. Create a new one
-    var sceneID = SceneController_IsUI7() ? application.newSceneId()+1000000 : new_scene_id();
+    var sceneID = SceneController_IsUI7() ? application.newSceneId() % 1000000 : new_scene_id();
 	var devObj = SceneController_IsUI7() ? application.getDeviceById(deviceID) : get_device_obj(deviceID);
     var sceneName = SceneController_CreateSceneName(devObj.name,
                                                label,
