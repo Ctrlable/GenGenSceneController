@@ -1,6 +1,8 @@
--- GenGeneric Scene Controller shared code Version 1.07
+-- GenGeneric Scene Controller shared code Version 1.08
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
+
+bit = require "bit"
 
 --
 -- Debugging functions
@@ -985,3 +987,43 @@ function GetFirstInstaller()
 	return firstInstaller
 end
 
+---
+--- Other shared functions
+---
+
+-- Given the Z-Wave node ID, NodeIdToDeviceNumbers returns the Z-Wave device number
+function NodeIdToDeviceNumber(node_id)
+  	local veraZWaveNode, ZWaveNetworkDeviceId = GetVeraIDs()
+	for k, v in pairs(luup.devices) do
+		if v.device_num_parent == ZWaveNetworkDeviceId and tonumber(v.id) == node_id then
+			return k
+		end
+	end
+	return nil
+end
+
+local DupData = {}
+local RECEIVE_STATUS_TYPE_MASK = 0x0C
+local RECEIVE_STATUS_TYPE_SINGLE = 0x00
+local RECEIVE_STATUS_TYPE_BROAD = 0x04
+local RECEIVE_STATUS_TYPE_MULTI = 0x08
+local RECEIVE_STATUS_TYPE_EXPLORE = 0x10
+local MAX_DUP_TIME = 0.125 -- seconds
+local MAX_EXPLORE_DUP_TIME = 0.40
+function CheckDups(peer_dev_num, time, receiveStatus, data)
+	VEntry()
+	local oldTable = DupData[peer_dev_num]
+	receiveStatus = bit.band(receiveStatus, RECEIVE_STATUS_TYPE_MASK);
+	local result = true
+	if oldTable and oldTable.data == data and 
+	    ((time-oldTable.time < MAX_DUP_TIME and
+		 (oldTable.receiveStatus == receiveStatus or
+		 (oldTable.receiveStatus > RECEIVE_STATUS_TYPE_SINGLE and receiveStatus == RECEIVE_STATUS_TYPE_SINGLE))) or
+		(time-oldTable.time < MAX_EXPLORE_DUP_TIME and receiveStatus >= RECEIVE_STATUS_TYPE_EXPLORE))  then
+		oldTable.time = time
+		log(ANSI_YELLOW, "peer_dev_num=", peer_dev_num, " data=", data, " timestamp=", time, " is a dup", ANSI_RESET)
+		result = false
+	end
+	DupData[peer_dev_num] = {time=time, receiveStatus=receiveStatus, data=data}
+	return result
+end

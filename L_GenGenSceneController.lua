@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller Version 1.07
+-- GenGeneric Scene Controller Version 1.08
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -7,7 +7,6 @@
 -- VerboseLogging == 3:	Includes verbose logs:        ELog, log, DLog, DEntry, VLog, VEntry
 VerboseLogging = 0
 
-bit = require "bit"
 posix = require "posix"
 socket = require "socket"
 zwint = require "zwint"
@@ -64,7 +63,7 @@ Devices = {
 									10,10,8,8,7,10,9,14,9,9,8,10,6,10,12,13},
 		ScreenWidth 		    = 65,
 		RightJustifyScreenWidth = 67,
-		SetTuningParameters = function(zwave_dev_num)
+		SetTuningParameters = function(zwave_dev_num, peer_dev_num)
 		    VEntry()
 			local versionString
 			local retry = 0
@@ -305,7 +304,7 @@ Devices = {
 	    SmallFontWidths         = {}, -- Empty if not HasScreen
 		screenWidth             = 1,  -- Dummy if not HasScreen
 		rightJustifyScreenWidth = 1,
-		SetTuningParameters = function(zwave_dev_num)
+		SetTuningParameters = function(zwave_dev_num, peer_dev_num)
 		    VEntry()
 			GetTuningParameter("InitStaggerSeconds"	    , 30            , zwave_dev_num)
 			GetTuningParameter("MinReinitSeconds"	    , 60 * 60 * 24  , zwave_dev_num)
@@ -432,7 +431,7 @@ Devices = {
 									10,10,8,8,7,10,9,14,9,9,8,10,6,10,12,13},
 		ScreenWidth 		    = 65,
 		RightJustifyScreenWidth = 67,
-		SetTuningParameters = function(zwave_dev_num)
+		SetTuningParameters = function(zwave_dev_num, peer_dev_num)
 		    VEntry()
 			GetTuningParameter("BaseDelay"     		, 300 , zwave_dev_num)
 			GetTuningParameter("ClearDelay"    		, 700 , zwave_dev_num)
@@ -454,7 +453,6 @@ Devices = {
 			GetTuningParameter("UnassociateDelay"        , 0  , zwave_dev_num)
 
 		   	local node_id = GetZWaveNode(zwave_dev_num)
-			local peer_dev_num = GetPeerDevNum(zwave_dev_num)
 
 			-- Here we set up kluges to avoid problems with UI7 with the Nexia One-Touch
 			-- LuaUPnP does not handle the ASSOCIATION_GROUP_INFO_GET command in list mode
@@ -1033,6 +1031,7 @@ function EVLCDLabel(screenFlags,lineArray, node_id, zwave_dev_num, delay_overrid
 	if not SCObj.HasScreen then
 		return true
 	end
+	local peer_dev_num = GetPeerDevNum(zwave_dev_num)
 	if param.SCENE_CTRL_CharDelay == nil then
 		SCObj.SetTuningParameters(zwave_dev_num)
 	end
@@ -1062,7 +1061,7 @@ function EVLCDLabel(screenFlags,lineArray, node_id, zwave_dev_num, delay_overrid
 			if delay_override then
 				delay = delay_override
 			end
-			EnqueueZWaveMessage("SetLabel_"..node_id, node_id, data, zwave_dev_num, delay);
+			EnqueueZWaveMessage("SetLabel_"..node_id, node_id, data, peer_dev_num, delay);
 			screenFlags = SCREEN_MD.NoChange
 	        data = "0x92 2 " .. tostring(screenFlags)
 			part = 1
@@ -1631,7 +1630,7 @@ function ConnectPeerDevice(peer_dev_num)
 		   	luup.call_action(SID_HAG,"DeleteDevice", {DeviceNum = peer_dev_num}, 0);
 		else
 			CheckInvisible(-zwave_dev_num)
-			SCObj.SetTuningParameters(zwave_dev_num)
+			SCObj.SetTuningParameters(zwave_dev_num, peer_dev_num)
 			GetTuningParameter("VerboseLogging", VerboseLogging, zwave_dev_num, "SceneController_VerboseLoggingChange");
 			peerID = luup.variable_get(SID_SCENECONTROLLER,"PeerID",zwave_dev_num)
 		    if peerID == "Pending" then
@@ -1728,22 +1727,6 @@ function GetPeerDevNum(dev_num)
 	end
 	-- caller passed the peer device number
 	return dev_num
-end
-
--- Given the Z-Wave node ID, NodeIdToDeviceNumbers returns the Z-Wave and peer device numbers
-function NodeIdToDeviceNumbers(node_id)
-  	local veraZWaveNode, ZWaveNetworkDeviceId = GetVeraIDs()
-	for k, v in pairs(luup.devices) do
-		if v.device_num_parent == ZWaveNetworkDeviceId and tonumber(v.id) == node_id then
-			local peer_dev_num_str = luup.variable_get(SID_SCENECONTROLLER,"PeerID",dev_num)
-			if peer_dev_num_str then
-				return k, tonumber(peer_dev_num_str)
-			else
-				return k, nil
-			end
-		end
-	end
-	return nil, nil
 end
 
 local IsPrimaryController
@@ -3501,32 +3484,6 @@ function GetCurrentScreen(peer_dev_num)
 		currentScreen = SCObj.DefaultScreen
 	end
 	return currentScreen
-end
-
-local DupData = {}
-local RECEIVE_STATUS_TYPE_MASK = 0x0C
-local RECEIVE_STATUS_TYPE_SINGLE = 0x00
-local RECEIVE_STATUS_TYPE_BROAD = 0x04
-local RECEIVE_STATUS_TYPE_MULTI = 0x08
-local RECEIVE_STATUS_TYPE_EXPLORE = 0x10
-local MAX_DUP_TIME = 0.125 -- seconds
-local MAX_EXPLORE_DUP_TIME = 0.40
-function CheckDups(peer_dev_num, time, receiveStatus, data)
-	VEntry()
-	local oldTable = DupData[peer_dev_num]
-	receiveStatus = bit.band(receiveStatus, RECEIVE_STATUS_TYPE_MASK);
-	local result = true
-	if oldTable and oldTable.data == data and 
-	    ((time-oldTable.time < MAX_DUP_TIME and
-		 (oldTable.receiveStatus == receiveStatus or
-		 (oldTable.receiveStatus > RECEIVE_STATUS_TYPE_SINGLE and receiveStatus == RECEIVE_STATUS_TYPE_SINGLE))) or
-		(time-oldTable.time < MAX_EXPLORE_DUP_TIME and receiveStatus >= RECEIVE_STATUS_TYPE_EXPLORE))  then
-		oldTable.time = time
-		log(ANSI_YELLOW, "peer_dev_num=", peer_dev_num, " data=", data, " timestamp=", time, " is a dup", ANSI_RESET)
-		result = false
-	end
-	DupData[peer_dev_num] = {time=time, receiveStatus=receiveStatus, data=data}
-	return result
 end
 
 function SceneActivatedMonitorCallback(peer_dev_num, result)

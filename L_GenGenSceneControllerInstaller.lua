@@ -1,4 +1,4 @@
--- Installer for GenGeneric Scene Controller Version 1.07
+-- Installer for GenGeneric Scene Controller Version 1.08
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 --
 -- Includes installation files for
@@ -195,97 +195,84 @@ end
 ScannedDeviceList = {}
 
 function ScanForNewDevices()
+
+	local function AdoptEvolveLCD1(device_num)
+		log("Found a new Evolve LCD1 controller. Device: ", device_num)
+		luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1", device_num)
+		luup.attr_set("device_file", "D_EvolveLCD1.xml", device_num)
+		luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
+		luup.attr_set("manufacturer", "Evolve Guest Controls", device_num)
+		luup.attr_set("device_json", "D_EvolveLCD1.json", device_num)
+		luup.attr_set("category_num", "14", device_num)
+		luup.attr_set("subcategory_num", "0", device_num)
+		luup.attr_set("model", "EVLCD1", device_num)
+		luup.attr_set("invisible", "1", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "NumButtons", "5", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "FiresOffEvents", "1", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "ActivationMethod", "0", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:ZWaveDevice1", "VariablesSet", "20-Display Timeout (seconds),m,,"..
+		                                                                                "21-Backlight ON level (1-20),m,,"..
+		                                                                                "22-Backlight OFF level (0-20),m,,"..
+		                                                                                "23-Button ON level (1-20),m,,"..
+		                                                                                "24-Button OFF level (0-20),m,,"..
+		                                                                                "25-LCD Contrast (5-20),m,,"..
+		                                                                                "26-Orientation(1=rotate 180 0=normal),m,,"..
+		                                                                                "27-Network Update (seconds),m,,"..
+		                                                                                "29-backlight level (0-100),m,,"..
+		                                                                                "32-Backlight Demo mode (0-1),m,", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:HaDevice1", "Documentation", "http://code.mios.com/trac/mios_evolve-lcd1", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:ZWaveDevice1", "Documentation", "http://code.mios.com/trac/mios_evolve-lcd1", device_num)
+	end
+
+	local function AdoptCooperRFWC5(device_num)
+		log("Found a new Cooper RFWC5 controller. Device: ", device_num)
+		luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1", device_num)
+		luup.attr_set("device_file", "D_CooperRFWC5.xml", device_num)
+		luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
+		luup.attr_set("manufacturer", "Cooper Industries", device_num)
+		luup.attr_set("name", "Cooper RFWC5 Controller Z-Wave", device_num)
+		luup.attr_set("dev ice_json", "D_CooperRFWC5.json", device_num)
+		luup.attr_set("category_num", "14", device_num)
+		luup.attr_set("subcategory_num", "0", device_num)
+		luup.attr_set("model", "RFWC5", device_num)
+		luup.attr_set("invisible", "1", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "NumButtons", "5", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "FiresOffEvents", "1", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "ActivationMethod", "0", device_num)
+	end
+
+	local function AdoptNexiaOneTouch(device_num)
+		log("Found a new Nexia One Touch controller. Device num: ", device_num)
+		luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1", device_num)
+		luup.attr_set("device_file", "D_NexiaOneTouch.xml", device_num)
+		luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
+		luup.attr_set("manufacturer", "Ingersoll Rand", device_num)
+		luup.attr_set("name", "Nexia One Touch Z-Wave", device_num)
+		luup.attr_set("device_json", "D_NexiaOneTouch.json", device_num)
+		luup.attr_set("category_num", "14", device_num)
+		luup.attr_set("subcategory_num", "0", device_num)
+		luup.attr_set("model", "NX1000", device_num)
+		luup.attr_set("invisible", "1", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "NumButtons", "5", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "FiresOffEvents", "1", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "ActivationMethod", "0", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:ZWaveDevice1", "VariablesSet", "20-Touch Calibration (1-10),m,,"..
+		                                                                                "21-Screen Contrast (1-10),m,,"..
+		                                                                                "23-Button LED Level (1-10),m,,"..
+		                                                                                "24-Backlight Level (1-10),m,,"..
+		                                                                                "25-Scene Button Press Backlight Timeout (10-15),m,,"..
+		                                                                                "26-Page Button Press Backlight Timeout (5-15),m,,"..
+		                                                                                "28-Screen Timeout (1-240),m,,"..
+		                                                                                "29-Screen Timeout Primary Page (0-3),m,,"..
+		                                                                                "30-Battery Stat Shutdown Threshold % (0-20),m,,"..
+		                                                                                "31-Battery Radio Cutoff Threshold % (0-40),m,,"..
+																					    "32-Battery LOWBATT Indicator Threshold % (5-50),m,,"..
+																					    "33-Battery Threshold Value for Midlevel % (30-80),m,",device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:HaDevice1", "Documentation", "http://products.z-wavealliance.org/products/1344", device_num)
+		luup.variable_set("urn:micasaverde-com:serviceId:ZWaveDevice1", "Documentation", "http://products.z-wavealliance.org/products/1344", device_num)
+	end
+
 	for device_num, device in pairs(luup.devices) do
-		if device.device_num_parent and
-	       luup.devices[device.device_num_parent] and
-	       luup.devices[device.device_num_parent].device_type == "urn:schemas-micasaverde-com:device:ZWaveNetwork:1" then
-	  		local manufacturer_info = luup.variable_get("urn:micasaverde-com:serviceId:ZWaveDevice1", "ManufacturerInfo", device_num)
-		    local device_file = luup.attr_get("device_file", device_num);
-	        if device.device_type == 'urn:schemas-micasaverde-com:device:SceneController:1' then
-		  		if manufacturer_info == "275,17750,19506" then
-					if device_file =="D_SceneController1.xml" then
-			  			reload_needed = true
-			  			log("Found a new Evolve LCD1 controller. Device ID: ", device.id)
-						luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1", device_num)
-			  			luup.attr_set("device_file", "D_EvolveLCD1.xml", device_num)
-						luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
-			  			luup.attr_set("manufacturer", "Evolve Guest Controls", device_num)
-						luup.attr_set("device_json", "D_EvolveLCD1.json", device_num)
-						luup.attr_set("category_num", "14", device_num)
-						luup.attr_set("subcategory_num", "0", device_num)
-						luup.attr_set("model", "EVLCD1", device_num)
-						luup.attr_set("invisible", "1", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "NumButtons", "5", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "FiresOffEvents", "1", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "ActivationMethod", "0", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:ZWaveDevice1", "VariablesSet", "20-Display Timeout (seconds),m,,"..
-						                                                                                "21-Backlight ON level (1-20),m,,"..
-						                                                                                "22-Backlight OFF level (0-20),m,,"..
-						                                                                                "23-Button ON level (1-20),m,,"..
-						                                                                                "24-Button OFF level (0-20),m,,"..
-						                                                                                "25-LCD Contrast (5-20),m,,"..
-						                                                                                "26-Orientation(1=rotate 180 0=normal),m,,"..
-						                                                                                "27-Network Update (seconds),m,,"..
-						                                                                                "29-backlight level (0-100),m,,"..
-						                                                                                "32-Backlight Demo mode (0-1),m,", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:HaDevice1", "Documentation", "http://code.mios.com/trac/mios_evolve-lcd1", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:ZWaveDevice1", "Documentation", "http://code.mios.com/trac/mios_evolve-lcd1", device_num)
-					end --  device_file =="D_SceneController1.xml"
-				elseif manufacturer_info == "26,22349,0" then
-					if device_file =="D_SceneController1.xml" then
-		 				reload_needed = true
-						log("Found a new Cooper RFWC5 controller. Device ID: ", device.id)
-						luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1", device_num)
-						luup.attr_set("device_file", "D_CooperRFWC5.xml", device_num)
-						luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
-						luup.attr_set("manufacturer", "Cooper Industries", device_num)
-						luup.attr_set("name", "Cooper RFWC5 Controller Z-Wave", device_num)
-						luup.attr_set("device_json", "D_CooperRFWC5.json", device_num)
-						luup.attr_set("category_num", "14", device_num)
-						luup.attr_set("subcategory_num", "0", device_num)
-						luup.attr_set("model", "RFWC5", device_num)
-						luup.attr_set("invisible", "1", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "NumButtons", "5", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "FiresOffEvents", "1", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "ActivationMethod", "0", device_num)
-					end -- device_file =="D_SceneController1.xml"
-				end -- elseif manufacturer_info == "26,22349,0"
-			elseif device.device_type == "urn:schemas-micasaverde-com:device:GenericIO:1" then
- 				if manufacturer_info == "376,21315,18229" then
-					if device_file =="D_GenericIO1.xml" then
-						reload_needed = true
-						log("Found a new Nexia One Touch controller. Device ID: ", device.id)
-						luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1", device_num)
-						luup.attr_set("device_file", "D_NexiaOneTouch.xml", device_num)
-						luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
-						luup.attr_set("manufacturer", "Ingersoll Rand", device_num)
-						luup.attr_set("name", "Nexia One Touch Z-Wave", device_num)
-						luup.attr_set("device_json", "D_NexiaOneTouch.json", device_num)
-						luup.attr_set("category_num", "14", device_num)
-						luup.attr_set("subcategory_num", "0", device_num)
-						luup.attr_set("model", "NX1000", device_num)
-						luup.attr_set("invisible", "1", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "NumButtons", "5", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "FiresOffEvents", "1", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:SceneController1", "ActivationMethod", "0", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:ZWaveDevice1", "VariablesSet", "20-Touch Calibration (1-10),m,,"..
-						                                                                                "21-Screen Contrast (1-10),m,,"..
-						                                                                                "23-Button LED Level (1-10),m,,"..
-						                                                                                "24-Backlight Level (1-10),m,,"..
-						                                                                                "25-Scene Button Press Backlight Timeout (10-15),m,,"..
-						                                                                                "26-Page Button Press Backlight Timeout (5-15),m,,"..
-						                                                                                "28-Screen Timeout (1-240),m,,"..
-						                                                                                "29-Screen Timeout Primary Page (0-3),m,,"..
-						                                                                                "30-Battery Stat Shutdown Threshold % (0-20),m,,"..
-						                                                                                "31-Battery Radio Cutoff Threshold % (0-40),m,,"..
-																									    "32-Battery LOWBATT Indicator Threshold % (5-50),m,,"..
-																									    "33-Battery Threshold Value for Midlevel % (30-80),m,",device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:HaDevice1", "Documentation", "http://products.z-wavealliance.org/products/1344", device_num)
-						luup.variable_set("urn:micasaverde-com:serviceId:ZWaveDevice1", "Documentation", "http://products.z-wavealliance.org/products/1344", device_num)
-	  				end	-- device_file == "D_GenericIO1.xml"
-				end -- manufacturer_info == "376,21315,18229"
-			end -- device.device_type == "urn:schemas-micasaverde-com:device:GenericIO:1"
-		end
 		if device.device_type == "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1" then
 			local impl = luup.attr_get("impl_file", device_num)  
 			if impl == "I_EvolveLCD1.xml" then
@@ -300,8 +287,74 @@ function ScanForNewDevices()
 			  	log("Updating the implementation file of the existing Cooper RFWC5 peer device: ", device_num)
 			  	luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num);
 			end
+		elseif device.device_num_parent and
+			luup.devices[device.device_num_parent] and
+			luup.devices[device.device_num_parent].device_type == "urn:schemas-micasaverde-com:device:ZWaveNetwork:1" then
+	  		local manufacturer_info = luup.variable_get("urn:micasaverde-com:serviceId:ZWaveDevice1", "ManufacturerInfo", device_num)
+		  	if manufacturer_info == "275,17750,19506" then
+	        	if device.device_type ~= 'urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1' then
+					AdoptEvolveLCD1(device_num)
+			  		reload_needed = true
+				end
+			elseif manufacturer_info == "26,22349,0" then
+				if device.device_type ~= "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1" then
+					AdoptCooperRFWC5(device_num)
+		 			reload_needed = true
+				end 
+			elseif manufacturer_info == "376,21315,18229" then
+				if device.device_type ~="urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1" then
+					AdoptNexiaOneTouch(device_num)
+					reload_needed = true
+	  			end
+			end
 		end
 	end	-- for device_num
+
+	local function NexiaManufacturerCallback(peer_dev_num, result)
+		local time = tonumber(result.time)
+		local receiveStatus = tonumber(result.C1, 16)
+		local node_id = tonumber(result.C2, 16)
+		local device_num = NodeIdToDeviceNumber(node_id)
+		DEntry("NexiaManufacturerCallback")
+		if device_num and CheckDups(device_num, time, receiveStatus, "72050178534347359e"..result.C2) then
+			local device = luup.devices[device_num]
+			if device and device.device_type ~= "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1" then
+				AdoptNexiaOneTouch(device_num)
+				log("Nexia One-Touch adopted. Reloading LuaUPnP.")
+				luup.call_action(HAG_SID, "Reload", {}, 0)
+			end
+		end
+	end
+
+	-- The Nexia One Touch may show up as a "Generic IO" device if it was included before the plug-in was installed
+	-- because UI7 gets confused by the devices's response to the COMMAND_CLASS_ASSOCIATION_GRP_INFO/ASSOCIATION_GROUP_INFO_GET command  
+--[==[
+                                                 C1  C2
+42      02/25/17 15:55:45.857   0x1 0xe 0x0 0x4 0x0 0xf 0x8 0x72 0x5 0x1 0x78 0x53 0x43 0x47 0x35 0x9e (#######r##xSCG5#) 
+           SOF - Start Of Frame --+   ¦   ¦   ¦   ¦   ¦   ¦    ¦   ¦ +------+ +-------+ +-------+    ¦
+                    length = 14 ------+   ¦   ¦   ¦   ¦   ¦    ¦   ¦    ¦         ¦         ¦        ¦
+                        Request ----------+   ¦   ¦   ¦   ¦    ¦   ¦    ¦         ¦         ¦        ¦
+FUNC_ID_APPLICATION_COMMAND_HANDLER ----------+   ¦   ¦   ¦    ¦   ¦    ¦         ¦         ¦        ¦
+          Receive Status SINGLE ------------------+   ¦   ¦    ¦   ¦    ¦         ¦         ¦        ¦
+          Device 10=_Generic IO ----------------------+   ¦    ¦   ¦    ¦         ¦         ¦        ¦
+                Data length = 8 --------------------------+    ¦   ¦    ¦         ¦         ¦        ¦
+COMMAND_CLASS_MANUFACTURER_SPECIFIC ---------------------------+   ¦    ¦         ¦         ¦        ¦
+   MANUFACTURER_SPECIFIC_REPORT -----------------------------------+    ¦         ¦         ¦        ¦
+  Manufacturer Id = Nexia (376) ----------------------------------------+         ¦         ¦        ¦
+       Product Type Id = 0x5343 --------------------------------------------------+         ¦        ¦
+            Procuct Id = 0x4735 ------------------------------------------------------------+        ¦
+                    Checksum OK ---------------------------------------------------------------------+
+--]==]
+	MonitorZWaveData(false, -- incoming,
+					 luup.device, -- peer_dev_num
+	                 nil, -- No arm_regex
+	                 "^01 .. 00 04 (..) (..) .. 72 05 01 78 53 43 47 35", -- Main RegEx
+	                 "06", -- ACK response,
+	                 NexiaManufacturerCallback,
+	                 false, -- Not OneShot
+	                 0, -- no timeout
+					 "NexiaManufacturer")
+
 end
 
 -- Return whether this is the latest version of the installer and if there

@@ -44,8 +44,8 @@
 		"Control": []
 	}, {
 		"Label": {
-			"lang_tag": "Screens",
-			"text": "Screens"
+			"lang_tag": "Configure",
+			"text": "Configure"
 		},
 		"Position": 1,
 		"TopNavigationTab": "1",
