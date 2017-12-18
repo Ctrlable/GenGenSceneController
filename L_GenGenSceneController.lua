@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller Version 1.14
+-- GenGeneric Scene Controller Version 1.15
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -798,6 +798,12 @@ local ZWaveSceneIdCacheList = {}
 local param = {}
 local lastChangedModes = {}
 local temperatureAutoChoices = {}
+
+-- IndicatorLocks is indexed by peer_dev_num
+-- 0 (or nil) no lock
+-- 1 Short term lock with timeout
+-- 2 long term lock without timeout. Should be disabled if unexpected event occurred. 
+-- 3 Indicator change bypassed due to lock
 local IndicatorLocks = {}
 
 -- Make sure tha all of the log functions work before even the SCObj global is set.
@@ -979,7 +985,9 @@ function EnqueueZWaveMessage(name, node_id, data, dev_num, delay)
 end
 
 -- Enqueue a Lua action within the Z-Wave queue
-function EnqueueLuupAction(name, device, service, action, arguments, delay)
+-- Name must be the name of the job as returned by the job watch callback. e.g. ZWJob_PollNode
+-- Parameters 2-5 are the same as luup_action.
+function EnqueueLuupAction(name, service, action, arguments, device, delay)
   VEntry()
   EnqueueActionOrMessage({
   	type=2,
@@ -994,6 +1002,8 @@ function EnqueueLuupAction(name, device, service, action, arguments, delay)
 end
 
 -- Enqueue a Z-Wave message, expecting a response.
+-- name, node_id, data, delay - as in EnqueueZWaveMessage
+-- controller: true if a message to the local controller, false if a message to a remote device
 -- pattern is a Linux externed refular expression which will be matched against the hexified incoming Z-Wave data.
 -- Callback is a function which is passed the peer device number and any captures from the regex. 
 --    The capture array is nil if a timeout occurred.
@@ -1006,7 +1016,7 @@ end
 -- If autoResponse is not nil then the received data is not received by LuaUPnP and the given autoResponse is sent to the device instead.
 -- Delay is applied after the response is received but ignored in case of a timeout.
 -- Returns a context which can be passed to CancelZWaveMonitor if callback is not nil.
-function EnqueueZWaveMessageWithResponse(name, node_id, data, delay, pattern, callback, oneshot, dev_num, timeout, armPattern, autoResponse)
+function EnqueueZWaveMessageWithResponse(name, node_id, data, delay, controller, pattern, callback, oneshot, dev_num, timeout, armPattern, autoResponse)
   VEntry()
   local context
   if callback then
@@ -1014,8 +1024,12 @@ function EnqueueZWaveMessageWithResponse(name, node_id, data, delay, pattern, ca
   	context = "R_" .. name .. "_" .. node_id .. "_" .. MonitorContextNum
   	MonitorContextList[context] = {incoming=true, callback=callback, oneshot=oneshot, releaseNodeId=node_id}
   end
+  local messageType = 1
+  if controller then
+	messageType = 0
+  end 
   EnqueueActionOrMessage({
-  	type=1,
+  	type=messageType,
   	name=name,
 	description=luup.devices[dev_num].description,
   	node_id=node_id,
@@ -1032,7 +1046,7 @@ function EnqueueZWaveMessageWithResponse(name, node_id, data, delay, pattern, ca
 end
 
 --
--- Sceen display
+-- Screen display
 --
 
 function ExpandString(s)
@@ -2190,7 +2204,7 @@ function SetIndicator(peer_dev_num, screen, force, cascadable)
 			-- 5. This messes up the "Indicator Get/Indicator Report" operation done when GenGenSceneController detects the Basic Set Off.
 			-- We solve this by temporarily deferring any SetIndicator operations on the given device while a Indicator Get is in progress.
 			DLog("  SetIndicator. Quick return because IndicatorLocks[", peer_dev_num, "]=", IndicatorLocks[peer_dev_num])
-			IndicatorLocks[peer_dev_num] = 2
+			IndicatorLocks[peer_dev_num] = 3
 			return
 		end
 	    local indicator = 0
@@ -2822,7 +2836,56 @@ function SetReturnRoute(zwave_dev_num, lcd_node_id, target_node_id)
 			end
 		end
 		if not  SceneController_ReturnRoutes[lcd_node_id][target_node_id] then
-			EnqueueZWaveControllerMessage("AssignReturnRoute_"..lcd_node_id.."->"..target_node_id, lcd_node_id,  "0x00 0x46 ".. lcd_node_id .. " " .. target_node_id .. " " .. veraZWaveNode, zwave_dev_num, param.SCENE_CTRL_ReturnRouteDelay)
+			local ReturnRouteCallback
+			ReturnRouteCallback = function(peer_dev_num, response)
+				if not response then
+					ELog("Assign return route timed out")
+				elseif response.C1 ~= "00" then
+					ELog("Assign return route failed")
+				end
+			end
+--[==[
+41      11/05/17 9:21:45.324                 0x1 0x6 0x0 0x46 0x2 0x17 0x1 0xab (###F####) 
+                        SOF - Start Of Frame --+   ¦   ¦    ¦   ¦    ¦   ¦    ¦
+                                  length = 6 ------+   ¦    ¦   ¦    ¦   ¦    ¦
+                                     Request ----------+    ¦   ¦    ¦   ¦    ¦
+              FUNC_ID_ZW_ASSIGN_RETURN_ROUTE ---------------+   ¦    ¦   ¦    ¦
+Source Node ID: 2 Device 3=Cooper RFWC5 Scene Controller Z-Wave +    ¦   ¦    ¦
+Destination Node ID: 23 Device 29=Qubino light strip ----------------+   ¦    ¦
+                             Callback ID = 1 ----------------------------+    ¦
+                                 Checksum OK ---------------------------------+
+42      11/05/17 9:21:45.352    0x6 0x1 0x4 0x1 0x46 0x1 0xbd (####F##) 
+              ACK - Acknowledge --+   ¦   ¦   ¦    ¦   ¦    ¦
+           SOF - Start Of Frame ------+   ¦   ¦    ¦   ¦    ¦
+                     length = 4 ----------+   ¦    ¦   ¦    ¦
+                       Response --------------+    ¦   ¦    ¦
+ FUNC_ID_ZW_ASSIGN_RETURN_ROUTE -------------------+   ¦    ¦
+     RetVal = Operation_Started -----------------------+    ¦
+                    Checksum OK ----------------------------+
+41      11/05/17 9:21:45.363    ACK: 0x6 (#)
+													  C1 
+42      11/05/17 9:21:45.641    0x1 0x5 0x0 0x46 0x1 0x0 0xbd (###F###) 
+           SOF - Start Of Frame --+   ¦   ¦    ¦   ¦   ¦    ¦
+                     length = 5 ------+   ¦    ¦   ¦   ¦    ¦
+                        Request ----------+    ¦   ¦   ¦    ¦
+ FUNC_ID_ZW_ASSIGN_RETURN_ROUTE ---------------+   ¦   ¦    ¦
+                Callback ID = 1 -------------------+   ¦    ¦
+  Status = TRANSMIT_COMPLETE_OK -----------------------+    ¦
+                    Checksum OK ----------------------------+
+41      11/05/17 9:21:45.641    ACK: 0x6 (#) 
+--]==]
+			EnqueueZWaveMessageWithResponse("AssignReturnRoute_"..lcd_node_id.."->"..target_node_id, -- label 
+										    lcd_node_id, 
+										    "0x00 0x46 ".. lcd_node_id .. " " .. target_node_id .. " 1", -- sendData
+										    0, -- delay
+										    true, -- local controller
+										    "^01 05 00 46 01 (..)", -- responsePattern
+										    ReturnRouteCallback, -- callback
+										    true, -- oneShot 
+										    zwave_dev_num, -- dev_num
+											5000, -- timeout
+											nil, -- armPattern
+											"06") -- autoResponse
 			SceneController_ReturnRoutes[lcd_node_id][target_node_id] = true
 			local returnRouteList = ""
 			for k,v in pairs(SceneController_ReturnRoutes[lcd_node_id]) do
@@ -3721,6 +3784,11 @@ function SceneActivatedMonitorCallback(peer_dev_num, result)
 	local time = tonumber(result.time)
 	local receiveStatus = tonumber(result.C1, 16)
 	if CheckDups(peer_dev_num, time, receiveStatus, "2B"..result.C2..result.C3) then
+		if IndicatorLocks[peer_dev_num] == 2 then
+			-- Reenable the indicator if we did not get a switch multilevel start but
+			-- then unexpectedly got a scene activation before the correspoonding switch multilevel stop 
+			IndicatorLocks[peer_dev_num] = 0
+		end
 		local zWaveSceneId = tonumber(result.C2, 16)
 		local dimminDuration = tonumber(result.C3, 16)
 		SceneChange(peer_dev_num, true, zWaveSceneId, time)
@@ -3732,6 +3800,11 @@ function BasicSetMonitorCallback(peer_dev_num, result)
 	local time = tonumber(result.time)
 	local receiveStatus = tonumber(result.C1, 16)
 	if CheckDups(peer_dev_num, time, receiveStatus, "20"..result.C2) then
+		if IndicatorLocks[peer_dev_num] == 2 then
+			-- Reenable the indicator if we did not get a switch multilevel start but
+			-- then unexpectedly got a basic set before the correspoonding switch multilevel stop 
+			IndicatorLocks[peer_dev_num] = 0
+		end
 		local setValue = tonumber(result.C2, 16)
 		SceneChange(peer_dev_num, false, setValue, time)
 	end
@@ -3749,14 +3822,17 @@ function MultiLevelSwitchStartLevelChangeMonitorCallback(peer_dev_num, result)
 		-- but the second without. Treat the second as a dup.
 		dupString = "2604" .. "04" .. string.sub(result.C3,1,5)
 	end
-	if SCObj.HasCooperConfiguration and CheckDups(peer_dev_num, time, receiveStatus, dupString) then
-		local mode = lastChangedModes[peer_dev_num]
-		local hexC3 = string.gsub(result.C3," "," 0x")
-		if mode then
-			for i = 1, #mode do
-				if not mode[i].dimmingDuration then
-					local node_id = GetZWaveNode(mode[i].device)
-					EnqueueZWaveMessage("StartLevelChangePassThrough", node_id, "0x26 0x04 0x" .. hexC3, mode[i].device, 0)
+	if CheckDups(peer_dev_num, time, receiveStatus, dupString) then
+		IndicatorLocks[peer_dev_num] = 2 -- Don't change indicators while a button is being held down
+	    if SCObj.HasCooperConfiguration then
+			local mode = lastChangedModes[peer_dev_num]
+			local hexC3 = string.gsub(result.C3," "," 0x")
+			if mode then
+				for i = 1, #mode do
+					if not mode[i].dimmingDuration then
+						local node_id = GetZWaveNode(mode[i].device)
+						EnqueueZWaveMessage("StartLevelChangePassThrough", node_id, "0x26 0x04 0x" .. hexC3, mode[i].device, 0)
+					end
 				end
 			end
 		end
@@ -3777,8 +3853,13 @@ function MultiLevelSwitchStopLevelChangeMonitorCallback(peer_dev_num, result)
 					local node_id = GetZWaveNode(mode[i].device)
 					EnqueueZWaveMessage("StopLevelChangePassThrough", node_id, "0x26 0x05", mode[i].device, 0)
 				end
-				luup.call_action(SID_HADEVICE, "Poll", {}, mode[i].device)
+				EnqueueLuupAction("ZWJob_PollNode", SID_HADEVICE, "Poll", {}, mode[i].device, 0);
 			end
+		end
+		local lock = IndicatorLocks[peer_dev_num]
+		IndicatorLocks[peer_dev_num] = 0
+		if lock > 2 then
+			SetIndicator(peer_dev_num, GetCurrentScreen(peer_dev_num), false, true)
 		end
 	end
 end
@@ -4191,7 +4272,7 @@ function SceneChange(peer_dev_num, isSceneId, zwave_scene, cur_scene_time)
 							-- This will typically be a no-op but is important for Exclusive modes
 							local lock = IndicatorLocks[peer_dev_num]
 							IndicatorLocks[peer_dev_num] = 0
-							if anyChange or lock > 1 then
+							if anyChange or lock > 2 then
 								SetIndicator(peer_dev_num, GetCurrentScreen(peer_dev_num), false, true)
 							end
 						end
@@ -4203,6 +4284,7 @@ function SceneChange(peer_dev_num, isSceneId, zwave_scene, cur_scene_time)
 															node_id, 
 															"0x87 0x02", -- sendData
 															0, -- delay
+															false, -- remote device
 															"^01 .. 00 04 (..) "..string.format("%02x",node_id).." .. 87 03 (..)", -- responsePattern
 															IndicatorReportCallback, -- callback
 															true, -- oneShot
@@ -4214,7 +4296,7 @@ function SceneChange(peer_dev_num, isSceneId, zwave_scene, cur_scene_time)
 							log("IndicatorReportCallback: timeout")
 							local lock = IndicatorLocks[peer_dev_num]
 							IndicatorLocks[peer_dev_num] = 0
-							if lock > 1 then
+							if lock > 2 then
 								SetIndicator(peer_dev_num, GetCurrentScreen(peer_dev_num), false, true)
 							end
 						end
@@ -4239,8 +4321,9 @@ Device 20=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦
 				IndicatorLocks[peer_dev_num] = 1
 				EnqueueZWaveMessageWithResponse("IndicatorReport", -- label
 												node_id, 
-												"0x87 0x02", -- sendData
+												"0x87 0x02", -- sendData COMMAND_CLASS_INDICATOR INDICATOR_GET
 												0, -- delay
+												false, -- remote device
 												"^01 .. 00 04 (..) "..string.format("%02x",node_id).." .. 87 03 (..)", -- responsePattern
 												IndicatorReportCallback, -- callback
 												true, -- oneShot
@@ -4334,8 +4417,8 @@ function SetDeviceStatus(device_num, value)
 	local variable = "LoadLevelStatus"
 	local result, lastUpdate = luup.variable_get(service, variable, device_num)
 	if result then
-  		DLog("  SetDeviceStatus: service=", service, " variable=", variable, " oldValue=", oldValue, " value=", value)
 		local oldValue = tonumber(result)
+  		DLog("  SetDeviceStatus: service=", service, " variable=", variable, " oldValue=", oldValue, " value=", value)
 		if oldValue ~= value then
 		    -- Temporarily unwatch the variable to avoid a loop which can cause problems if more than one device is attached to a button.
 		    TempVariableUnwatch(service, variable, device_num) 

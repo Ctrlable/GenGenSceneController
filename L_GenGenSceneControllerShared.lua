@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller shared code Version 1.14
+-- GenGeneric Scene Controller shared code Version 1.15
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -280,7 +280,7 @@ local function EnqueueInternalActionOrMessage(queueNode)
 	if queueNode.pattern then
 		-- Handle cases where callback was passed as nil.
 		-- Also handles cases where a non-first-peer relays the response to
-		-- the first peer to release the waitingForResponse flag.
+		-- the installert to release the waitingForResponse flag.
 		if not queueNode.context then
 	  		MonitorContextNum = MonitorContextNum + 1
 		  		queueNode.context = "W" .. queueNode.node_id .. "_" .. MonitorContextNum
@@ -389,7 +389,7 @@ end
 -- Callback is a function which is passed the peer device number and any captures from
 --   the main regex. The capture array is nil if a timeout occurred.
 --   Callback can also be a string as a function name in which case the callback will be executed
---     by the "first peer" device which actually dispatches most Z-Wave commands
+--     by the installer device which actually dispatches most Z-Wave commands
 --   Unlike EnqueueZWaveMessageWithResponse, Callback must not be nil.
 -- Oneshot is true if the intercept should be canceled as soon as it matches.
 --   If OneShot is false and arm_regex is not nil, then the intercept is disarmed when it triggers.
@@ -429,9 +429,14 @@ end
 -- Remove the current job from the Z-Wave queue.
 -- Return true if there are more jobs in the queue
 local function RemoveHeadFromZWaveQueue(job)
+	VEntry()
 	local queue = ZWaveQueueNext
 	if job then
 	   queue = ZWaveQueue[job.node_id]
+		if not queue then
+			ELog("Job not in queue:", ZWaveQueue)
+			return false
+		end
 	end
 	if not queue then
 		return false
@@ -461,6 +466,7 @@ local function RemoveNodeFromZWaveQueue(job)
 	if job.node_id == 0 then
 		return RemoveHeadFromZWaveQueue(job)
 	end
+	local result = true
 	local queue = ZWaveQueueNext
 	if job then
 	   queue = ZWaveQueue[job.node_id]
@@ -472,7 +478,7 @@ local function RemoveNodeFromZWaveQueue(job)
 	ZWaveQueueNodes = ZWaveQueueNodes - 1
 	if queue.next == queue then
 		ZWaveQueueNext = nil
-		return false
+		result = false
 	else
 		queue.next.prev = queue.prev
 		queue.prev.next = queue.next
@@ -480,7 +486,18 @@ local function RemoveNodeFromZWaveQueue(job)
 			ZWaveQueueNext = queue.next
 		end
 	end
-	return true;
+	while #queue > 0 do
+		local j2 = table.remove(queue, 1)
+		if j2 ~= job and j2.responseDevice and j2.responseDevice > 0 and j2.timeout and j2.timeout > 0 then
+			VLog("RemoveNodeFromZWaveQueue: sending fake timeout for job which was never started due to previously failed job:", j2)
+			while not take_global_lock() do
+				luup.sleep(100)	 -- Will this work and not cause LuaUPnP crashes? Using luup.call_delay here is difficult
+			end
+			luup.call_action(SID_ZWAVEMONITOR, "Timeout", {key=j2.context}, j2.responseDevice)
+			give_global_lock()
+		end
+	end
+	return result;
 end
 
 function SceneController_InitWakeupMonitor(device, settings)
@@ -849,9 +866,11 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 		elseif j.type == 1 then
 		  	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") type=ZWave, Node=Device name=", j.name, ": ", SID_ZWN, " SendData ", {Node = j.node_id, Data = j.data}, " ", ZWaveNetworkDeviceId);
 		  	j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(SID_ZWN, "SendData", {Node = j.node_id, Data = j.data}, ZWaveNetworkDeviceId)
-		else
+		elseif j.type == 2 then
 			VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") type=LuaAction: name=", j.name)
 			j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(j.service, j.action, j.arguments, j.device)
+		else
+			ELog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Invalid job type: ", j)
 		end
 
 		give_global_lock()
@@ -1056,23 +1075,27 @@ function SceneController_JobWatchCallBack(lul_job)
 	if j.type == 0 then
 		expectedJobType = "ZWJob_GenericSendFrame"
 		expectedName = "send_code"
-	else
+	elseif j.type == 1 then
 		expectedJobType = "ZWJob_SendData"
 		expectedName = "childcmd node "..j.node_id
+	elseif j.type == 2 then
+		expectedJobType = j.name
 	end
 	if lul_job.type ~= expectedJobType then
 		VLog("SceneController_JobWatchCallBack: Job type expected ", expectedJobType, " but got ", lul_job.type)
 		HandleOtherJob(lul_job)
 		return
 	end
-	if lul_job.name ~= expectedName then
-		VLog("SceneController_JobWatchCallBack: Expected ", expectedName, " but got ", lul_job.name)
-		HandleOtherJob(lul_job)
-		return
-	end
-	if lul_job.status < 2 or lul_job.status > 4 then
-		VLog("SceneController_JobWatchCallBack: status is still ", lul_job.status, ". notes:", lul_job.notes)
-		return
+	if j.type ~= 2 then
+		if lul_job.name ~= expectedName then
+			VLog("SceneController_JobWatchCallBack: Expected ", expectedName, " but got ", lul_job.name)
+			HandleOtherJob(lul_job)
+			return
+		end
+		if lul_job.status < 2 or lul_job.status > 4 then
+			VLog("SceneController_JobWatchCallBack: status is still ", lul_job.status, ". notes:", lul_job.notes)
+			return
+		end
 	end
 	ActiveZWaveJob = nil
 	if lul_job.status == 2 then -- error
@@ -1098,8 +1121,8 @@ function SceneController_JobWatchCallBack(lul_job)
 		RunInternalZWaveQueue("Battery wait", 0)
 		return
 	end
-	if lul_job.status ~= 4 then
-		ELog("SceneController_JobWatchCallBack: Job ",j.name," for ",j.description," failed. Give up and to next node. Final status was ", lul_job.status, " notes:", lul_job.notes)
+	if lul_job.status ~= 4 and j.type ~= 2 then
+		ELog("SceneController_JobWatchCallBack: Job ",j.name," for ",j.description," failed. Give up and go to next node. Final status was ", lul_job.status, " notes:", lul_job.notes)
 		if RemoveNodeFromZWaveQueue(j) then
 			RunInternalZWaveQueue("Failed_Job", 0)
 		end
@@ -1152,14 +1175,16 @@ function SceneController_ZWaveMonitorResponse(device, response, is_intercept, is
 				end
 			end
 		else
-			-- A non-first-peer receives the response message first but then relays it
-			-- to the first peer so that it can clear the WaitingForResponse flag
-			-- and allow more messages to be sent for that device.
-			while not take_global_lock() do
-				luup.sleep(100)	 -- Will this work and not cause LuaUPnP crashes? Using luup.call_delay here is difficult
+			if response.time then -- The Fake timeout is passed from installer to device and does not have the time keyword.
+				-- A device receives the response message first but then relays it
+				-- to the installer so that it can clear the WaitingForResponse flag
+				-- and allow more messages to be sent for that device.
+				while not take_global_lock() do
+					luup.sleep(100)	 -- Will this work and not cause LuaUPnP crashes? Using luup.call_delay here is difficult
+				end
+		  		luup.call_action(SID_ZWAVEMONITOR, response.action, response, GetFirstInstaller())
+				give_global_lock()
 			end
-	  		luup.call_action(SID_ZWAVEMONITOR, response.action, response, GetFirstInstaller())
-			give_global_lock()
 		end
 	end
 	if callback then
