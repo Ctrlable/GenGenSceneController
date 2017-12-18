@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller shared code Version 1.10
+-- GenGeneric Scene Controller shared code Version 1.11
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -249,6 +249,7 @@ local ActiveZWaveJob = nil
 local ZWaveQueueNext = nil
 local ZWaveQueueNodes = 0
 local TaskHandleList = {}
+local OtherJobPending = false
 
 MonitorContextNum = 0
 MonitorContextList = {}
@@ -682,6 +683,10 @@ end
 
 function SceneController_RunInternalZWaveQueue(fromWhere)
 	VEntry("SceneController_RunInternalZWaveQueue")
+	if OtherJobPending then
+      VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") An outside job is still active")
+	  return
+	end
   	if not ZWaveQueueNext then
       VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") queue is empty")
 	  return
@@ -852,15 +857,34 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 	end
 end
 
+-- We need to monitor other jobs that are not aurs in order to avoid the dreaded cannot get lock crash
+-- We either wait indefinitely or wait for a given timeout depending on the job status
+local function HandleOtherJob(lul_job)
+	VEntry("HandleOtherJob")
+	local status = lul_job.status
+	if status == 1 or status >= 5 then
+		OtherJobPending = true;
+	else
+		local wasPending = OtherJobPending
+		OtherJobPending = false;
+		if wasPending and ZWaveQueueNext then
+			RunInternalZWaveQueue("Other job finished", 100)
+		end
+	end 
+end
+
+-- This is the job watch callback which monitors all jobs whether or not they belong to us.
 function SceneController_JobWatchCallBack(lul_job)
 	VEntry("SceneController_JobWatchCallBack")
 	if not ZWaveQueueNext then
 		VLog("SceneController_JobWatchCallBack: ZWaveQueue is empty.");
+		HandleOtherJob(lul_job)
 		return
 	end
 	local j = ActiveZWaveJob
 	if not j then
 		VLog("SceneController_JobWatchCallBack: No Active Z-Wave job.");
+		HandleOtherJob(lul_job)
 		return
 	end
 	local expectedJobType, expectedName
@@ -873,10 +897,12 @@ function SceneController_JobWatchCallBack(lul_job)
 	end
 	if lul_job.type ~= expectedJobType then
 		VLog("SceneController_JobWatchCallBack: Job type expected ", expectedJobType, " but got ", lul_job.type)
+		HandleOtherJob(lul_job)
 		return
 	end
 	if lul_job.name ~= expectedName then
 		VLog("SceneController_JobWatchCallBack: Expected ", expectedName, " but got ", lul_job.name)
+		HandleOtherJob(lul_job)
 		return
 	end
 	if lul_job.status < 2 or lul_job.status > 4 then

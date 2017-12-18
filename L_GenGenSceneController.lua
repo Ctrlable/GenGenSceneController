@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller Version 1.10.1
+-- GenGeneric Scene Controller Version 1.11
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -1470,7 +1470,7 @@ COMMAND_CLASS_THERMOSTAT_FAN_MODE -----------------------------+   ¦   ¦    ¦
 						 "ThermostatFanMode")
 
 	end
-	RunZWaveQueue("Init", 0)
+	RunZWaveQueue("Init")
 	return true, "ok", SCObj.Name
 end
 
@@ -1488,7 +1488,7 @@ function SceneController_InitScreen(peer_dev_num_string)
 		log("SceneController_InitScreen starting for peer device ", peer_dev_num, " currentScreen=", currentScreen);
 		-- doTimeOut, Force, not IndicatorOnly
 		SetScreen(peer_dev_num, currentScreen, true, true, false);
-		RunZWaveQueue("InitScreen", 0);
+		RunZWaveQueue("InitScreen");
 	end
 end
 
@@ -1658,6 +1658,8 @@ function ConnectPeerDevice(peer_dev_num)
 			end
 			if IsVeraPrimaryController() then
               VariableWatch("SceneController_ConfiguredChanged",SID_HADEVICE,"Configured",zwave_dev_num,"")
+			  VariableWatch("SceneController_CommFailureChanged",SID_HADEVICE,"CommFailure",zwave_dev_num,"")
+			  PropagateCommFailure(zwave_dev_num, peer_dev_num)
 			end
 			-- Rename the Z-Wave device to match the peer device
 			local zwave_name = luup.attr_get("name",zwave_dev_num);
@@ -1775,7 +1777,7 @@ function SceneController_ScreenTimeout(data)
 			DLog("ScreenTimeout: peer_dev_num=", peer_dev_num, " sequenceNumber=", sequenceNumber, " timeoutScreen=", timeoutScreen);
 			-- DoTimeout, not force, not indicatorOnly
 			SetScreen(peer_dev_num, timeoutScreen, true, false, false);
-			RunZWaveQueue("ScreenTimeout", 0)
+			RunZWaveQueue("ScreenTimeout")
 		else
 			DLog("ScreenTimeout: Ignore stale ScreenTimeout(", data, ") Current timeoutSequenceNumber=", timeoutSequenceNumber);
 		end
@@ -1792,7 +1794,7 @@ function SceneController_SetScreenTimeout(peer_dev_num, screen, timeoutEnable, t
 		local currentScreen = luup.variable_get(SID_SCENECONTROLLER, CURRENT_SCREEN, peer_dev_num)
 		if currentScreen == screen then
 			SetScreenTimeout(peer_dev_num, screen, true)
-			RunZWaveQueue("SetScreenTimeout", 0);
+			RunZWaveQueue("SetScreenTimeout");
 		end
 	end
 end
@@ -1843,7 +1845,7 @@ function SceneController_SetNumLines(peer_dev_num, screen, lines)
 		if currentScreen == screen and oldLines ~= lines then
 			-- doTimeout, force, not indicatorOnly
 			SetScreen(peer_dev_num, currentScreen, true, true, false);
-			RunZWaveQueue("SetNumLines", 0);
+			RunZWaveQueue("SetNumLines");
 		end
 	end
 end
@@ -2121,7 +2123,7 @@ function SetIndicator(peer_dev_num, screen, force, delay)
 							VariableWatch("SceneController_WatchedIndicatorDeviceChanged", service, variable, device, context)
 						end
 					end
-					if num_on > num_off and num_on > 0 then
+					if num_on >= num_off and num_on > 0 then
 						highlighted = true
 					end
 				    DLog("  button=", physicalButton, " mode=", modeStr, " num_on=", num_on, " num_off=", num_off, " highlighted=", highlighted)
@@ -2174,7 +2176,7 @@ function SceneController_WatchedIndicatorDeviceChanged(device, service, variable
 		if not SCObj.HasScreen or curScreen == screen then
 			SetIndicator(peer_dev_num, screen, false, 100)
 		end
-		RunZWaveQueue("WatchedIndicatorDeviceChanged", 250) -- 250ms delay to avoid a "cannot get lock" crash as job is in progress
+		RunZWaveQueue("WatchedIndicatorDeviceChanged")
 	end
 end
 
@@ -2912,7 +2914,7 @@ function SceneController_UpdateCustomLabel(peer_dev_num, screen, virtualButton, 
 		    -- not dotimeout, no force, not indicatorOnly
 			SetScreen(peer_dev_num,screen,false,false,false);
 		end
-		RunZWaveQueue("UpdateCustomLabel", 0);
+		RunZWaveQueue("UpdateCustomLabel");
 	end
 end
 
@@ -3105,7 +3107,7 @@ function SceneController_SetPresetLanguage(peer_dev_num, language)
 	if SCObj.HasPresetLanguages and IsVeraPrimaryController() then
 	   	luup.variable_set(SID_SCENECONTROLLER, PRESET_LANGUAGE, language, peer_dev_num)
 		SCObj.SetLanguage(peer_dev_num, language)
-		RunZWaveQueue("SetPresetLanguage", 0);
+		RunZWaveQueue("SetPresetLanguage");
 	end
 end
 
@@ -3240,7 +3242,7 @@ function SceneController_UpdateTemperatureDevice(peer_dev_num, screen, temperatu
 				SetTemperatureLCDParameters(peer_dev_num, temperatureDevice);
 			end
 		end
-		RunZWaveQueue("UpdateTemperatureDevice", 0);
+		RunZWaveQueue("UpdateTemperatureDevice");
 	end
 end
 
@@ -3258,7 +3260,7 @@ function SceneController_TemperatureDeviceChanged(temperatureDevice, service, va
 	end
 	local screenNum = tonumber(screen:sub(2))
 	SetTemperatureScreen(peer_dev_num, screenNum, nil, false, false)
-	RunZWaveQueue("TemperatureDeviceChanged", 0)
+	RunZWaveQueue("TemperatureDeviceChanged")
 end
 
 function TemperatureDeviceIsSettable(temperatureDevice)
@@ -3405,7 +3407,7 @@ function SceneController_SetScreen(peer_dev_num, screen, doTimeout, forceClear, 
 	DEntry()
 	if IsVeraPrimaryController() then
 		SetScreen(peer_dev_num, screen, doTimeout, forceClear, indicatorOnly)
-		RunZWaveQueue("SetScreen", 0);
+		RunZWaveQueue("SetScreen");
 	end
 end
 
@@ -3420,7 +3422,7 @@ function SceneController_SetBacklight(peer_dev_num, timeout)
 			SCObj.SetBacklight(peer_dev_num, true)
 		end
 		luup.call_delay("SceneController_BacklightTimeout", timeout, peer_dev_num, true);
-		RunZWaveQueue("SetBacklight", 0);
+		RunZWaveQueue("SetBacklight");
 	end
 end
 
@@ -3431,7 +3433,26 @@ function SceneController_BacklightTimeout(peer_dev_num_string)
 			local peer_dev_num = tonumber(peer_dev_num_string)
 			SCObj.SetBacklight(peer_dev_num, false)
 		end
-		RunZWaveQueue("BacklightTimeout", 0);
+		RunZWaveQueue("BacklightTimeout");
+	end
+end
+
+-- commfailure flags change on the Z-Wave device, copy it to the peer device
+function SceneController_CommFailureChanged(lul_device, lul_service, lul_variable, lul_value_old, lul_value_new, context)
+	DEntry()
+	local zwave_dev_num = tonumber(lul_device);
+  	local peer_dev_num = GetPeerDevNum(luup.device)
+	PropagateCommFailure(zwave_dev_num, peer_dev_num)
+end
+
+function PropagateCommFailure(zwave_dev_num, peer_dev_num)
+	DEntry()
+	for index, keyword in ipairs {"CommFailure", "CommFailureTime", "CommFailureAlarm"} do
+		local zValue = luup.variable_get(SID_HADEVICE, keyword, zwave_dev_num)
+		local pValue = luup.variable_get(SID_HADEVICE, keyword, peer_dev_num)
+		if zValue ~= pValue then
+			luup.variable_set(SID_HADEVICE, keyword, zValue, peer_dev_num)
+		end
 	end
 end
 
@@ -3479,7 +3500,7 @@ function SceneController_ConfiguredChanged(lul_device, lul_service, lul_variable
     		TempVariableUnwatch(lul_service, lul_variable, lul_device) 
 	  		luup.variable_set(lul_service, lul_variable, 1, lul_device)
 		end
-		RunZWaveQueue("ConfiguredChanged", 0);
+		RunZWaveQueue("ConfiguredChanged");
 	end
 end
 

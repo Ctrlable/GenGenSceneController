@@ -1,4 +1,4 @@
--- Installer for GenGeneric Scene Controller Version 1.10
+-- Installer for GenGeneric Scene Controller Version 1.11
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 --
 -- Includes installation files for
@@ -194,9 +194,10 @@ end
 ScannedDeviceList = {}
 
 function ScanForNewDevices()
+	DEntry()
 
 	local function AdoptEvolveLCD1(device_num)
-		log("Found a new Evolve LCD1 controller. Device: ", device_num)
+		DEntry()
 		luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1", device_num)
 		luup.attr_set("device_file", "D_EvolveLCD1.xml", device_num)
 		luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
@@ -224,7 +225,7 @@ function ScanForNewDevices()
 	end
 
 	local function AdoptCooperRFWC5(device_num)
-		log("Found a new Cooper RFWC5 controller. Device: ", device_num)
+		DEntry()
 		luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1", device_num)
 		luup.attr_set("device_file", "D_CooperRFWC5.xml", device_num)
 		luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
@@ -241,7 +242,7 @@ function ScanForNewDevices()
 	end
 
 	local function AdoptNexiaOneTouch(device_num)
-		log("Found a new Nexia One Touch controller. Device num: ", device_num)
+		DEntry()
 		luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1", device_num)
 		luup.attr_set("device_file", "D_NexiaOneTouch.xml", device_num)
 		luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
@@ -272,10 +273,21 @@ function ScanForNewDevices()
 	end
 
 	-- This is a hack for UI7 1.7.2608 getting confused by inconsistent node info reports from the Kichler 12387 undercabinet light controller.
+	-- Vera also does not like devices that don't support COMMAND_CLASS_VERSION so we add it to the command class list and intercept the expected
+	-- version and command class version queries.
 	local function ApplyKichler12387Hack(device_num, node_id)
+		DEntry()
 
-		local function Kichler12387Callback(peer_dev_num, result)
-			log("Kichler 12387 node info intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
+		local function Kichler12387NodeInfoCallback(peer_dev_num, result)
+			DLog("Kichler 12387 node info intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
+		end
+
+		local function Kichler12387VersionCallback(peer_dev_num, result)
+			DLog("Kichler 12387 Version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
+		end
+
+		local function Kichler12387CommandClassVersionCallback(peer_dev_num, result)
+			DLog("Kichler 12387 Version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
 		end
 
 		MonitorZWaveData(true, -- outgoing,
@@ -302,32 +314,158 @@ Node: 96 Device 204=UD17F Breakfast undercabinet lights +    ¦
 42      04/02/17 23:01:39.700   got expected ACK 
 41      04/02/17 23:01:39.700   ACK: 0x6 (#) 
 
-42      04/02/17 23:01:39.737     0x1 0xc 0x0 0x49 0x84 0x60 0x6 0x2 0x11 0x0 0x72 0x85 0x26 0x99 (###I#`####r#&#) 
-             SOF - Start Of Frame --+   ¦   ¦    ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦
-                      length = 12 ------+   ¦    ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦
-                          Request ----------+    ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦
-    FUNC_ID_ZW_APPLICATION_UPDATE ---------------+    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦
-Update state = Node Info received --------------------+    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦
-Node ID: 96 Device 204=UD17F Breakfast undercabinet lights +   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦
-             Node info length = 6 -----------------------------+   ¦    ¦   ¦    ¦    ¦    ¦    ¦
-   Basic type = Static Controller ---------------------------------+    ¦   ¦    ¦    ¦    ¦    ¦
- Generic type = switch multilevel --------------------------------------+   ¦    ¦    ¦    ¦    ¦
-         Specific type = Not used ------------------------------------------+    ¦    ¦    ¦    ¦
-Can receive command class[1] = COMMAND_CLASS_MANUFACTURER_SPECIFIC --------------+    ¦    ¦    ¦
-Can receive command class[2] = COMMAND_CLASS_ASSOCIATION -----------------------------+    ¦    ¦
-Can receive command class[3] = COMMAND_CLASS_SWITCH_MULTILEVEL ----------------------------+    ¦
-                      Checksum OK --------------------------------------------------------------+
+42      04/02/17 23:01:39.737     0x1 0xc 0x0 0x49 0x84 0x60 0x7 0x2 0x11 0x0 0x72 0x85 0x26 0x86 0x99 (###I#`####r#&#) 
+             SOF - Start Of Frame --+   ¦   ¦    ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦
+                      length = 12 ------+   ¦    ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦
+                          Request ----------+    ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦
+    FUNC_ID_ZW_APPLICATION_UPDATE ---------------+    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦
+Update state = Node Info received --------------------+    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦
+Node ID: 96 Device 204=UD17F Breakfast undercabinet lights +   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦
+             Node info length = 6 -----------------------------+   ¦    ¦   ¦    ¦    ¦    ¦    ¦    ¦
+   Basic type = Static Controller ---------------------------------+    ¦   ¦    ¦    ¦    ¦    ¦    ¦
+ Generic type = switch multilevel --------------------------------------+   ¦    ¦    ¦    ¦    ¦    ¦
+         Specific type = Not used ------------------------------------------+    ¦    ¦    ¦    ¦    ¦
+Can receive command class[1] = COMMAND_CLASS_MANUFACTURER_SPECIFIC --------------+    ¦    ¦    ¦    ¦
+Can receive command class[2] = COMMAND_CLASS_ASSOCIATION -----------------------------+    ¦    ¦    ¦
+Can receive command class[3] = COMMAND_CLASS_SWITCH_MULTILEVEL ----------------------------+    ¦    ¦
+Can receive command class[3] = COMMAND_CLASS_VERSION (fake) ------------------------------------+    ¦   
+                      Checksum OK -------------------------------------------------------------------+
 --]==]
-		                 "06 01 04 01 60 01 XX 01 0C 00 49 84 " .. string.format("%02X", node_id) .. " 06 02 11 00 72 85 26 XX", -- Autoresponse,
-		                 Kichler12387Callback,
+		                 "06 01 04 01 60 01 XX 01 0C 00 49 84 " .. string.format("%02X", node_id) .. " 07 02 11 00 72 85 26 86 XX", -- Autoresponse,
+		                 Kichler12387NodeInfoCallback,
 		                 false, -- Not OneShot
 		                 0, -- no timeout
 						 "Kichler12387NodeInfo", -- label
 						 false) -- no forward
+
+		MonitorZWaveData(true, -- outgoing,
+						 luup.device, -- peer_dev_num
+		                 nil, -- No arm_regex
+--[==[
+41      07/17/17 7:52:58.995    0x1 0x9 0x0 0x13 0x40 0x2 0x86 0x11 0x25 0x5 0x10 (####@###%##) 
+           SOF - Start Of Frame --+   ¦   ¦    ¦    ¦   ¦    ¦    ¦    ¦   ¦    ¦
+                     length = 9 ------+   ¦    ¦    ¦   ¦    ¦    ¦    ¦   ¦    ¦
+                        Request ----------+    ¦    ¦   ¦    ¦    ¦    ¦   ¦    ¦
+           FUNC_ID_ZW_SEND_DATA ---------------+    ¦   ¦    ¦    ¦    ¦   ¦    ¦
+Device 175=SD17-2 Breakfast workspace light --------+   ¦    ¦    ¦    ¦   ¦    ¦
+                Data length = 2 ------------------------+    ¦    ¦    ¦   ¦    ¦
+          COMMAND_CLASS_VERSION -----------------------------+    ¦    ¦   ¦    ¦
+                    VERSION_GET ----------------------------------+    ¦   ¦    ¦
+Xmit options = ACK | AUTO_ROUTE | Reserved bits : 0x20 ----------------+   ¦    ¦
+                   Callback = 5 -------------------------------------------+    ¦
+                    Checksum OK ------------------------------------------------+
+--]==]
+		                 "^01 09 00 13 " .. string.format("%02X", node_id) .. " 02 86 11 .. (..)", -- Main RegEx
+
+--[==[
+42      07/17/17 7:52:59.027    0x6 0x1 0x4 0x1 0x13 0x1 0xe8 (#######) 
+              ACK - Acknowledge --+   ¦   ¦   ¦    ¦   ¦    ¦
+           SOF - Start Of Frame ------+   ¦   ¦    ¦   ¦    ¦
+                     length = 4 ----------+   ¦    ¦   ¦    ¦
+                       Response --------------+    ¦   ¦    ¦
+           FUNC_ID_ZW_SEND_DATA -------------------+   ¦    ¦
+                     RetVal: OK -----------------------+    ¦
+                    Checksum OK ----------------------------+
+42      07/17/17 23:51:36.201   0x1 0x5 0x0 0x13 0x05 0x0 0x9d (####t##) 
+           SOF - Start Of Frame --+   ¦   ¦    ¦    ¦   ¦    ¦
+                     length = 5 ------+   ¦    ¦    ¦   ¦    ¦
+                        Request ----------+    ¦    ¦   ¦    ¦
+           FUNC_ID_ZW_SEND_DATA ---------------+    ¦   ¦    ¦
+                   Callback = 5 --------------------+   ¦    ¦
+           TRANSMIT_COMPLETE_OK ------------------------+    ¦
+                    Checksum OK -----------------------------+
+41      07/17/17 23:51:36.201   ACK: 0x6 (#) 
+42      07/17/17 7:52:59.060    0x1 0xd 0x0 0x4 0x0 0x40 0x7 0x86 0x12 0x6 0x3 0x2a 0x5 0x29 0x26 (#\r###@#####*#)&) 
+           SOF - Start Of Frame --+   ¦   ¦   ¦   ¦    ¦   ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦
+                    length = 13 ------+   ¦   ¦   ¦    ¦   ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦
+                        Request ----------+   ¦   ¦    ¦   ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦
+FUNC_ID_APPLICATION_COMMAND_HANDLER ----------+   ¦    ¦   ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦
+          Receive Status SINGLE ------------------+    ¦   ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦
+Device 175=SD17-2 Breakfast workspace light -----------+   ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦
+                Data length = 7 ---------------------------+    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦
+          COMMAND_CLASS_VERSION --------------------------------+    ¦   ¦   ¦    ¦   ¦    ¦    ¦
+                 VERSION_REPORT -------------------------------------+   ¦   ¦    ¦   ¦    ¦    ¦
+Z-Wave Library Type = SLAVE_ROUTING -------------------------------------+   ¦    ¦   ¦    ¦    ¦
+Z-Wave Protocol Version = 3 -------------------------------------------------+    ¦   ¦    ¦    ¦
+Z-Wave Protocol Sub-Version = 42 -------------------------------------------------+   ¦    ¦    ¦
+        Application Version = 5 ------------------------------------------------------+    ¦    ¦
+   Application Sub-Version = 41 -----------------------------------------------------------+    ¦
+                    Checksum OK ----------------------------------------------------------------+
+41      07/17/17 7:52:59.061    ACK: 0x6 (#) 
+--]==]
+		                 "06 01 04 01 13 01 XX 01 04 00 13 \\1 00 XX 01 0D 00 04 00 " .. string.format("%02X", node_id) .. " 07 86 12 06 03 2A 99 99 XX", -- Autoresponse,
+		                 Kichler12387VersionCallback,
+		                 false, -- Not OneShot
+		                 0, -- no timeout
+						 "Kichler12387Version", -- label
+						 false) -- no forward
+
+		MonitorZWaveData(true, -- outgoing,
+						 luup.device, -- peer_dev_num
+		                 nil, -- No arm_regex
+--[==[
+41      07/17/17 7:52:59.260    0x1 0xa 0x0 0x13 0x40 0x3 0x86 0x13 0x26 0x5 0x6 0x15 (#\n##@###&###) 
+           SOF - Start Of Frame --+   ¦   ¦    ¦    ¦   ¦    ¦    ¦    ¦   ¦   ¦    ¦
+                    length = 10 ------+   ¦    ¦    ¦   ¦    ¦    ¦    ¦   ¦   ¦    ¦
+                        Request ----------+    ¦    ¦   ¦    ¦    ¦    ¦   ¦   ¦    ¦
+           FUNC_ID_ZW_SEND_DATA ---------------+    ¦   ¦    ¦    ¦    ¦   ¦   ¦    ¦
+Device 175=SD17-2 Breakfast workspace light --------+   ¦    ¦    ¦    ¦   ¦   ¦    ¦
+                Data length = 3 ------------------------+    ¦    ¦    ¦   ¦   ¦    ¦
+          COMMAND_CLASS_VERSION -----------------------------+    ¦    ¦   ¦   ¦    ¦
+      VERSION_COMMAND_CLASS_GET ----------------------------------+    ¦   ¦   ¦    ¦
+Requested Command Class = COMMAND_CLASS_SWITCH_MULTILEVEL -------------+   ¦   ¦    ¦
+Xmit options = ACK | AUTO_ROUTE -------------------------------------------+   ¦    ¦
+                   Callback = 6 -----------------------------------------------+    ¦
+                    Checksum OK ----------------------------------------------------+
+--]==]
+		                 "^01 0A 00 13 " .. string.format("%02X", node_id) .. " 03 86 13 (..) .. (..) ..", -- Main RegEx
+--[==[
+
+42      07/17/17 7:52:59.306    0x6 0x1 0x4 0x1 0x13 0x1 0xe8 (#######) 
+              ACK - Acknowledge --+   ¦   ¦   ¦    ¦   ¦    ¦
+           SOF - Start Of Frame ------+   ¦   ¦    ¦   ¦    ¦
+                     length = 4 ----------+   ¦    ¦   ¦    ¦
+                       Response --------------+    ¦   ¦    ¦
+           FUNC_ID_ZW_SEND_DATA -------------------+   ¦    ¦
+                     RetVal: OK -----------------------+    ¦
+                    Checksum OK ----------------------------+
+41      07/17/17 7:52:59.307    ACK: 0x6 (#) 
+42      07/17/17 23:51:36.660   0x1 0x5 0x0 0x13 0x06 0x0 0x9c (####u##) 
+           SOF - Start Of Frame --+   ¦   ¦    ¦    ¦   ¦    ¦
+                     length = 5 ------+   ¦    ¦    ¦   ¦    ¦
+                        Request ----------+    ¦    ¦   ¦    ¦
+           FUNC_ID_ZW_SEND_DATA ---------------+    ¦   ¦    ¦
+                   Callback = 6 --------------------+   ¦    ¦
+           TRANSMIT_COMPLETE_OK ------------------------+    ¦
+                    Checksum OK -----------------------------+
+41      07/17/17 23:51:36.660   ACK: 0x6 (#) 42      
+        07/17/17 7:52:59.339    0x1 0xa 0x0 0x4 0x0 0x40 0x4 0x86 0x14 0x26 0x1 0x0 (#\n###@###&##) 
+           SOF - Start Of Frame --+   ¦   ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦   ¦   ¦
+                    length = 10 ------+   ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦   ¦   ¦
+                        Request ----------+   ¦   ¦    ¦   ¦    ¦    ¦    ¦   ¦   ¦
+FUNC_ID_APPLICATION_COMMAND_HANDLER ----------+   ¦    ¦   ¦    ¦    ¦    ¦   ¦   ¦
+          Receive Status SINGLE ------------------+    ¦   ¦    ¦    ¦    ¦   ¦   ¦
+Device 175=SD17-2 Breakfast workspace light -----------+   ¦    ¦    ¦    ¦   ¦   ¦
+                Data length = 4 ---------------------------+    ¦    ¦    ¦   ¦   ¦
+          COMMAND_CLASS_VERSION --------------------------------+    ¦    ¦   ¦   ¦
+   VERSION_COMMAND_CLASS_REPORT -------------------------------------+    ¦   ¦   ¦
+Requested Command Class = COMMAND_CLASS_SWITCH_MULTILEVEL ----------------+   ¦   ¦
+      Command CLass Version = 1 ----------------------------------------------+   ¦
+                    Checksum OK --------------------------------------------------+
+41      07/17/17 7:52:59.340    ACK: 0x6 (#) 
+--]==]
+		                 "06 01 04 01 13 01 XX 01 05 00 13 \\2 00 XX 01 0A 00 04 00 " .. string.format("%02X", node_id) .. " 04 86 14 \\1 01 XX", -- Autoresponse,
+		                 Kichler12387CommandClassVersionCallback,
+		                 false, -- Not OneShot
+		                 0, -- no timeout
+						 "Kichler12387CommandClassVersion", -- label
+						 false) -- no forward
+
 	end
 
 	-- This is a hack for UI7 1.7.2608 mishandling of the Shlage BE469 lock. It is incorrectly sending a Command Cleass Version, Version Command Class Get in non-secure mode.
 	local function ApplySchageLockHack(device_num, node_id)
+		DEntry()
 
 		local function ShlageLockVersionCallback(peer_dev_num, result)
 			log("Shlage lock version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
@@ -416,6 +554,7 @@ Requested Command Class = COMMAND_CLASS_ALARM ---------------------------+    ¦ 
 			luup.devices[device.device_num_parent].device_type == "urn:schemas-micasaverde-com:device:ZWaveNetwork:1" then
 	  		local manufacturer_info = luup.variable_get("urn:micasaverde-com:serviceId:ZWaveDevice1", "ManufacturerInfo", device_num)
 			local capabilities = luup.variable_get("urn:micasaverde-com:serviceId:ZWaveDevice1", "Capabilities", device_num)
+			DLog("device_num=",device_num," name=",device.description," manufacturer_info=",manufacturer_info," capabilities=",capabilities);
 		  	if manufacturer_info == "275,17750,19506" then
 	        	if device.device_type ~= 'urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1' then
 					AdoptEvolveLCD1(device_num)
@@ -431,7 +570,7 @@ Requested Command Class = COMMAND_CLASS_ALARM ---------------------------+    ¦ 
 					AdoptNexiaOneTouch(device_num)
 					reload_needed = true
 	  			end
-			elseif manufacturer_info == "59,25409,20548" then
+			elseif manufacturer_info == "59,25409,20548" or capabilities == "83,220,0,4,64,3,R,B,RS,W1,|32S,34,93S,98S,99S,112S,113S,114,122,128S,133S,134,152," then
 				ApplySchageLockHack(device_num, device.id)
 			elseif capabilities == "146,150,0,2,17,0,L,B,|38,114,133," then
 				ApplyKichler12387Hack(device_num, device.id)
@@ -440,6 +579,8 @@ Requested Command Class = COMMAND_CLASS_ALARM ---------------------------+    ¦ 
 	end	-- for device_num
 
 	local function NexiaManufacturerCallback(peer_dev_num, result)
+		DEntry()
+
 		local time = tonumber(result.time)
 		local receiveStatus = tonumber(result.C1, 16)
 		local node_id = tonumber(result.C2, 16)
@@ -530,6 +671,7 @@ end
 -- is more than one installer device of the same version, whether or not
 -- this is the lowest device number
 function IsFirstAndLatestInstallerVersion(our_dev_num, our_version)
+	DEntry()
 	local version = 0;
 	local count = 0;
 	local our_index = 0;
@@ -563,6 +705,7 @@ function IsFirstAndLatestInstallerVersion(our_dev_num, our_version)
 end
 
 function DeleteOldInstallers(our_dev_num)
+	DEntry()
 	for dev_num, v in pairs(luup.devices) do
 		if dev_num ~= our_dev_num and
 		   (v.device_type == "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD1Installer:1" or
