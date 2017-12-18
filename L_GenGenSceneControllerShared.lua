@@ -1,8 +1,10 @@
--- GenGeneric Scene Controller shared code Version 1.09
+-- GenGeneric Scene Controller shared code Version 1.10
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
 bit = require "bit"
+nixio = require "nixio"
+nixFs = require "nixio.fs"
 
 --
 -- Debugging functions
@@ -209,6 +211,26 @@ function tableToString(tab, hash)
    hash[tab] = nil
    return s
 end
+
+--
+-- Global lock
+--
+local global_lock_name = "/tmp/gengen_lock"
+local global_lock_flags = nixio.open_flags("creat", "excl")
+function take_global_lock()
+	local lockFile = nixio.open(global_lock_name, global_lock_flags, 666)
+	if lockFile then
+		lockFile:close()
+		return true
+	end
+	DLog("Waiting for global lock")
+	return false
+end
+
+function give_global_lock()
+    nixFs.unlink(global_lock_name)	
+end
+
 
 --
 -- Z-Wave Queue and job handling
@@ -724,6 +746,11 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 	until candidate == ZWaveQueueNext
 
 	if bestCandidate then
+		if not take_global_lock() then
+			RunInternalZWaveQueue(fromWhere .. " spinlock", 1000)
+            return
+		end
+
 		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") running next job: ",  candidate[1])
 	    ZWaveQueueNext = bestCandidate
 	    -- At this pont, we know we have something to do.
@@ -780,8 +807,12 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 			j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(j.service, j.action, j.arguments, j.device)
 		end
 
+
 	    -- Check for an immediate failure and retry in 5 seconds if so.
 		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") call_action returned err_num=", j.err_num, " err_msg=", j.err_msg, " job_num=", j.job_num, " arguments=", j.arguments)
+
+		give_global_lock()
+
 		if j.err_num ~= 0 or j.job_num == 0 then
 		    log("SceneController_RunInternalZWaveQueue(", fromWhere, "): call_action failed, retrying in 5 seconds. ", j);
 			ActiveZWaveJob = nil
@@ -931,7 +962,11 @@ function SceneController_ZWaveMonitorResponse(device, response, is_intercept, is
 			-- A non-first-peer receives the response message first but then relays it
 			-- to the first peer so that it can clear the WaitingForResponse flag
 			-- and allow more messages to be sent for that device.
+			while not take_global_lock() do
+				luup.sleep(100)	 -- Will this work and not cause LuaUPnP crashes? Using luup.call_delay here is difficult
+			end
 	  		luup.call_action(SID_ZWAVEMONITOR, response.action, response, GetFirstInstaller())
+			give_global_lock()
 		end
 	end
 	if callback then
@@ -1002,8 +1037,14 @@ function SceneController_RunExternalZWaveQueue(fromWhere)
 			data["E"..i] = tableToString(v);
 		end
 		data.NumEntries = #ExternalZWaveQueue
+		if not take_global_lock() then
+			luup.call_delay("SceneController_RunExternalZWaveQueue", 1, fromWhere.." spinLock2", true)
+			return
+		end
+
 		ExternalZWaveQueue = {}
 	  	luup.call_action(GENGENINSTALLER_SID, "RunZWaveQueue", data, GetFirstInstaller())
+		give_global_lock()
 	end
 end
 

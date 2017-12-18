@@ -1,4 +1,4 @@
--- Installer for GenGeneric Scene Controller Version 1.09
+-- Installer for GenGeneric Scene Controller Version 1.10
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 --
 -- Includes installation files for
@@ -271,6 +271,131 @@ function ScanForNewDevices()
 		luup.variable_set("urn:micasaverde-com:serviceId:ZWaveDevice1", "Documentation", "http://products.z-wavealliance.org/products/1344", device_num)
 	end
 
+	-- This is a hack for UI7 1.7.2608 getting confused by inconsistent node info reports from the Kichler 12387 undercabinet light controller.
+	local function ApplyKichler12387Hack(device_num, node_id)
+
+		local function Kichler12387Callback(peer_dev_num, result)
+			log("Kichler 12387 node info intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
+		end
+
+		MonitorZWaveData(true, -- outgoing,
+						 luup.device, -- peer_dev_num
+		                 nil, -- No arm_regex
+--[==[
+41      04/02/17 23:01:39.675       0x1 0x4 0x0 0x60 0x60 0xfb (###``#) 
+               SOF - Start Of Frame --+   ¦   ¦    ¦    ¦    ¦
+                         length = 4 ------+   ¦    ¦    ¦    ¦
+                            Request ----------+    ¦    ¦    ¦
+       FUNC_ID_ZW_REQUEST_NODE_INFO ---------------+    ¦    ¦
+Node: 96 Device 204=UD17F Breakfast undercabinet lights +    ¦
+                        Checksum OK -------------------------+--]==]
+		                 "^01 04 00 60 " .. string.format("%02X", node_id) .. " ..", -- Main RegEx
+--[==[
+42      04/02/17 23:01:39.700   0x6 0x1 0x4 0x1 0x60 0x1 0x9b (####`##) 
+              ACK - Acknowledge --+   ¦   ¦   ¦    ¦   ¦    ¦
+           SOF - Start Of Frame ------+   ¦   ¦    ¦   ¦    ¦
+                     length = 4 ----------+   ¦    ¦   ¦    ¦
+                       Response --------------+    ¦   ¦    ¦
+   FUNC_ID_ZW_REQUEST_NODE_INFO -------------------+   ¦    ¦
+               Result = Success -----------------------+    ¦
+                    Checksum OK ----------------------------+
+42      04/02/17 23:01:39.700   got expected ACK 
+41      04/02/17 23:01:39.700   ACK: 0x6 (#) 
+
+42      04/02/17 23:01:39.737     0x1 0xc 0x0 0x49 0x84 0x60 0x6 0x2 0x11 0x0 0x72 0x85 0x26 0x99 (###I#`####r#&#) 
+             SOF - Start Of Frame --+   ¦   ¦    ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦
+                      length = 12 ------+   ¦    ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦
+                          Request ----------+    ¦    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦
+    FUNC_ID_ZW_APPLICATION_UPDATE ---------------+    ¦    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦
+Update state = Node Info received --------------------+    ¦   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦
+Node ID: 96 Device 204=UD17F Breakfast undercabinet lights +   ¦   ¦    ¦   ¦    ¦    ¦    ¦    ¦
+             Node info length = 6 -----------------------------+   ¦    ¦   ¦    ¦    ¦    ¦    ¦
+   Basic type = Static Controller ---------------------------------+    ¦   ¦    ¦    ¦    ¦    ¦
+ Generic type = switch multilevel --------------------------------------+   ¦    ¦    ¦    ¦    ¦
+         Specific type = Not used ------------------------------------------+    ¦    ¦    ¦    ¦
+Can receive command class[1] = COMMAND_CLASS_MANUFACTURER_SPECIFIC --------------+    ¦    ¦    ¦
+Can receive command class[2] = COMMAND_CLASS_ASSOCIATION -----------------------------+    ¦    ¦
+Can receive command class[3] = COMMAND_CLASS_SWITCH_MULTILEVEL ----------------------------+    ¦
+                      Checksum OK --------------------------------------------------------------+
+--]==]
+		                 "06 01 04 01 60 01 XX 01 0C 00 49 84 " .. string.format("%02X", node_id) .. " 06 02 11 00 72 85 26 XX", -- Autoresponse,
+		                 Kichler12387Callback,
+		                 false, -- Not OneShot
+		                 0, -- no timeout
+						 "Kichler12387NodeInfo", -- label
+						 false) -- no forward
+	end
+
+	-- This is a hack for UI7 1.7.2608 mishandling of the Shlage BE469 lock. It is incorrectly sending a Command Cleass Version, Version Command Class Get in non-secure mode.
+	local function ApplySchageLockHack(device_num, node_id)
+
+		local function ShlageLockVersionCallback(peer_dev_num, result)
+			log("Shlage lock version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
+		end
+
+		MonitorZWaveData(true, -- outgoing,
+						 luup.device, -- peer_dev_num
+		                 nil, -- No arm_regex
+--[==[
+                                              C1                               C2
+41      04/02/17 15:21:37.647   0x1 0xa 0x0 0x13 0xba 0x3 0x86 0x13 0x71 0x5 0xc7 0x79 (#\n######q##y) 
+           SOF - Start Of Frame --+   ¦   ¦    ¦    ¦   ¦    ¦    ¦    ¦   ¦    ¦    ¦
+                    length = 10 ------+   ¦    ¦    ¦   ¦    ¦    ¦    ¦   ¦    ¦    ¦
+                        Request ----------+    ¦    ¦   ¦    ¦    ¦    ¦   ¦    ¦    ¦
+           FUNC_ID_ZW_SEND_DATA ---------------+    ¦   ¦    ¦    ¦    ¦   ¦    ¦    ¦
+     Device 548=Front Door Lock --------------------+   ¦    ¦    ¦    ¦   ¦    ¦    ¦
+                Data length = 3 ------------------------+    ¦    ¦    ¦   ¦    ¦    ¦
+          COMMAND_CLASS_VERSION -----------------------------+    ¦    ¦   ¦    ¦    ¦
+      VERSION_COMMAND_CLASS_GET ----------------------------------+    ¦   ¦    ¦    ¦
+Requested Command Class = COMMAND_CLASS_ALARM -------------------------+   ¦    ¦    ¦
+Xmit options = ACK | AUTO_ROUTE -------------------------------------------+    ¦    ¦
+                 Callback = 199 ------------------------------------------------+    ¦
+                    Checksum OK -----------------------------------------------------+
+--]==]
+		                 "^01 .. 00 (..) " .. string.format("%02X", node_id) .. " 03 86 13 71 .. (..) ..", -- Main RegEx
+--[==[
+42      04/02/17 15:21:37.331   0x6 0x1 0x4 0x1 0x13 0x1 0xe8 (#######) 
+              ACK - Acknowledge --+   ¦   ¦   ¦    ¦   ¦    ¦
+           SOF - Start Of Frame ------+   ¦   ¦    ¦   ¦    ¦
+                     length = 4 ----------+   ¦    ¦   ¦    ¦
+                       Response --------------+    ¦   ¦    ¦
+           FUNC_ID_ZW_SEND_DATA -------------------+   ¦    ¦
+                     RetVal: OK -----------------------+    ¦
+                    Checksum OK ----------------------------+
+42      04/02/17 15:21:37.331   got expected ACK 
+41      04/02/17 15:21:37.332   ACK: 0x6 (#) 
+
+42      04/02/17 15:21:37.409   0x1 0x5 0x0 0x13 0xc6 0x0 0x2f (######/) 
+           SOF - Start Of Frame --+   ¦   ¦    ¦    ¦   ¦    ¦
+                     length = 5 ------+   ¦    ¦    ¦   ¦    ¦
+                        Request ----------+    ¦    ¦   ¦    ¦
+           FUNC_ID_ZW_SEND_DATA ---------------+    ¦   ¦    ¦
+                 Callback = 198 --------------------+   ¦    ¦
+           TRANSMIT_COMPLETE_OK ------------------------+    ¦
+                    Checksum OK -----------------------------+
+41      04/02/17 15:21:37.410   ACK: 0x6 (#) 
+42      04/02/17 15:21:37.631   0x1 0xa 0x0 0x4 0x0 0xba 0x4 0x86 0x14 0x71 0x3 0xbd 
+           SOF - Start Of Frame --+   ¦   ¦   ¦   ¦    ¦   ¦    ¦    ¦   ¦    ¦    ¦
+                    length = 10 ------+   ¦   ¦   ¦    ¦   ¦    ¦    ¦   ¦    ¦    ¦
+                        Request ----------+   ¦   ¦    ¦   ¦    ¦    ¦   ¦    ¦    ¦
+FUNC_ID_APPLICATION_COMMAND_HANDLER ----------+   ¦    ¦   ¦    ¦    ¦   ¦    ¦    ¦
+          Receive Status SINGLE ------------------+    ¦   ¦    ¦    ¦   ¦    ¦    ¦
+     Device 548=Front Door Lock -----------------------+   ¦    ¦    ¦   ¦    ¦    ¦
+                Data length = 4 ---------------------------+    ¦    ¦   ¦    ¦    ¦
+          COMMAND_CLASS_VERSION --------------------------------+    ¦   ¦    ¦    ¦
+   VERSION_COMMAND_CLASS_REPORT -------------------------------------+   ¦    ¦    ¦
+Requested Command Class = COMMAND_CLASS_ALARM ---------------------------+    ¦    ¦
+                    Version = 3 ----------------------------------------------+    ¦
+                    Checksum OK ---------------------------------------------------+
+--]==]
+		                 "06 01 04 01 \\1 01 XX 01 05 00 \\1 \\2 00 XX 01 0A 00 04 00 " .. string.format("%02X", node_id) .. " 04 86 14 71 03 XX", -- Autoresponse,
+		                 ShlageLockVersionCallback,
+		                 false, -- Not OneShot
+		                 0, -- no timeout
+						 "ShlageLockVersion", -- label
+						 false) -- no forward
+	end
+
 	for device_num, device in pairs(luup.devices) do
 		if device.device_type == "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1" then
 			local impl = luup.attr_get("impl_file", device_num)  
@@ -290,6 +415,7 @@ function ScanForNewDevices()
 			luup.devices[device.device_num_parent] and
 			luup.devices[device.device_num_parent].device_type == "urn:schemas-micasaverde-com:device:ZWaveNetwork:1" then
 	  		local manufacturer_info = luup.variable_get("urn:micasaverde-com:serviceId:ZWaveDevice1", "ManufacturerInfo", device_num)
+			local capabilities = luup.variable_get("urn:micasaverde-com:serviceId:ZWaveDevice1", "Capabilities", device_num)
 		  	if manufacturer_info == "275,17750,19506" then
 	        	if device.device_type ~= 'urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1' then
 					AdoptEvolveLCD1(device_num)
@@ -305,6 +431,10 @@ function ScanForNewDevices()
 					AdoptNexiaOneTouch(device_num)
 					reload_needed = true
 	  			end
+			elseif manufacturer_info == "59,25409,20548" then
+				ApplySchageLockHack(device_num, device.id)
+			elseif capabilities == "146,150,0,2,17,0,L,B,|38,114,133," then
+				ApplyKichler12387Hack(device_num, device.id)
 			end
 		end
 	end	-- for device_num
@@ -450,8 +580,11 @@ end
 local nixio = require("nixio")
 
 function SceneControllerInstaller_Init(lul_device)
+  -- First, delete any stale global lock. Note that there may be a race condition
+  -- here if another device just took it but we will live with that.
+  give_global_lock()
 
-  -- First, make sure that we are the latest version of this installer
+  -- Now, make sure that we are the latest version of this installer
   -- And if there is more than one of us, that we are the lowest numbered device.
   -- Otherwise delete ourselves.
   if not IsFirstAndLatestInstallerVersion(lul_device, GenGenInstaller_Version) then

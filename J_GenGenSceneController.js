@@ -1,4 +1,4 @@
-// User interface for GenGeneric Scene Controller Version 1.09
+// User interface for GenGeneric Scene Controller Version 1.10
 // Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
