@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<implementation>
+  <files>L_GenGenSceneControllerInstaller.lua</files>
+  <startup>SceneControllerInstaller_Init</startup>
+</implementation>

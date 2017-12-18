@@ -1,0 +1,388 @@
+{
+	"flashicon": "icons/NexiaOneTouch_50x50.png",
+	"default_icon": "NexiaOneTouch_50x50.png",
+	"x": 3,
+	"y": 4,
+	"inScene": "1",
+	"DisplayStatus": {},
+	"doc_url": {
+		"doc_page": "NexiaOneTouch_doc"
+	},
+	"Tabs": [{
+		"Label": {
+			"lang_tag": "Select",
+			"text": "Select"
+		},
+		"Position": 0,
+		"TopNavigationTab": "1",
+		"TabType": "flash",
+		"top_navigation_tab": 1,
+		"ControlGroup": [{
+			"id": 1,
+			"scenegroup": 1
+		}, {
+			"id": 2,
+			"scenegroup": 2
+		}],
+        "AfterInit": {
+        	"ScriptName": "J_GenGenSceneController.js",
+            "Function": "GenGenSceneController.NexiaOneTouch_AfterInit"
+        } ,
+		"SceneGroup": [{
+			"id": 1,
+			"top": 0,
+			"left": 0,
+			"x": 3,
+			"y": 3
+		}, {
+			"id": 2,
+			"top": 2,
+			"left": 2,
+			"x": 1,
+			"y": 1
+		}],
+		"Control": [{
+			"ControlGroup": 1,
+			"ControlType": "button",
+			"ControlCode": "Custom_1",
+			"top": 0,
+			"left": 0,
+			"Label": {
+				"lang_tag": "Custom_1",
+				"text": "Custom 1"
+			},
+			"Display": {
+				"Value": "C1",
+				"Top": 50,
+				"Left": 50,
+				"Width": 75,
+				"Height": 20,
+				"Service": "urn:gengen_mcv-org:serviceId:NexiaOneTouch",
+				"Variable": "CurrentScreen"
+			},
+			"Command": {
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Action": "SetScreen",
+				"Parameters": [{
+					"Name": "Screen",
+					"Value": "C1"
+				}]
+			}
+		}, {
+			"ControlGroup": 1,
+			"ControlType": "button",
+			"ControlCode": "Custom_2",
+			"top": 1,
+			"left": 0,
+			"Label": {
+				"lang_tag": "Custom_2",
+				"text": "Custom 2"
+			},
+			"Display": {
+				"Top": 80,
+				"Left": 50,
+				"Width": 75,
+				"Height": 20,
+				"Service": "urn:gengen_mcv-org:serviceId:NexiaOneTouch",
+				"Variable": "CurrentScreen",
+				"Value": "C2"
+			},
+			"Command": {
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Action": "SetScreen",
+				"Parameters": [{
+					"Name": "Screen",
+					"Value": "C2"
+				}]
+			}
+		}, {
+			"ControlGroup": 1,
+			"ControlType": "button",
+			"ControlCode": "Custom_3",
+			"top": 2,
+			"left": 0,
+			"Label": {
+				"lang_tag": "Custom_3",
+				"text": "Custom 3"
+			},
+			"Display": {
+				"Top": 110,
+				"Left": 50,
+				"Width": 75,
+				"Height": 20,
+				"Service": "urn:gengen_mcv-org:serviceId:NexiaOneTouch",
+				"Variable": "CurrentScreen",
+				"Value": "C3"
+			},
+			"Command": {
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Action": "SetScreen",
+				"Parameters": [{
+					"Name": "Screen",
+					"Value": "C3"
+				}]
+			}
+		}, {
+			"ControlGroup": 1,
+			"ControlCode": "Line_break_2",
+			"ControlType": "line_break"
+		}, {
+			"ControlGroup": 1,
+			"ControlType": "button",
+			"ControlCode": "Custom_4",
+			"top": 0,
+			"left": 1,
+			"Label": {
+				"lang_tag": "Custom_4",
+				"text": "Custom 4"
+			},
+			"Display": {
+				"Top": 140,
+				"Left": 50,
+				"Width": 75,
+				"Height": 20,
+				"Service": "urn:gengen_mcv-org:serviceId:NexiaOneTouch",
+				"Variable": "CurrentScreen",
+				"Value": "C4"
+			},
+			"Command": {
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Action": "SetScreen",
+				"Parameters": [{
+					"Name": "Screen",
+					"Value": "C4"
+				}]
+			}
+		}, {
+			"ControlGroup": 1,
+			"ControlType": "button",
+			"ControlCode": "Custom_5",
+			"top": 1,
+			"left": 1,
+			"Label": {
+				"lang_tag": "Custom_5",
+				"text": "Custom 5"
+			},
+			"Display": {
+				"Top": 170,
+				"Left": 50,
+				"Width": 75,
+				"Height": 20,
+				"Service": "urn:gengen_mcv-org:serviceId:NexiaOneTouch",
+				"Variable": "CurrentScreen",
+				"Value": "C5"
+			},
+			"Command": {
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Action": "SetScreen",
+				"Parameters": [{
+					"Name": "Screen",
+					"Value": "C5"
+				}]
+			}
+		}, {
+			"ControlGroup": 1,
+			"ControlType": "button",
+			"ControlCode": "Custom_6",
+			"top": 2,
+			"left": 1,
+			"Label": {
+				"lang_tag": "Custom_6",
+				"text": "Custom 6"
+			},
+			"Display": {
+				"Top": 200,
+				"Left": 50,
+				"Width": 75,
+				"Height": 20,
+				"Service": "urn:gengen_mcv-org:serviceId:NexiaOneTouch",
+				"Variable": "CurrentScreen",
+				"Value": "C6"
+			},
+			"Command": {
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Action": "SetScreen",
+				"Parameters": [{
+					"Name": "Screen",
+					"Value": "C6"
+				}]
+			}
+		}, {
+			"ControlGroup": 1,
+			"ControlCode": "Line_break_3",
+			"ControlType": "line_break"
+		}, {
+			"ControlGroup": 1,
+			"ControlType": "button",
+			"ControlCode": "Preset",
+			"top": 0,
+			"left": 2,
+			"Label": {
+				"lang_tag": "Preset",
+				"text": "Preset"
+			},
+			"Display": {
+				"Top": 230,
+				"Left": 50,
+				"Width": 75,
+				"Height": 20,
+				"Service": "urn:gengen_mcv-org:serviceId:NexiaOneTouch",
+				"Variable": "CurrentScreen",
+				"Value": "P1"
+			},
+			"Command": {
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Action": "SetScreen",
+				"Parameters": [{
+					"Name": "Screen",
+					"Value": "P1"
+				}]
+			}
+		}, {
+			"ControlGroup": 1,
+			"ControlType": "button",
+			"ControlCode": "Temp.",
+			"top": 1,
+			"left": 2,
+			"Label": {
+				"lang_tag": "Temperature",
+				"text": "Temperature"
+			},
+			"Display": {
+				"Top": 260,
+				"Left": 50,
+				"Width": 75,
+				"Height": 20,
+				"Service": "urn:gengen_mcv-org:serviceId:NexiaOneTouch",
+				"Variable": "CurrentScreen",
+				"Value": "T1"
+			},
+			"Command": {
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Action": "SetScreen",
+				"Parameters": [{
+					"Name": "Screen",
+					"Value": "T1"
+				}]
+			}
+		}, {
+			"ControlGroup": 1,
+			"ControlCode": "Line_break_4",
+			"ControlType": "line_break"
+		}, {
+			"ControlGroup": 2,
+			"ControlType": "button",
+			"ControlCode": "Backlight",
+			"top": 0,
+			"left": 0,
+			"Label": {
+				"lang_tag": "Backlight",
+				"text": "Backlight"
+			},
+			"Display": {
+				"Top": 290,
+				"Left": 50,
+				"Width": 75,
+				"Height": 20,
+				"Service": "urn:gengen_mcv-org:serviceId:NexiaOneTouch"
+			},
+			"Command": {
+				"Service": "urn:gengen_mcv-org:serviceId:SceneController",
+				"Action": "SetBacklight",
+				"Parameters": [{
+					"Name": "Timeout",
+					"Value": "30"
+				}]
+			}
+		}]
+	}, {
+		"Label": {
+			"lang_tag": "Screens",
+			"text": "Screens"
+		},
+		"Position": 1,
+		"TopNavigationTab": "1",
+		"TabType": "javascript",
+		"ScriptName": "J_GenGenSceneController.js",
+		"Function": "NexiaOneTouch_Screens"
+	}, {
+		"Label": {
+			"lang_tag": "settings",
+			"text": "Settings"
+		},
+		"Position": 3,
+		"TopNavigationTab": "1",
+		"TabType": "javascript",
+		"ScriptName": "J_GenGenSceneController.js",
+		"Function": "NexiaOneTouch_simple_device"
+	}, {
+		"Label": {
+			"lang_tag": "advanced",
+			"text": "Advanced"
+		},
+		"Position": 4,
+		"TopNavigationTab": "1",
+		"TabType": "javascript",
+		"ScriptName": "J_GenGenSceneController.js",
+		"Function": "NexiaOneTouch_advanced_device"
+	}, {
+		"Label": {
+			"lang_tag": "device_options",
+			"text": "Options"
+		},
+		"Position": 5,
+		"TopNavigationTab": "1",
+		"TabType": "javascript",
+		"ScriptName": "J_GenGenSceneController.js",
+		"Function": "NexiaOneTouch_device_zwave_options"
+	}],
+	"eventList2": [{
+		"id": 1,
+		"label": {
+			"lang_tag": "a_scene_is_activated",
+			"text": "A scene is activated"
+		},
+		"serviceId": "urn:micasaverde-com:serviceId:SceneController1",
+		"argumentList": [{
+			"id": 1,
+			"dataType": "ui2",
+			"defaultValue": "",
+			"name": "sl_SceneActivated",
+			"comparisson": "=",
+			"prefix": {
+				"lang_tag": "which_scene_number",
+				"text": "Which scene number"
+			},
+			"suffix": {},
+			"HumanFriendlyText": {
+				"lang_tag": "hft_scene_number_is_activated",
+				"text": "_DEVICE_NAME_: scene number _ARGUMENT_VALUE_ is activated"
+			}
+		}]
+	}, {
+		"id": 2,
+		"label": {
+			"lang_tag": "a_scene_is_deactivated",
+			"text": "A scene is de-activated"
+		},
+		"serviceId": "urn:micasaverde-com:serviceId:SceneController1",
+		"argumentList": [{
+			"id": 1,
+			"dataType": "ui2",
+			"defaultValue": "",
+			"name": "sl_SceneDeactivated",
+			"comparisson": "=",
+			"prefix": {
+				"lang_tag": "which_scene_number",
+				"text": "Which scene number"
+			},
+			"suffix": {},
+			"HumanFriendlyText": {
+				"lang_tag": "hft_scene_number_is_deactivated",
+				"text": "_DEVICE_NAME_: scene number _ARGUMENT_VALUE_ is deactivated"
+			}
+		}]
+	}],
+	"DeviceType": "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1",
+	"device_type": "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1"
+}

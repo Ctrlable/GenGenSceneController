@@ -1,0 +1,92 @@
+<?xml version="1.0"?>
+<implementation>
+  <files>L_GenGenSceneController.lua</files>
+  <startup>SceneController_Init</startup>
+  <actionList>
+    <action>
+        <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
+        <name>RunZWaveQueue</name>
+        <run>
+			return SceneController_RunZWaveQueue(lul_device, lul_settings)
+        </run>
+    </action>
+    <action>
+        <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
+        <name>SetScreen</name>
+        <run>
+			local device = tonumber(lul_device);
+			local screen = tostring(lul_settings.Screen);
+			local timeout = lul_settings.Timeout ~= "false";
+			local forceClear = lul_settings.ForceClear == "true";
+			local indicatorOnly = lul_settings.IndicatorOnly == "true";
+			SceneController_SetScreen(device,screen,timeout,forceClear,indicatorOnly);
+			return true;
+        </run>
+    </action>
+    <action>
+        <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
+        <name>UpdateCustomLabel</name>
+        <run>
+		    return SceneController_UpdateCustomLabel(tonumber(lul_settings.DeviceNum), 
+		    						            lul_settings.Screen,
+		    						            tonumber(lul_settings.Button),
+		    						            lul_settings.Label, 
+									            lul_settings.Font,
+									            lul_settings.Align,
+		    						            lul_settings.Mode)
+        </run>
+    </action>
+    <action>
+        <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
+        <name>SetPresetLanguage</name>
+        <run>
+		    return SceneController_SetPresetLanguage(tonumber(lul_device), tonumber(lul_settings.Language))
+        </run>
+    </action>
+    <action>
+        <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
+        <name>UpdateTemperatureDevice</name>
+        <run>
+		    return SceneController_UpdateTemperatureDevice(tonumber(lul_device), lul_settings.Screen, lul_settings.TemperatureDevice)
+        </run>
+    </action>
+    <action>
+	    <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
+	    <name>SetBacklight</name>
+	    <run>
+			local device = tonumber(lul_device);
+			local timeout = tonumber(lul_settings.Timeout);
+		    SceneController_SetBacklight(device,timeout);
+			return true;
+	    </run>
+    </action>
+    <action>
+	    <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
+	    <name>SetScreenTimeout</name>
+	    <run>
+		    SceneController_SetScreenTimeout(tonumber(lul_device),lul_settings.Screen,lul_settings.Enable=="true",lul_settings.TimeoutScreen,tonumber(lul_settings.TimeoutSeconds));
+			return true;
+	    </run>
+    </action>
+    <action>
+	    <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
+	    <name>SetNumLines</name>
+	    <run>
+		    SceneController_SetNumLines(tonumber(lul_device),lul_settings.Screen,tonumber(lul_settings.Lines));
+			return true;
+	    </run>
+    </action>
+
+  </actionList>
+
+  <settings>
+    <protocol>raw</protocol>
+	<handleChildren>1</handleChildren>
+  </settings>
+
+  <incoming>
+     <lua>
+		luup.log("I_GenGenSceneController: Incoming: device="..tostring(lul_device).." data="..tostring(lul_data).." settings="..tostring(lul_settings).." Job="..tostring(lul_job))  
+     </lua>
+  </incoming>
+</implementation>

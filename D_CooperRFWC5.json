@@ -1,0 +1,135 @@
+{
+	"flashicon": "icons/CooperRFWC5_50x50.png",
+	"default_icon": "CooperRFWC5_50x50.png",
+	"x": 3,
+	"y": 4,
+	"inScene": "1",
+	"DisplayStatus": {},
+	"doc_url": {
+		"doc_page": "CooperRFWC5_doc"
+	},
+	"Tabs": [{
+		"Label": {
+			"lang_tag": "Select",
+			"text": "Select"
+		},
+		"Position": 0,
+		"TopNavigationTab": "1",
+		"TabType": "flash",
+		"top_navigation_tab": 1,
+        "AfterInit": {
+        	"ScriptName": "J_GenGenSceneController.js",
+            "Function": "GenGenSceneController.CooperRFWC5_AfterInit"
+        } ,
+		"ControlGroup": [{
+			"id": 1,
+			"scenegroup": 1
+		}, {
+			"id": 2,
+			"scenegroup": 2
+		}],
+		"SceneGroup": [{
+			"id": 1,
+			"top": 0,
+			"left": 0,
+			"x": 3,
+			"y": 3
+		}, {
+			"id": 2,
+			"top": 2,
+			"left": 2,
+			"x": 1,
+			"y": 1
+		}],
+		"Control": []
+	}, {
+		"Label": {
+			"lang_tag": "Screens",
+			"text": "Screens"
+		},
+		"Position": 1,
+		"TopNavigationTab": "1",
+		"TabType": "javascript",
+		"ScriptName": "J_GenGenSceneController.js",
+		"Function": "CooperRFWC5_Screens"
+	}, {
+		"Label": {
+			"lang_tag": "settings",
+			"text": "Settings"
+		},
+		"Position": 3,
+		"TopNavigationTab": "1",
+		"TabType": "javascript",
+		"ScriptName": "J_GenGenSceneController.js",
+		"Function": "CooperRFWC5_simple_device"
+	}, {
+		"Label": {
+			"lang_tag": "advanced",
+			"text": "Advanced"
+		},
+		"Position": 4,
+		"TopNavigationTab": "1",
+		"TabType": "javascript",
+		"ScriptName": "J_GenGenSceneController.js",
+		"Function": "CooperRFWC5_advanced_device"
+	}, {
+		"Label": {
+			"lang_tag": "device_options",
+			"text": "Options"
+		},
+		"Position": 5,
+		"TopNavigationTab": "1",
+		"TabType": "javascript",
+		"ScriptName": "J_GenGenSceneController.js",
+		"Function": "CooperRFWC5_device_zwave_options"
+	}],
+	"eventList2": [{
+		"id": 1,
+		"label": {
+			"lang_tag": "a_scene_is_activated",
+			"text": "A scene is activated"
+		},
+		"serviceId": "urn:micasaverde-com:serviceId:SceneController1",
+		"argumentList": [{
+			"id": 1,
+			"dataType": "ui2",
+			"defaultValue": "",
+			"name": "sl_SceneActivated",
+			"comparisson": "=",
+			"prefix": {
+				"lang_tag": "which_scene_number",
+				"text": "Which scene number"
+			},
+			"suffix": {},
+			"HumanFriendlyText": {
+				"lang_tag": "hft_scene_number_is_activated",
+				"text": "_DEVICE_NAME_: scene number _ARGUMENT_VALUE_ is activated"
+			}
+		}]
+	}, {
+		"id": 2,
+		"label": {
+			"lang_tag": "a_scene_is_deactivated",
+			"text": "A scene is de-activated"
+		},
+		"serviceId": "urn:micasaverde-com:serviceId:SceneController1",
+		"argumentList": [{
+			"id": 1,
+			"dataType": "ui2",
+			"defaultValue": "",
+			"name": "sl_SceneDeactivated",
+			"comparisson": "=",
+			"prefix": {
+				"lang_tag": "which_scene_number",
+				"text": "Which scene number"
+			},
+			"suffix": {},
+			"HumanFriendlyText": {
+				"lang_tag": "hft_scene_number_is_deactivated",
+				"text": "_DEVICE_NAME_: scene number _ARGUMENT_VALUE_ is deactivated"
+			}
+		}]
+	}],
+	"DeviceType": "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1",
+	"device_type": "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1"
+}

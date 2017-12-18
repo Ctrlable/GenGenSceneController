@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+  <specVersion>
+    <major>1</major>
+    <minor>0</minor>
+  </specVersion>
+  <device>
+    <deviceType>urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1</deviceType>
+    <staticJson>D_CooperRFWC5.json</staticJson>
+    <friendlyName>Cooper RFWC5 Controller</friendlyName>
+    <manufacturer>Cooper Industries</manufacturer>
+    <Category_Num>14</Category_Num>
+    <SubCategory_Num>0</SubCategory_Num>
+    <serviceList>
+      <service>
+        <serviceType>urn:schemas-gengen_mcv-org:service:CooperRFWC5:1</serviceType>
+        <serviceId>urn:gengen_mcv-org:serviceId:SceneController</serviceId>
+        <SCPDURL>S_GenGenSceneController.xml</SCPDURL>
+      </service>
+      <service>
+        <serviceType>urn:schemas-micasaverde-com:service:SceneController:1</serviceType>
+        <serviceId>urn:micasaverde-com:serviceId:SceneController1</serviceId>
+        <SCPDURL>S_SceneController1.xml</SCPDURL>
+      </service>
+      <service>
+        <serviceType>urn:schemas-micasaverde-com:service:HaDevice:1</serviceType>
+        <serviceId>urn:micasaverde-com:serviceId:HaDevice1</serviceId>
+        <SCPDURL>S_HaDevice1.xml</SCPDURL>
+      </service>
+      <service>
+        <serviceType>urn:schemas-upnp-org:service:SwitchPower:1</serviceType>
+        <serviceId>urn:upnp-org:serviceId:SwitchPower1</serviceId>
+        <SCPDURL>S_SwitchPower1.xml</SCPDURL>
+      </service>
+    </serviceList>
+    <implementationList>
+      <implementationFile>I_GenGenSceneController.xml</implementationFile>
+    </implementationList>
+  </device>
+</root>
