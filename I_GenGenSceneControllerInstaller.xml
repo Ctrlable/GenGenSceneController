@@ -15,7 +15,6 @@
       <serviceId>urn:gengen_mcv-org:serviceId:ZWaveMonitor1</serviceId>
       <name>Monitor</name>
       <run>
-luup.log("urn:gengen_mcv-org:serviceId:ZWaveMonitor1 -> Monitor: lul_device="..lul_device)
 		SceneController_ZWaveMonitorResponse(lul_device, lul_settings, false, false)
         return true;
       </run>

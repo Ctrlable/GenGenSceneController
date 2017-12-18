@@ -1,4 +1,4 @@
--- Installer for GenGeneric Scene Controller Version 1.06
+-- Installer for GenGeneric Scene Controller Version 1.07
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 --
 -- Includes installation files for
@@ -10,6 +10,7 @@
 
 -- VerboseLogging == 0: important logs and errors:    ELog, log
 -- VerboseLogging == 1: Includes debug logs:          ELog, log, DLog, DEntry
+-- VerboseLogging == 2: Include extended ZWave Queue  ELog, log, DLog, DEntry
 -- VerboseLogging == 3:	Includes verbose logs:        ELog, log, DLog, DEntry, VLog, VEntry
 VerboseLogging = 0
 

@@ -1,7 +1,7 @@
--- GenGeneric Scene Controller shared code Version 1.06
+-- GenGeneric Scene Controller shared code Version 1.07
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
- 
+
 --
 -- Debugging functions
 --
@@ -228,12 +228,18 @@ local TaskHandleList = {}
 
 MonitorContextNum = 0
 MonitorContextList = {}
+local DeviceAwakeList = {}
+local NoMoreInformationContexts = {}
 
 local function EnqueueInternalActionOrMessage(queueNode)
 	VEntry()
 	local node_id = queueNode.node_id
 	if not node_id then
 		node_id = 0
+	end
+	if queueNode.type == 4 then
+		InitWakeUpNotificationMonitor(queueNode.responseDevice, queueNode.node_id, true)
+		return
 	end
 	if queueNode.pattern then
 		-- Handle cases where callback was passed as nil.
@@ -269,31 +275,51 @@ local function EnqueueInternalActionOrMessage(queueNode)
 		end
 	else
 		table.insert(newDev, queueNode) -- Normal case. Insert at end.
+		if queueNode.hasBattery then
+			InitWakeUpNotificationMonitor(queueNode.responseDevice, queueNode.node_id, false)
+			if #newDev == 1 and DeviceAwakeList[queueNode.node_id] ~= 1 then
+				log(ANSI_YELLOW, queueNode.description, " is now on battery wait", ANSI_RESET)
+				local handle = TaskHandleList[queueNode.responseDevice]
+				if not handle then
+					handle = -1
+				end
+				TaskHandleList[queueNode.responseDevice] = luup.task("Waiting for device to wake up", 1, queueNode.description, handle)
+			end
+		end
 	end
-	if queueNode.node_id == 0 and ZWaveQueueNext ~= newDev then
-		-- Node 0 entries have priority. Bring them to the front of the queue.
-		newDev.next.prev = newDev.prev
-		newDev.prev.next = newDev.next
-		newDev.next = ZWaveQueueNext
-		newDev.prev = ZWaveQueueNext.prev
-		ZWaveQueueNext.prev.next = newDev
-		ZWaveQueueNext.prev = newDev
-		ZWaveQueueNext = newDev
-	end
+end
+
+-- Enqueues a special message called as part of the "configured" trigger.
+-- which initializes the wake-up monitor in "already awake" state if it
+-- has not already been initialized
+function EnqueueInitWakeupMonitorMessage(name, node_id, peer_dev_num)
+  VEntry("EnqueueInitWakeupMonitorMessage")
+  local queueNode = {
+  	type=4,
+  	name=name,
+  	node_id=node_id,
+	responseDevice = peer_dev_num,
+	description = luup.devices[peer_dev_num].description,
+	hasBattery = true}
+  table.insert(ExternalZWaveQueue, queueNode)
 end
 
 -- Enqueue the last Z-Wave message in a group. 
 -- This is used for the "no more information" message for battery devices. 
 -- It may be deleted if other items are queued behind it.
-function EnqueueFinalZWaveMessage(name, node_id, data)
-  VEntry()
-  EnqueueInternalActionOrMessage({
+local function EnqueueFinalZWaveMessage(name, node_id, data, peer_dev_num)
+  VEntry("EnqueueFinalZWaveMessage")
+  local queueNode = {
   	type=1,
   	name=name,
   	node_id=node_id,
   	data=data,
   	delay=0,
-  	final=true})
+	responseDevice = peer_dev_num,
+	description = luup.devices[peer_dev_num].description,
+	hasBattery = true,
+  	final=true}
+  table.insert(ExternalZWaveQueue, queueNode)
 end
 
 
@@ -392,6 +418,11 @@ function SceneController_RunZWaveQueue(device, settings)
 	RunInternalZWaveQueue("External", 0)
 end
 
+function SceneController_InitWakeupMonitor(device, settings)
+	DEntry()
+	InitWakeUpNotificationMonitor(settings.Peer_Dev_Num, settings.ZWave_Node)
+end
+
 -- A UI5 substitutwe for the new luup.job_watch in UI7
 local function CheckUI5ZWaveQueueHeadStatus(data)
   	local j = ActiveZWaveJob
@@ -438,7 +469,7 @@ function CheckUI5ZWaveQueueHeadStatus2(data)
   		j.last_err_num = j.err_num
   		j.last_err_msg = j.err_msg
 		local lul_job = {}
-		if j.node_id == 0 then
+		if j.type == 0 then
 			lul_job.type = "ZWJob_GenericSendFrame"
 			lul_job.name = "send_code"
 		else
@@ -455,10 +486,145 @@ function CheckUI5ZWaveQueueHeadStatus2(data)
 	CheckUI5ZWaveQueueHeadStatus("")
 end
 
+local function ChangeBatteryNoMoreInformationMonitor(peer_dev_num, zwave_node, enable)
+	VEntry("ChangeBatteryNoMoreInformationMonitor")
+	local BatteryNoMoreInformationCallback = function(installer, captures)
+		VEntry("BatteryNoMoreInformationCallback")
+		local deviceAwakeCount = DeviceAwakeList[zwave_node]
+		if not deviceAwakeCount == nil or deviceAwakeCount == 0 then
+			ELog("Received a No More Information message for device ", peer_dev_num, " Z-Wave node ", zwave_node, " without a corresponing wake-up event.")
+			return 
+		end
+		deviceAwakeCount = deviceAwakeCount - 1;
+		DeviceAwakeList[zwave_node] = deviceAwakeCount;
+		if deviceAwakeCount == 1 then
+			local list = ZWaveQueue[zwave_node]
+			if list and list[1] then
+				local device = luup.devices[peer_dev_num]
+				log(ANSI_YELLOW, "Battery wait released for ", device.description, ANSI_RESET)
+				local handle = TaskHandleList[peer_dev_num]
+				if not handle then
+					handle = -1
+				end
+				TaskHandleList[peer_dev_num] = luup.task("", 4, device.description, handle)
+			end
+		    EnqueueFinalZWaveMessage("BatteryNoMoreInformation", zwave_node, "0x84 0x8", peer_dev_num);
+		end
+	end
+
+	if enable then
+		if not NoMoreInformationContexts[peer_dev_num] then
+			NoMoreInformationContexts[peer_dev_num] = MonitorZWaveData( 
+				true, -- outgoing
+				luup.device, -- peer_dev_num
+				nil, -- armRegEx
+--[==[
+                                              C1  C2                                   C3
+41      12/04/16 20:05:27.515   0x1 0xd 0x0 0x19 0x9 0x2 0x84 0x8 0x5 0x0 0x0 0x0 0x0 0x4 0x6d (#\r############m)
+           SOF - Start Of Frame --+   ¦   ¦    ¦   ¦   ¦    ¦   ¦   ¦ +-------------+   ¦    ¦
+                    length = 13 ------+   ¦    ¦   ¦   ¦    ¦   ¦   ¦        ¦          ¦    ¦
+                        Request ----------+    ¦   ¦   ¦    ¦   ¦   ¦        ¦          ¦    ¦
+   FUNC_ID_ZW_SEND_DATA_GENERIC ---------------+   ¦   ¦    ¦   ¦   ¦        ¦          ¦    ¦
+Device 12=Nexia One Touch Scene Controller Z-Wave -+   ¦    ¦   ¦   ¦        ¦          ¦    ¦
+                Data length = 2 -----------------------+    ¦   ¦   ¦        ¦          ¦    ¦
+          COMMAND_CLASS_WAKE_UP ----------------------------+   ¦   ¦        ¦          ¦    ¦
+    WAKE_UP_NO_MORE_INFORMATION --------------------------------+   ¦        ¦          ¦    ¦
+Xmit options = ACK | AUTO_ROUTE ------------------------------------+        ¦          ¦    ¦
+           Routing data ignored ---------------------------------------------+          ¦    ¦
+                   Callback = 4 --------------------------------------------------------+    ¦
+                    Checksum OK -------------------------------------------------------------+
+--]==]
+				"^01 .. 00 (..) (" .. string.format("%02X", zwave_node) .. ") .. 84 08 .+ (..) ..$",
+--[==[
+42      12/04/16 20:05:27.538   0x6 0x1 0x4 0x1 0x19 0x1 0xe2 (#######)
+              ACK - Acknowledge --+   ¦   ¦   ¦    ¦   ¦    ¦
+           SOF - Start Of Frame ------+   ¦   ¦    ¦   ¦    ¦
+                     length = 4 ----------+   ¦    ¦   ¦    ¦
+                       Response --------------+    ¦   ¦    ¦
+   FUNC_ID_ZW_SEND_DATA_GENERIC -------------------+   ¦    ¦
+                     RetVal: OK -----------------------+    ¦
+                    Checksum OK ----------------------------+
+42      12/04/16 20:05:27.539   got expected ACK -- removed
+
+        ACK: 0x6 (#)
+
+42      12/04/16 20:05:27.778   0x1 0x5 0x0 0x19 0x4 0x0 0xe7 (#######)
+           SOF - Start Of Frame --+   ¦   ¦    ¦   ¦   ¦    ¦
+                     length = 5 ------+   ¦    ¦   ¦   ¦    ¦
+                        Request ----------+    ¦   ¦   ¦    ¦
+   FUNC_ID_ZW_SEND_DATA_GENERIC ---------------+   ¦   ¦    ¦
+                   Callback = 4 -------------------+   ¦    ¦
+           TRANSMIT_COMPLETE_OK -----------------------+    ¦
+                    Checksum OK ----------------------------+
+41      12/04/16 20:05:27.779   ACK: 0x6 (#) -- removed
+--]==]
+				"06 01 04 01 \\1 01 XX 01 05 00 \\1 \\3 00 XX",
+				BatteryNoMoreInformationCallback, 
+				false, -- not oneShot
+				0, -- no timeout
+				"BatteryNoMoreInfo")
+		end
+		VLog("  Created no more information context: ", NoMoreInformationContexts[peer_dev_num]) 
+	else
+		local context = NoMoreInformationContexts[peer_dev_num]
+		if context then 
+			VLog(" Deleting no more information context: ", context) 
+			zwint.cancel(luup.device, context)
+			MonitorContextList[context] = nil
+			NoMoreInformationContexts[peer_dev_num] = nil
+		end -- if context
+	end -- else not enable
+end -- function ChangeBatteryNoMoreInformationMonitor
+
+function InitWakeUpNotificationMonitor(peer_dev_num, zwave_node, alreadyAwake)
+	VEntry()
+	if DeviceAwakeList[zwave_node] ~= nil then
+		return
+	end
+	DeviceAwakeList[zwave_node] = 0
+	local WakeUpNotificationCallback = function(installer, captures)
+		VEntry("WakeUpNotificationCallback")
+		if DeviceAwakeList[zwave_node] > 0 then
+			DeviceAwakeList[zwave_node] = DeviceAwakeList[zwave_node] + 1
+		else
+			DeviceAwakeList[zwave_node] = 2
+		end
+		if DeviceAwakeList[zwave_node] == 2 then
+			ChangeBatteryNoMoreInformationMonitor(peer_dev_num, zwave_node, true)
+		end
+	end 	
+	MonitorZWaveData( 
+				false, -- outgoing
+				luup.device, -- peer_dev_num
+				nil, -- arm_regex
+--[==[
+42      12/04/16 20:05:26.449   0x1 0x8 0x0 0x4 0x4 0x9 0x2 0x84 0x7 0x7f (##########)
+           SOF - Start Of Frame --+   ¦   ¦   ¦   ¦   ¦   ¦    ¦   ¦    ¦
+                     length = 8 ------+   ¦   ¦   ¦   ¦   ¦    ¦   ¦    ¦
+                        Request ----------+   ¦   ¦   ¦   ¦    ¦   ¦    ¦
+FUNC_ID_APPLICATION_COMMAND_HANDLER ----------+   ¦   ¦   ¦    ¦   ¦    ¦
+           Receive Status BROAD ------------------+   ¦   ¦    ¦   ¦    ¦
+Device 12=Nexia One Touch Scene Controller Z-Wave ----+   ¦    ¦   ¦    ¦
+                Data length = 2 --------------------------+    ¦   ¦    ¦
+          COMMAND_CLASS_WAKE_UP -------------------------------+   ¦    ¦
+           WAKE_UP_NOTIFICATION -----------------------------------+    ¦
+                    Checksum OK ----------------------------------------+
+--]==]
+				"^01 .. 00 04 .. " .. string.format("%02X", zwave_node) .. " .. 84 07",
+				nil, -- autoResponse
+				WakeUpNotificationCallback, 
+				false, -- not oneShot
+				0, -- no timeout
+				"WakeUpNotification")
+	if alreadyAwake then
+		WakeUpNotificationCallback(nil, nil)
+	end
+end
+
 function SceneController_RunInternalZWaveQueue(fromWhere)
 	VEntry("SceneController_RunInternalZWaveQueue")
   	if not ZWaveQueueNext then
-      VLog("SceneController_RunInternalZWaveQueue: fromWhere=", fromWhere, " queue is empty")
+      VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") queue is empty")
 	  return
   	end
 
@@ -473,123 +639,153 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
    	local now =	socket.gettime()
     local nextTime = nil
     local nextQueue = nil
-    local ZWaveQueueFirst = ZWaveQueueNext
-  	while ZWaveQueueNext[1].waitUntil or ZWaveQueueNext[1].waitingForResponse or ZWaveQueueNext[1].batteryWait do
-  		if not (ZWaveQueueNext[1].waitingForResponse or ZWaveQueueNext[1].batteryWait) then
-  			if ZWaveQueueNext[1].waitUntil > now then
-  				if not nextTime or nextTime > ZWaveQueueNext[1].waitUntil then
-  		    		nextTime = ZWaveQueueNext[1].waitUntil
-  		    		nextQueue = ZWaveQueueNext
-  		  		end
-  		  	else
-				VLog("SceneController_RunInternalZWaveQueue: Removing time wait queu entry which timed out ", (now - ZWaveQueueNext[1].waitUntil), "seconds ago: ", ZWaveQueueNext[1])
-  		  		if RemoveHeadFromZWaveQueue() then
-  		  			RunInternalZWaveQueue(fromWhere.." after timeout", 0)
-  		  		end
-  		  		return
-  		  	end
-  		end
-  		if ZWaveQueueNext.node_id ~= 0 and ZWaveQueueNext.next ~= ZWaveQueueFirst then
-  		    ZWaveQueueNext = ZWaveQueueNext.next
+	local biggestDelay = -1
+	local longestQueue = 0
+	local bestCandidate = nil
+    local candidate = ZWaveQueueNext
+	repeat
+		if candidate[1].waitingForResponse then
+			VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Skipping candidate due to waitingForResponse:", candidate[1])
+		elseif candidate[1].hasBattery and DeviceAwakeList[candidate[1].node_id] ~= 1 then
+			VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Skipping candidate due to batteryWait:", candidate[1])
   		else
-  		  	if not nextQueue then
-				VLog("SceneController_RunInternalZWaveQueue: No good candidates. quitting: ", ZWaveQueueNext)
-  		  		return
-  		  	end
-  		    ZWaveQueueNext = nextQueue
-  		    local waitTime = nextTime - now
-  		    if waitTime >= 1 then
-			  	VLog("SceneController_RunInternalZWaveQueue: Delaying for ", waitTime, " seconds using luup.call_delay.")
-  			  	luup.call_delay("SceneController_RunInternalZWaveQueue", waitTime, fromWhere.." DelayFor ".. waitTime, true)
-  		    else
-			  	VLog("SceneController_RunInternalZWaveQueue: Delaying for ", waitTime, " seconds using luup.sleep.")
-  			  	luup.sleep(waitTime*1000)
-  		  		if RemoveHeadFromZWaveQueue() then
-  		  			RunInternalZWaveQueue(fromWhere.." after sleep", 0)
+  			if candidate[1].waitUntil then
+  				if candidate[1].waitUntil > now then
+					VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") time wait queue entry still waiting for ", (candidate[1].waitUntil - now), " seconds from now: ", candidate[1])
+  					if not nextTime or nextTime > candidate[1].waitUntil then
+  		    			nextTime = candidate[1].waitUntil
+  		    			nextQueue = candidate
+						if candidate.type == 0 then -- We cannot start jobs for other nodes until any local job has had time to complete.
+							bestCandidate = nil
+							break;
+						end
+  		  			end
+  		  		else
+					VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Removing time wait queue entry which timed out ", (now - candidate[1].waitUntil), " seconds ago: ", candidate[1])
+					ZWaveQueueNext = candidate
+	  		  		if RemoveHeadFromZWaveQueue() then
+	  		  			RunInternalZWaveQueue(fromWhere.." after timeout", 0)
+	  		  		end
+  		  			return
   		  		end
-  		  	end
-  		    return
-  		end
-   	end
+			elseif candidate.type == 0 then -- local Z-Wave controller commands always have priority
+			   VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Found a local job and stopping search.", candidate[1])
+			   bestCandidate = candidate
+			   break
+			elseif candidate[1].delay > biggestDelay then -- If several devices are in the queue, give priority to the one with the biggest delay to get it started first.
+			   VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Found a bigger delay job. ", candidate[1].delay, " > ", biggestDelay, ": ",  candidate[1])
+			   bestCandidate = candidate
+			   biggestDelay = candidate[1].delay
+			   longestQueue = #candidate
+			elseif candidate[1].delay == biggestDelay and #candidate > longestQueue then -- If delays are the same (typically 0) then choose the device with the most jobs to do.
+			   VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Found a bigger queue length job. ",  #candidate, " > ", longestQueue, ": ",  candidate[1])
+			   bestCandidate = candidate
+			   longestQueue = #candidate
+  			end
+		end
+		candidate = candidate.next
+	until candidate == ZWaveQueueNext
 
-    -- At this pont, we know we have something to do.
-    -- Dump the queue to the log in various ways.
-  	if VerboseLogging >= 2 then
-      local curDev = ZWaveQueueNext
-	  local count = 1;
-	  repeat
-		DLog  ("SceneController_RunInternalZWaveQueue(", fromWhere, ")   Node_id: ", curDev.node_id, "  Next: ", curDev.next.node_id, "  Prev: ", curDev.prev.node_id)
-	    for i = 1, #curDev do
-	      DLog("SceneController_RunInternalZWaveQueue(", fromWhere, ")     Entry ", count, ": ", curDev[i])
-		  count = count + 1;
-	    end
-	    curDev = curDev.next
-	  until curDev == ZWaveQueueNext
-	elseif VerboseLogging > 0 then
-  	  local count = 0
-  	  local curDev = ZWaveQueueNext
-	  local nodelist = ""
-	  repeat
-	  	nodelist = nodelist .. curDev.node_id .. "("..#curDev..") "
-		curDev = curDev.next;
-		count = count + 1
-	  until curDev == ZWaveQueueNext or count > 10
-	  DLog("SceneController_RunInternalZWaveQueue(", fromWhere, "): Nodes: ", ZWaveQueueNodes, " ( ", nodelist, ")")
-	end
+	if bestCandidate then
+		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") running next job: ",  candidate[1])
+	    ZWaveQueueNext = bestCandidate
+	    -- At this pont, we know we have something to do.
+	    -- Dump the queue to the log in various ways.
+	  	if VerboseLogging >= 2 then
+	      local curDev = ZWaveQueueNext
+		  local count = 1;
+		  repeat
+			DLog  ("SceneController_RunInternalZWaveQueue(", fromWhere, ")   Node_id: ", curDev.node_id, "  Next: ", curDev.next.node_id, "  Prev: ", curDev.prev.node_id)
+		    for i = 1, #curDev do
+		      DLog("SceneController_RunInternalZWaveQueue(", fromWhere, ")     Entry ", count, ": ", curDev[i])
+			  count = count + 1;
+		    end
+		    curDev = curDev.next
+		  until curDev == ZWaveQueueNext
+		elseif VerboseLogging > 0 then
+	  	  local count = 0
+	  	  local curDev = ZWaveQueueNext
+		  local nodelist = ""
+		  repeat
+		  	nodelist = nodelist .. curDev.node_id .. "("..#curDev..") "
+			curDev = curDev.next;
+			count = count + 1
+		  until curDev == ZWaveQueueNext or count > 10
+		  DLog("SceneController_RunInternalZWaveQueue(", fromWhere, "): Nodes: ", ZWaveQueueNodes, " ( ", nodelist, ")")
+		end
 
-	local veraZWaveNode, ZWaveNetworkDeviceId = GetVeraIDs()
-    local j = ZWaveQueueNext[1];
+		local veraZWaveNode, ZWaveNetworkDeviceId = GetVeraIDs()
+	    local j = ZWaveQueueNext[1];
 
-	if j.pattern then
-		DLog("SceneController_RunInternalZWaveQueue(", fromWhere, "): Calling zwint.monitor: ", j)
-		zwint.monitor(j.responseDevice,j.context,j.pattern,j.oneshot,j.timeout, j.armPattern, j.autoResponse);
-		j.waitingForResponse = true
-	end
+		if j.pattern then
+			DLog("SceneController_RunInternalZWaveQueue(", fromWhere, "): Calling zwint.monitor: ", j)
+			zwint.monitor(j.responseDevice,j.context,j.pattern,j.oneshot,j.timeout, j.armPattern, j.autoResponse);
+			j.waitingForResponse = true
+		end
 
-	-- if j.HasBattery then
-		-- If the device is battery operated turn on or off the no more information intercept
-	--	ChangeBatteryNoMoreInformationMonitor(j.responseDevice, j.node_id, not j.final)
-	-- end
+		if j.hasBattery and j.final then
+			-- If the device is battery operated and this is the final "no more information" message, 
+			-- then turn off the no more information intercept to let it go through.
+			ChangeBatteryNoMoreInformationMonitor(j.responseDevice, j.node_id, false)
+			DeviceAwakeList[j.node_id] = 0
+		end
 
-    -- This is where we actually perform the action in a queue entry.
-	ActiveZWaveJob = j
-	if j.type == 1 then
-		if j.node_id > 0 then
-		  	VLog("SceneController_RunInternalZWaveQueue: type=ZWave, Node=Device name=", j.name, ": ", SID_ZWN, " SendData ", {Node = j.node_id, Data = j.data}, " ", ZWaveNetworkDeviceId);
+	    -- This is where we actually perform the action in a queue entry.
+		ActiveZWaveJob = j
+		if j.type == 0 then
+		  	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") type=ZWave, Node=Controller name=", j.name, ": ", SID_ZWN, " SendData ", {Data = j.data}, " ", ZWaveNetworkDeviceId);
+		  	j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(SID_ZWN, "SendData", {                  Data = j.data}, ZWaveNetworkDeviceId)
+		elseif j.type == 1 then
+		  	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") type=ZWave, Node=Device name=", j.name, ": ", SID_ZWN, " SendData ", {Node = j.node_id, Data = j.data}, " ", ZWaveNetworkDeviceId);
 		  	j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(SID_ZWN, "SendData", {Node = j.node_id, Data = j.data}, ZWaveNetworkDeviceId)
 		else
-		  	VLog("SceneController_RunInternalZWaveQueue: type=ZWave, Node=Controller name=", j.name, ": ", SID_ZWN, " SendData ", {Data = j.data}, " ", ZWaveNetworkDeviceId);
-		  	j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(SID_ZWN, "SendData", {                  Data = j.data}, ZWaveNetworkDeviceId)
+			VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") type=LuaAction: name=", j.name)
+			j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(j.service, j.action, j.arguments, j.device)
 		end
+
+	    -- Check for an immediate failure and retry in 5 seconds if so.
+		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") call_action returned err_num=", j.err_num, " err_msg=", j.err_msg, " job_num=", j.job_num, " arguments=", j.arguments)
+		if j.err_num ~= 0 or j.job_num == 0 then
+		    log("SceneController_RunInternalZWaveQueue(", fromWhere, "): call_action failed, retrying in 5 seconds. ", j);
+			ActiveZWaveJob = nil
+		    if j.pattern then
+				j.waitingForResponse = false
+		    	zwint.cancel(j.responseDevice, j.context)
+		    end
+		    RunInternalZWaveQueue(fromWhere.." retry", 5000)
+		    return
+		end
+
+		if luup.job_watch then
+			return
+		end
+
+		-- From here down is for UI5 only
+		j.startTime = socket.gettime()
+	    CheckUI5ZWaveQueueHeadStatus("")
+
+	elseif nextQueue then
+		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") waiting for  next job: ",  nextQueue[1])
+		-- No entries are ready to run, so wait until the one that will be ready sooonest
+	    ZWaveQueueNext = nextQueue
+	    local waitTime = nextTime - now
+	    if waitTime >= 1 then
+	  		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Delaying for ", waitTime, " seconds using luup.call_delay.")
+		  	luup.call_delay("SceneController_RunInternalZWaveQueue", waitTime, fromWhere.." DelayFor ".. waitTime, true)
+	    else
+	  		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Delaying for ", waitTime, " seconds using luup.sleep.")
+		  	luup.sleep(waitTime*1000)
+	  		if RemoveHeadFromZWaveQueue() then
+	  			RunInternalZWaveQueue(fromWhere.." after sleep", 0)
+	  		end
+	  	end
 	else
-		VLog("SceneController_RunInternalZWaveQueue: type=LuaAction: name=", j.name)
-		j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(j.service, j.action, j.arguments, j.device)
+		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Nothing to do")	
 	end
-
-    -- Check for an immediate failure and retry in 5 seconds if so.
-	VLog("SceneController_RunInternalZWaveQueue: call_action returned err_num=", j.err_num, " err_msg=", j.err_msg, " job_num=", j.job_num, " arguments=", j.arguments)
-	if j.err_num ~= 0 or j.job_num == 0 then
-	    log("SceneController_RunInternalZWaveQueue(", fromWhere, "): call_action failed, retrying in 5 seconds. ", j);
-		ActiveZWaveJob = nil
-	    if j.pattern then
-			j.waitingForResponse = false
-	    	zwint.cancel(j.responseDevice, j.context)
-	    end
-	    RunInternalZWaveQueue(fromWhere.." retry", 5000)
-	    return
-	end
-
-	if luup.job_watch then
-		return
-	end
-
-	-- From here down is for UI5 only
-	j.startTime = socket.gettime()
-    CheckUI5ZWaveQueueHeadStatus("")
 end
 
 function SceneController_JobWatchCallBack(lul_job)
-	VEntry()
+	VEntry("SceneController_JobWatchCallBack")
 	if not ZWaveQueueNext then
 		VLog("SceneController_JobWatchCallBack: ZWaveQueue is empty.");
 		return
@@ -600,7 +796,7 @@ function SceneController_JobWatchCallBack(lul_job)
 		return
 	end
 	local expectedJobType, expectedName
-	if j.node_id == 0 then
+	if j.type == 0 then
 		expectedJobType = "ZWJob_GenericSendFrame"
 		expectedName = "send_code"
 	else
@@ -632,14 +828,14 @@ function SceneController_JobWatchCallBack(lul_job)
 			return
 		end
 	end
-	if lul_job.status == 3 and j.responseDevice and j.HasBattery and not j.final then
-		j.batteryWait = true
-		log(ANSI_YELLOW, j.description, " is now on battery wait", ANSI_RESET)
+	if lul_job.status == 3 and j.responseDevice and j.hasBattery and not j.final then
+		DeviceAwakeList[j.node_id] = 0
+		log(ANSI_YELLOW, j.description, " went to sleep unexpectedly", ANSI_RESET)
 		local handle = TaskHandleList[j.responseDevice]
 		if not handle then
 			handle = -1
 		end
-		TaskHandleList[j.responseDevice] = luup.task("Waiting for device to wake up", 1, j.description, handle)
+		TaskHandleList[j.responseDevice] = luup.task("Device went to sleep unexpectedly", 1, j.description, handle)
 		RunInternalZWaveQueue("Battery wait", 0)
 		return
 	end
@@ -713,102 +909,6 @@ end
 function SceneController_ZWaveMonitorError(device, errorCode, errorMessage)
 	ELog("SceneController_ZWaveMonitorError: errorCode=", errorCode, " errorMessage=", errorMessage)
 end
-
-
-local NoMoreInformationContexts = {}
-function ChangeBatteryNoMoreInformationMonitor(peer_dev_num, zwave_node, enable)
-
-	local BatteryNoMoreInformationCallback = function(installer, captures)
-		VEntry("BatteryNoMoreInformationCallback")
-		local node_id = tonumber(captures.C2, 16)
-		local list = ZWaveQueue[node_id]
-		if list and list[1] and list[1].batteryWait then
-			list[1].batteryWait = false
-			local device = luup.devices[peer_dev_num]
-			log(ANSI_YELLOW, "Battery wait released for ", device.description, ANSI_RESET)
-			local handle = TaskHandleList[peer_dev_num]
-			if not handle then
-				handle = -1
-			end
-			TaskHandleList[peer_dev_num] = luup.task("", 4, device.description, handle)
-		end
-	    EnqueueFinalZWaveMessage("BatteryNoMoreInformation", node_id, "0x84 0x8");
-	end
-
-	if enable then
-		if not NoMoreInformationContexts[peer_dev_num] then
-			NoMoreInformationContexts[peer_dev_num] = MonitorZWaveData( 
-				true, -- outgoing
-				luup.device, -- peer_dev_num
---[==[
-42      12/04/16 20:05:26.449   0x1 0x8 0x0 0x4 0x4 0x9 0x2 0x84 0x7 0x7f (##########)
-           SOF - Start Of Frame --+   ¦   ¦   ¦   ¦   ¦   ¦    ¦   ¦    ¦
-                     length = 8 ------+   ¦   ¦   ¦   ¦   ¦    ¦   ¦    ¦
-                        Request ----------+   ¦   ¦   ¦   ¦    ¦   ¦    ¦
-FUNC_ID_APPLICATION_COMMAND_HANDLER ----------+   ¦   ¦   ¦    ¦   ¦    ¦
-           Receive Status BROAD ------------------+   ¦   ¦    ¦   ¦    ¦
-Device 12=Nexia One Touch Scene Controller Z-Wave ----+   ¦    ¦   ¦    ¦
-                Data length = 2 --------------------------+    ¦   ¦    ¦
-          COMMAND_CLASS_WAKE_UP -------------------------------+   ¦    ¦
-           WAKE_UP_NOTIFICATION -----------------------------------+    ¦
-                    Checksum OK ----------------------------------------+
---]==]
-				"^01 .. 00 04 .. " .. string.format("%02X", zwave_node) .. " .. 84 07",
---[==[
-                                              C1  C2                                   C3
-41      12/04/16 20:05:27.515   0x1 0xd 0x0 0x19 0x9 0x2 0x84 0x8 0x5 0x0 0x0 0x0 0x0 0x4 0x6d (#\r############m)
-           SOF - Start Of Frame --+   ¦   ¦    ¦   ¦   ¦    ¦   ¦   ¦ +-------------+   ¦    ¦
-                    length = 13 ------+   ¦    ¦   ¦   ¦    ¦   ¦   ¦        ¦          ¦    ¦
-                        Request ----------+    ¦   ¦   ¦    ¦   ¦   ¦        ¦          ¦    ¦
-   FUNC_ID_ZW_SEND_DATA_GENERIC ---------------+   ¦   ¦    ¦   ¦   ¦        ¦          ¦    ¦
-Device 12=Nexia One Touch Scene Controller Z-Wave -+   ¦    ¦   ¦   ¦        ¦          ¦    ¦
-                Data length = 2 -----------------------+    ¦   ¦   ¦        ¦          ¦    ¦
-          COMMAND_CLASS_WAKE_UP ----------------------------+   ¦   ¦        ¦          ¦    ¦
-    WAKE_UP_NO_MORE_INFORMATION --------------------------------+   ¦        ¦          ¦    ¦
-Xmit options = ACK | AUTO_ROUTE ------------------------------------+        ¦          ¦    ¦
-           Routing data ignored ---------------------------------------------+          ¦    ¦
-                   Callback = 4 --------------------------------------------------------+    ¦
-                    Checksum OK -------------------------------------------------------------+
---]==]
-				"^01 .. 00 (..) (" .. string.format("%02X", zwave_node) .. ") .. 84 08 .+ (..) ..$",
---[==[
-42      12/04/16 20:05:27.538   0x6 0x1 0x4 0x1 0x19 0x1 0xe2 (#######)
-              ACK - Acknowledge --+   ¦   ¦   ¦    ¦   ¦    ¦
-           SOF - Start Of Frame ------+   ¦   ¦    ¦   ¦    ¦
-                     length = 4 ----------+   ¦    ¦   ¦    ¦
-                       Response --------------+    ¦   ¦    ¦
-   FUNC_ID_ZW_SEND_DATA_GENERIC -------------------+   ¦    ¦
-                     RetVal: OK -----------------------+    ¦
-                    Checksum OK ----------------------------+
-42      12/04/16 20:05:27.539   got expected ACK -- removed
-
-        ACK: 0x6 (#)
-
-42      12/04/16 20:05:27.778   0x1 0x5 0x0 0x19 0x4 0x0 0xe7 (#######)
-           SOF - Start Of Frame --+   ¦   ¦    ¦   ¦   ¦    ¦
-                     length = 5 ------+   ¦    ¦   ¦   ¦    ¦
-                        Request ----------+    ¦   ¦   ¦    ¦
-   FUNC_ID_ZW_SEND_DATA_GENERIC ---------------+   ¦   ¦    ¦
-                   Callback = 4 -------------------+   ¦    ¦
-           TRANSMIT_COMPLETE_OK -----------------------+    ¦
-                    Checksum OK ----------------------------+
-41      12/04/16 20:05:27.779   ACK: 0x6 (#) -- removed
---]==]
-				"06 01 04 01 \\1 01 XX 01 05 00 \\1 \\3 00 XX",
-				BatteryNoMoreInformationCallback, 
-				false, -- not oneShot
-				0, -- no timeout
-				"BatteryNoMoreInfo")
-		end
-	else
-		local context = NoMoreInformationContexts[peer_dev_num]
-		if context then 
-			zwint.cancel(peer_dev_num, context)
-			MonitorContextList[context] = nil
-			NoMoreInformationContexts[peer_dev_num] = nil
-		end -- if context
-	end -- else not enable
-end -- function ChangeBatteryNoMoreInformationMonitor
 
 local veraZWaveNode
 local ZWaveNetworkDeviceId

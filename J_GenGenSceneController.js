@@ -1,4 +1,4 @@
-// User interface for GenGeneric Scene Controller Version 1.06
+// User interface for GenGeneric Scene Controller Version 1.07
 // Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
@@ -16,7 +16,7 @@ var EVOLVELCD1 = {
     LastFixedSceneId        : 10,
 	HasOffScenes            : true,
 	HasCooperConfiguration  : false,
-	MaxDirectAssociations   : 29, // 30 direct associations but 1 reserved for Vera.
+	MaxDirectAssociations   : 30,
 	DefaultScreen           : "C1",
 	DefaultModeString       : "M",
 	DevType                 : "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1",
@@ -154,7 +154,7 @@ var COOPERRFWC5 = {
     LastFixedSceneId        : 5,
 	HasOffScenes            : false,
 	HasCooperConfiguration  : true,
-	MaxDirectAssociations   : 4, // 5 direct associations but 1 reserved for Vera.
+	MaxDirectAssociations   : 5,
 	DefaultScreen           : "P1",
 	DefaultModeString       : "T",
 	DevType                 : "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1",
@@ -199,7 +199,7 @@ var NEXIAONETOUCH = {
     LastFixedSceneId        : 46,
 	HasOffScenes            : false,
 	HasCooperConfiguration  : false,
-	MaxDirectAssociations   : 2, // 2 direct associations. Vera uses the Lifeline/Central Scene
+	MaxDirectAssociations   : 2,
 	DefaultScreen           : "C1",
 	DefaultModeString       : "M",
 	DevType                 : "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1",
@@ -211,7 +211,7 @@ var NEXIAONETOUCH = {
 		{ prefix: "C", name: "Custum",      num: 3 }
 	],
 	CustomModeList 			: [
-		"M", "2", "3", "4", "5", "6", "7", "8", "9"
+		"M", "T", "H"
 	],
 	SceneBases              : {
 		C: 1	// Custom screen scenes start at base 1
@@ -473,7 +473,7 @@ SceneController_Modes = {
 	S:"Toggle Direct",  // Obsolete
 	X:"Exclusive",
 	N:"Switch Screen",
-	H:"Temperature",
+	H:"Thermostat",
 	W:"Welcome"
 };
 
@@ -1288,11 +1288,20 @@ function SceneController_Screens(SCObj, deviceId) {
 							     +       SceneController_ScreenMenu(SCObj, modeParam, curScreen, lcdVersion)
 							     +  '   </select>\n';
 						}
-						// Disable Vera scenes if we have already selected a non-scene-capable direct device. 
-						var disableVeraScene = !SCObj.HasCooperConfiguration && 
-						    mode.length > 0 && 
-						    SceneController_GetDeviceProperties(SceneController_get_device_object(mode[0].device)).basicSetOnly;
-						var enableNonSceneDirect = SCObj.HasCooperConfiguration || (SceneController_FindScene(peerId, sceneNum, -1) == null && states == 1);
+						// Disable Vera scenes if we have already selected a non-scene-capable direct device
+						// or if in toggle mode and there are no "off" scenes (i.e. toggle off is basic set 0)
+						// or if the number of direct devices has reached the number of associations
+						var disableVeraScene = (!SCObj.HasCooperConfiguration && 
+						                        mode.length > 0 && 
+						                        (SceneController_GetDeviceProperties(SceneController_get_device_object(mode[0].device)).basicSetOnly ||
+						                         (mode.prefix == "T" && !SCObj.HasOffScenes))) ||
+						                       mode.length >= SCObj.MaxDirectAssociations;
+						var hasVeraScenes = SceneController_FindScene(peerId, sceneNum, -1)
+						var enableMoreDirectScenes = mode.length < SCObj.MaxDirectAssociations &&
+						                             (!hasVeraScenes ||
+													  SCObj.HasCooperConfiguration ||
+													  (mode.prefix != "T" || SCObj.HasOffScenes))
+						var enableNonSceneDirect = SCObj.HasCooperConfiguration || (!hasVeraScenes && states == 1);
 						switch (mode.prefix) {
 						   	case "M":	// Momentary
 							case "X":	// EXclusive
@@ -1315,13 +1324,11 @@ function SceneController_Screens(SCObj, deviceId) {
 								}
 								break;
 						}
-						if (mode.length < SCObj.MaxDirectAssociations) {
-							html += '    <button type="button" class="btn" style="min-width:10px;'+
-								             (mode.length>0?';color:orange;':'')+
-								             '" onClick="SceneController_SetPlaceholder('+SCObj.Id+','+peerId+','+stateButton+')">+Direct</button>\n';
-							if (SceneController_Placeholder == stateButton) {
-								mode.push({device:0});
-							}
+						html += '    <button type="button" class="btn" '+(enableMoreDirectScenes?'':"disabled ")+'style="min-width:10px;'+
+							             (mode.length>0?';color:orange;':'')+(enableMoreDirectScenes?'':'background-color:#AAAAAA;')+
+							             '" onClick="SceneController_SetPlaceholder('+SCObj.Id+','+peerId+','+stateButton+')">+Direct</button>\n';
+						if (enableMoreDirectScenes && SceneController_Placeholder == stateButton) {
+							mode.push({device:0});
 						}
 						html += '   </div>\n  </td>\n </tr>\n';
 						// Extra lines for direct association
@@ -1352,13 +1359,13 @@ function SceneController_Screens(SCObj, deviceId) {
 									}
 									if (controllable.basicSetOnly) { // The target device is not scene capable
 										if (!enableNonSceneDirect && mode.prefix != "T") {
-											return 0  // A vera scene is enabled. We need Scene Activate mode unless we can figure which button was pushed indifectly by reading the toggling indicator.
+											return 0  // A vera scene is enabled. We need Scene Activate mode unless we can figure which button was pushed indirectly by reading the toggling indicator.
 										}
 									}
 									return result;
 		  	 					});
 							var controllable = SceneController_GetDeviceProperties(SceneController_get_device_object(mode[j].device))
-							if (mode.sceneControllable && (controllable.scene && controllable.multiLevel) || SCObj.HasCooperConfiguration) {
+							if ((mode.sceneControllable && controllable.scene) || SCObj.HasCooperConfiguration) {
 								html +=  '    <input type="checkbox"'+((mode[j].level || mode[j].level == 0) && mode[j].level != 255 ?' checked':'')+' id="LevelSelect_'+peerId+'_'+curScreen+'_'+stateButton+'_'+j+'"'
 								     +   ' style="min-width:10px;margin-left:10px;" onChange="SceneController_SelectDirectDevice('+SCObj.Id+',\''+mode.prefix+'\','+peerId+',\''+curScreen+'\',\''+stateButton+'\',\''+j+'\',2)"><span/>\n'
 								     +   'Level: '
