@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller Version 1.01
+-- GenGeneric Scene Controller Version 1.02
 -- Copyright 2016 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -7,7 +7,7 @@
 -- VerboseLogging == 2: Include extended ZWave Queue  ELog, log, DLog, DTableToString,
 -- VerboseLogging == 3:	Includes verbose logs:        ELog, log, DLog, DTableToString, VLog, VTableToString
 
-local VerboseLogging = 0
+local VerboseLogging = 1
 
 bit = require "bit"
 posix = require "posix"
@@ -45,7 +45,7 @@ Devices = {
 		OldServiceId            = "urn:gengen_mcv-org:serviceId:EvolveLCD1",
 		OldParamPrefix          = "LCD",
 		ScreenList              = {C=6,T=6,P=41},
-		NumTemperaturScrens     = 3, -- Preset Pages 8, 16, and 40
+		NumTemperatureScreens   = 3, -- Preset Pages 8, 16, and 40
 		-- The "Large" font is actually narrower than the small font and can thus fit more characters per line.
 		-- However two lines of the small font can fit in one line of the large font.
 	    LargeFontWidths         = {
@@ -277,7 +277,7 @@ Devices = {
 		OldParamPrefix          = "RFWC5",
 		DeviceXml               = "D_CooperRFWC5.xml",
 		ScreenList              = {P=1},
-		NumTemperaturScrens     = 0,
+		NumTemperatureScreens   = 0,
 	    LargeFontWidths         = {}, -- Empty if not HasScreen
 	    SmallFontWidths         = {}, -- Empty if not HasScreen
 		screenWidth             = 1,  -- Dummy if not HasScreen
@@ -378,7 +378,7 @@ Devices = {
 		OldParamPrefix          = "NEXIA",
 		DeviceXml               = "D_NexiaOneTouch.xml",
 		ScreenList              = {C=1},
-		NumTemperaturScrens     = 0,
+		NumTemperatureScreens   = 0,
 		-- The "Large" font is actually narrower than the small font and can thus fit more characters per line.
 		-- However two lines of the small font can fit in one line of the large font.
 	    LargeFontWidths         = {
@@ -3355,7 +3355,7 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 				if not levels[v] then
 					levels[v] = true
 					local list = {}
-					for k2, v2 in pairs(assocList) do
+					for k2, v2 in pairs(associateList) do
 						if v2 == v then
 							list[k2] = true;
 						end
@@ -3549,7 +3549,7 @@ function SetCustomScreen(peer_dev_num, screenNum, doTimeout, forceClear, indicat
 			prevScreen = ""
 		end
 	end
-	if forceClear and not indicatorOnly then
+	if (not indicatorOnly) and (forceClear or (SCObj.ScreenPage(screen) ~= SCObj.ScreenPage(prevScreen))) then
 		SCObj.SetDeviceScreen(peer_dev_num, screen)
 	end
 	local prevNumLines, prevScrollOffset
@@ -4255,7 +4255,7 @@ function SceneActivatedMonitorCallback(peer_dev_num, result)
 	local zWaveSceneId = tonumber(result.C2, 16)
 	local dimminDuration = tonumber(result.C3, 16)
 	if CheckDups(peer_dev_num, time, receiveStatus, "2B"..result.C2..result.C3) then
-		SceneChange(peer_dev_num, zWaveSceneId, time)
+		SceneChange(peer_dev_num, true, zWaveSceneId, time)
 	end
 end
 
@@ -4265,11 +4265,7 @@ function BasicSetMonitorCallback(peer_dev_num, result)
 	local receiveStatus = tonumber(result.C1, 16)
 	local setValue = tonumber(result.C2, 16)
 	if CheckDups(peer_dev_num, time, receiveStatus, "20"..result.C2) then
-		if setValue == 0 then
-			SceneChange(peer_dev_num, setValue, time)
-		else
-			ELog("BasicSetMonitorCallback: Basic Set not set to 0: " .. tostring(setValue))
-		end
+		SceneChange(peer_dev_num, false, setValue, time)
 	end
 end
 
@@ -4512,7 +4508,7 @@ function IndicatorChanged(peer_dev_num, response)
 	local oldIndicator = tonumber(oldindicator_string)
 	DEntry()
 	luup.variable_set(SID_SCENECONTROLLER, CURRENT_INDICATOR, tostring(newIndicator), peer_dev_num)
-	for physicalButton = 0, SCObj.NumButtons do
+	for physicalButton = 1, SCObj.NumButtons do
 		local b = SCObj.PhysicalButtonToIndicator(physicalButton);
 		if bit.band(b, oldIndicator) ~= bit.band(b, newIndicator) then
 			local activate = bit.band(b, newIndicator) ~= 0
@@ -4522,7 +4518,7 @@ function IndicatorChanged(peer_dev_num, response)
 	RunZWaveQueue("IndicatorChanged", 0)
 end
 
-function SceneChange(peer_dev_num, zwave_scene, cur_scene_time)
+function SceneChange(peer_dev_num, isSceneId, zwave_scene, cur_scene_time)
     DEntry()
 	local act_deact
 	local physicalButton
@@ -4533,18 +4529,19 @@ function SceneChange(peer_dev_num, zwave_scene, cur_scene_time)
 	end
 	local currentScreen = GetCurrentScreen(peer_dev_num)
 	local numLines, scrollOffset = GetNumLinesAndScrollOffset(peer_dev_num, currentScreen)
-	if zwave_scene == 0 then
-		-- We just got a BASIC_SET_OFF command and we are not sure which button was turned off.
-	  	local indicator_string = luup.variable_get(SID_SCENECONTROLLER, CURRENT_INDICATOR, peer_dev_num)
-	  	local indicator = tonumber(indicator_string)
-		for i = 0, SCObj.NumButtons do
-			if indicator == SCObj.PhysicalButtonToIndicator(i) then
-				activate = false
-				physicalButton = i
-				break
+	if not isSceneId then
+		-- We just got a BASIC_SET command and we are not sure which button was turned off.
+		if SCObj.HasIndicator then
+		  	local indicator_string = luup.variable_get(SID_SCENECONTROLLER, CURRENT_INDICATOR, peer_dev_num)
+		  	local indicator = tonumber(indicator_string)
+			for i = 0, SCObj.NumButtons do
+				if indicator == SCObj.PhysicalButtonToIndicator(i) then
+					activate = false
+					physicalButton = i
+					break
+				end
 			end
-		end
-		if not physicalButton then
+			if not physicalButton then
 --[[
 42      12/18/16 13:37:28.574   0x1 0x9 0x0 0x4 0x0 0xc 0x3 0x87 0x3 0x1 0x78 (##########x)
            SOF - Start Of Frame --+   ¦   ¦   ¦   ¦   ¦   ¦    ¦   ¦   ¦    ¦
@@ -4560,16 +4557,17 @@ Device 20=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦
                     Checksum OK --------------------------------------------+
 41      12/18/16 13:37:28.574   ACK: 0x6 (#)
 --]]
-			EnqueueZWaveMessageWithResponse("GetIndicator("..node_id..")", -- label
-											node_id, 
-											"0x87 0x02", -- sendData
-											0, -- delay
-											"^01 .. 00 04 .. "..string.format("%02x",node_id).." .. 87 03 (..)", -- responsePattern
-											IndicatorChanged, -- callback
-											true, -- oneShot
-											2000, -- timeout
-											nil, -- armPattern
-											"06") -- autoResponse
+				EnqueueZWaveMessageWithResponse("GetIndicator("..node_id..")", -- label
+												node_id, 
+												"0x87 0x02", -- sendData
+												0, -- delay
+												"^01 .. 00 04 .. "..string.format("%02x",node_id).." .. 87 03 (..)", -- responsePattern
+												IndicatorChanged, -- callback
+												true, -- oneShot
+												2000, -- timeout
+												nil, -- armPattern
+												"06") -- autoResponse
+				end
 			return
 		end
 	elseif zwave_scene > SCObj.LastFixedSceneId then

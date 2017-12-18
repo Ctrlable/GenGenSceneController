@@ -1,4 +1,4 @@
-// User interface for GenGeneric Scene Controller Version 1.01
+// User interface for GenGeneric Scene Controller Version 1.02
 // Copyright 2016 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
@@ -622,6 +622,17 @@ function SceneController_SetPlaceholder(SCObj, peerId, button)
 	SceneController_Screens(SCObj, peerId);
 }
 
+function SceneController_GetDevice(id)
+{
+	var i
+	for (i = 0; i < jsonp.ud.devices.length; ++i) {
+		if (jsonp.ud.devices[i].id == id) {
+			return jsonp.ud.devices[i];
+		}
+	}
+	return null
+}
+
 // Mode strings consist or Prefix {newScreen:+}? {(S{SceneId@}?{offSceneId@}?)|C}? {entry}[0-5]
 // Prefix is M for momentary, T for Toggle, etc.
 // newScreen is a letter/digit such as C3 for Custom 3 or P4 for Preset 4
@@ -651,33 +662,44 @@ function SceneController_ParseModeString(SCObj, str) {
 			mode.sceneControllable = true;
 			var re2 = /(\d+),(\d+),(\d+)/g;
 			var reResult;
-			if ((reResult = /^.(%d+)@(%d+)@(.*)$/.exec(str)) != null) {
+			if ((reResult = /^.(\d+)@(\d+)@(.*)$/.exec(str)) != null) {
 				mode.sceneId = parseInt(reResult[1]);
 		 		mode.offSceneId = parseInt(reResult[2]);
 				str = reResult[3];
-			} else if ((reResult = /^.(%d+)@(.*)$/.exec(str)) != null) {
+			} else if ((reResult = /^.(\d+)@(.*)$/.exec(str)) != null) {
 				mode.sceneId = parseInt(reResult[1]);
 				str = reResult[2];
 			}
 			while ((reResult = re2.exec(str)) != null) {
-				mode.push({device: parseInt(reResult[1]),
-				           level: parseInt(reResult[2]),
-				           dimmingDuration: parseInt(reResult[3])
-				          });
+				var device = parseInt(reResult[1])
+				var level = parseInt(reResult[2])
+				var dimmingDuration = parseInt(reResult[3])
+				if (SceneController_GetDevice(device)) {
+					mode.push({device: device,
+				           	   level: level,
+				           	   dimmingDuration: dimmingDuration})
+				}
 			}
 		} else if (str.charAt(0) == "C") {
 			mode.cooperConfiguration = true
 			var re = /(\d+),(\d+)/g;
 			var reResult
 			while ((reResult = re.exec(str)) != null) {
-				mode.push({device: parseInt(reResult[1]),
-				           level: parseInt(reResulg[2])});
+				var device = parseInt(reResult[1])
+				var level = parseInt(reResult[2])
+				if (SceneController_GetDevice(device)) {
+					mode.push({device: device,
+				           	   level: level});
+				}
 			}
 		} else {
 			var re = /(\d+)/g;
 			var reResult
 			while ((reResult = re.exec(str)) != null) {
-				mode.push({device: parseInt(reResult[1])});
+				var device = parseInt(reResult[1])
+				if (SceneController_GetDevice(device)) {
+					mode.push({device: device});
+				}
 			}
 		}
 	}
@@ -704,7 +726,7 @@ function SceneController_GenerateModeString(SCObj, mode) {
 					str += mode.offSceneId + "@"
 				}
 			}
-		} else if (mode.coopeConfiguration) {
+		} else if (mode.cooperConfiguration) {
 			str += "C";
 		}
 		var first = true;
