@@ -1,4 +1,4 @@
--- Installer for GenGeneric Scene Controller Version 1.19d
+-- Installer for GenGeneric Scene Controller Version 1.20d
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 --
 -- Includes installation files for
@@ -18,7 +18,7 @@ VerboseLogging = 4
 -- Set UseDebugZWaveInterceptor to true to enable zwint log messages to log.LuaUPnP (Do not confuse with LuaUPnP.log)
 local UseDebugZWaveInterceptor = true
 
-local GenGenInstaller_Version = 118 -- Update this each time we update the installer.
+local GenGenInstaller_Version = 120 -- Update this each time we update the installer.
 
 local bit = require 'bit'
 local nixio = require "nixio"
@@ -64,7 +64,7 @@ function UpdateFileWithContent(filename, content, permissions, version, force)
 	if stat then
 		if version > oldversion or (version == oldversion and stat.size ~= #content) or force then
 			log("Backing up ", filename, " to ", backupName, " and replacing with new version.")
-			VLog("Old ", filename, " size was ", stat.size, " bytes. new size is ", #content, " bytes.")
+	VLog("Old ", filename, " size was ", stat.size, " bytes. new size is ", #content, " bytes.")
 			nixio.fs.rename(backupName, oldName)
 			local result, errno, errmsg =  nixio.fs.rename(filename, backupName)
 			if result then
@@ -75,13 +75,13 @@ function UpdateFileWithContent(filename, content, permissions, version, force)
 			end
 		else
 			if oldversion > version then
-				VLog("Not updating ", filename, " because the old version is ", oldversion, " and the new version is ", version)
+	VLog("Not updating ", filename, " because the old version is ", oldversion, " and the new version is ", version)
 			else
-				VLog("Not updating ", filename, " because the new content is ", #content, " bytes and the old is ", stat.size, " bytes.")
+	VLog("Not updating ", filename, " because the new content is ", #content, " bytes and the old is ", stat.size, " bytes.")
 			end
 		end
 	else
-		VLog("updating ", filename, " because a previous version does not exist")
+	VLog("updating ", filename, " because a previous version does not exist")
 		update = true
 	end
 	if update then
@@ -93,7 +93,7 @@ function UpdateFileWithContent(filename, content, permissions, version, force)
 				if backup then
 					nixio.fs.remove(oldName)
 				end
-				VLog("Wrote ", filename, " successfully (", #content, " bytes)")
+	VLog("Wrote ", filename, " successfully (", #content, " bytes)")
 				if version > 0 then
 					luup.variable_set(GENGENINSTALLER_SID, filename .. "_version", tostring(version), lul_device)
 				end
@@ -241,7 +241,7 @@ function updateJson(filename, update_func, updated)
 		write_file:close()
 		reload_needed = filename
 	else
-		VLog("Not updating ", filename)
+	VLog("Not updating ", filename)
 	end
 end
 
@@ -251,7 +251,7 @@ function ScanForNewDevices()
 	DEntry()
 
 	local function AdoptEvolveLCD1(device_num)
-		DEntry()
+	DEntry()
 		luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1", device_num)
 		luup.attr_set("device_file", "D_EvolveLCD1.xml", device_num)
 		luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
@@ -280,7 +280,7 @@ function ScanForNewDevices()
 	end
 
 	local function AdoptCooperRFWC5(device_num)
-		DEntry()
+	DEntry()
 		luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerCooperRFWC5:1", device_num)
 		luup.attr_set("device_file", "D_CooperRFWC5.xml", device_num)
 		luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
@@ -297,7 +297,7 @@ function ScanForNewDevices()
 	end
 
 	local function AdoptNexiaOneTouch(device_num)
-		DEntry()
+	DEntry()
 		luup.attr_set("device_type", "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1", device_num)
 		luup.attr_set("device_file", "D_NexiaOneTouch.xml", device_num)
 		luup.attr_set("impl_file", "I_GenGenSceneController.xml", device_num)
@@ -329,10 +329,10 @@ function ScanForNewDevices()
 
     -- This is a hack for the Aeotec Siren which includes "COMMAND_CLASS_SECURITY" in its node info but never actually responds to a Security Nonce Get command
 	local function ApplyAeotecSirenHack()
-		DEntry()
+	DEntry()
 
 		local function AeotecSirenCallback(dev_num, result)
-			DLog("Aeotec Siren node info intercept: peer_dev_num num=", dev_num," result=",result);
+	DLog("Aeotec Siren node info intercept: peer_dev_num num=", dev_num," result=",result);
 		end
 
 		MonitorZWaveData(false, -- incoming
@@ -410,18 +410,18 @@ Can send command class[2] = COMMAND_CLASS_HAIL ---------------------------------
 	-- Vera also does not like devices that don't support COMMAND_CLASS_VERSION so we add it to the command class list and intercept the expected
 	-- version and command class version queries.
 	local function ApplyKichler12387Hack(device_num, node_id)
-		DEntry()
+	DEntry()
 
 		local function Kichler12387NodeInfoCallback(peer_dev_num, result)
-			DLog("Kichler 12387 node info intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
+	DLog("Kichler 12387 node info intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
 		end
 
 		local function Kichler12387VersionCallback(peer_dev_num, result)
-			DLog("Kichler 12387 Version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
+	DLog("Kichler 12387 Version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
 		end
 
 		local function Kichler12387CommandClassVersionCallback(peer_dev_num, result)
-			DLog("Kichler 12387 Version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
+	DLog("Kichler 12387 Version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
 		end
 
 		MonitorZWaveData(true, -- outgoing,
@@ -599,7 +599,7 @@ Requested Command Class = COMMAND_CLASS_SWITCH_MULTILEVEL ----------------+   ¦ 
 
 	-- This is a hack for UI7 1.7.2608 mishandling of the Shlage BE469 lock. It is incorrectly sending a Command Cleass Version, Version Command Class Get in non-secure mode.
 	local function ApplySchageLockHack(device_num, node_id)
-		DEntry()
+	DEntry()
 
 		local function ShlageLockVersionCallback(peer_dev_num, result)
 			log("Shlage lock version intercept: device num=".. device_num.." node_id="..node_id.. "result=".. tableToString(result));
@@ -743,7 +743,7 @@ Requested Command Class = COMMAND_CLASS_ALARM ---------------------------+    ¦ 
 			luup.devices[device.device_num_parent].device_type == "urn:schemas-micasaverde-com:device:ZWaveNetwork:1" then
 	  		local manufacturer_info = luup.variable_get("urn:micasaverde-com:serviceId:ZWaveDevice1", "ManufacturerInfo", device_num)
 			local capabilities = luup.variable_get("urn:micasaverde-com:serviceId:ZWaveDevice1", "Capabilities", device_num)
-			DLog("device_num=",device_num," name=",device.description," manufacturer_info=",manufacturer_info," capabilities=",capabilities);
+	DLog("device_num=",device_num," name=",device.description," manufacturer_info=",manufacturer_info," capabilities=",capabilities);
 		  	if manufacturer_info == "275,17750,19506" then
 	        	if device.device_type ~= 'urn:schemas-gengen_mcv-org:device:SceneControllerEvolveLCD:1' then
 					AdoptEvolveLCD1(device_num)
@@ -768,13 +768,13 @@ Requested Command Class = COMMAND_CLASS_ALARM ---------------------------+    ¦ 
 	end	-- for device_num
 
 	local function NexiaManufacturerCallback(peer_dev_num, result)
-		DEntry()
+	DEntry()
 
 		local time = tonumber(result.time)
 		local receiveStatus = tonumber(result.C1, 16)
 		local node_id = tonumber(result.C2, 16)
 		local device_num = NodeIdToDeviceNumber(node_id)
-		DEntry("NexiaManufacturerCallback")
+	DEntry("NexiaManufacturerCallback")
 		if device_num and CheckDups(device_num, time, receiveStatus, "72050178534347359e"..result.C2) then
 			local device = luup.devices[device_num]
 			if device and device.device_type ~= "urn:schemas-gengen_mcv-org:device:SceneControllerNexiaOneTouch:1" then
@@ -840,7 +840,7 @@ Z-Wave Protocol Sub-Version = 32 -----------------------------------------------
 	convert version 4, subversion 32 to version 3, subversion 28 (Z-Wave 5.03.00)
 --]==]
 		local function NexiaVersionCallback(peer_dev_num, result)
-			DEntry("NexiaVersionCallback")
+	DEntry("NexiaVersionCallback")
 		end
 
 		MonitorZWaveData(false, -- incoming,
@@ -2193,7 +2193,7 @@ AXAPASAgPC8psADwAcwJBjwvc2NwZD4NChEAAA==
 		log("Files updated including ",reload_needed,". Reloading LuaUPnP.")
 		luup.call_action(HAG_SID, "Reload", {}, 0)
 	else
-		VLog("Nothing updated. No need to reload.")
+	VLog("Nothing updated. No need to reload.")
 	end
 end	-- function SceneControllerInstaller_Init
 
