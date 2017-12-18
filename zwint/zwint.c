@@ -37,7 +37,7 @@
 #include <lauxlib.h>
 #include <luaconf.h>
 
-#define VERSION 1.03
+#define VERSION 1.04
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -74,6 +74,7 @@ typedef struct monitor {
 	char oneshot;			/* 0 if not oneshot */
 	char has_arm_pattern;	/* 1 if arm_pattern is valid */
 	char armed;				/* 1 if intercept and arm_pattern has been matched */
+	char forward;			/* 1 if response should be forwarded */
 	regex_t arm_pattern;	/* Pattern to arm the intercept */
 	regex_t pattern;
 	char *response;		/* intercept only */
@@ -398,7 +399,7 @@ static void process_zwave(int input_fd, int output_fd, int send, zwave_state *s)
 											int error = 0;
 											unsigned char byte = 0;
 											while ((c = *r++) && !error) {
-												DBG("      Response c=%c rstate=%d byte=0x%02X", c, rstate, byte);
+												DBG("      %s c=%c rstate=%d byte=0x%02X", m->forward ? "forward" : "response", c, rstate, byte);
 												int val = -1;
 												if (c >= '0' && c <= '9' && rstate < 4) {
 													val = c - '0';
@@ -478,9 +479,9 @@ static void process_zwave(int input_fd, int output_fd, int send, zwave_state *s)
 													s->response_partpos[++s->response_numParts] = s->response_zpos;
 												}
 												int rlen = s->response_partpos[1] - s->response_buff; 
-												int result = write(input_fd, s->response_buff, rlen);
+												int result = write(m->forward ? output_fd : input_fd, s->response_buff, rlen);
 												if (result < 0) {
-													thread_error("Intercept write", errno);
+													thread_error(m->forward ? "Forward write" : "Response write", errno);
 												
 												}
 												s->response_partNum = 0;
@@ -842,6 +843,14 @@ static int wwint_monitor_intercept(lua_State *L, int is_intercept) {
 		response = "";
 		response_len = 0;
 	}
+	int forward = 0;
+	if (lua_gettop(L) >= 8) {
+		if (lua_isboolean(L, 8)) {
+			forward = lua_toboolean(L, 8);
+		} else {
+        	return luaL_argerror(L, 8, "Forward not boolean");
+		}
+	}
 
 	int monitor_len =  sizeof(monitor) + strlen(key) + strlen(response) + 2;
 	monitor *m = malloc(monitor_len);
@@ -877,8 +886,9 @@ static int wwint_monitor_intercept(lua_State *L, int is_intercept) {
 	m->armed = !has_arm_pattern;
 	strcpy(p, response);
 	m->response = response_len > 0 ? p : NULL;
+	m->forward = forward;
 	m->timeout = timeout ? now() + timeout : 0;
-	DBG("Lua %s: key=%s arm_pattern=%s pattern=%s response=%s oneshot=%d timeout=%d", m->intercept?"intercept":"monitor", m->key, arm_pattern, pattern, response, m->oneshot, timeout);  
+	DBG("Lua %s: key=%s arm_pattern=%s pattern=%s response=%s oneshot=%d timeout=%d forward=%d", m->intercept?"intercept":"monitor", m->key, arm_pattern, pattern, response, m->oneshot, timeout, forward);  
 	pthread_mutex_lock(&mutex);
 	/* Insert the monitor into the doubly linked circular list so that the
 	 * entries with the soonest timeout comes first followed by any with no timeout
@@ -905,7 +915,7 @@ static int wwint_monitor_intercept(lua_State *L, int is_intercept) {
 }
 
 /*
- * zwint.monitor(device_num, key, pattern, oneshot, timeout, <arm_pattern>, <response>)
+ * zwint.monitor(device_num, key, pattern, oneshot, timeout, <arm_pattern>, <response>, <forward>)
  * Monitor for incoming Z-Wave data.
  * device_num: LuaUPnP Device number which is monitoring Z-Wave.
  * key: string - returned through the HTTP server when the monitor matches
@@ -924,6 +934,9 @@ static int wwint_monitor_intercept(lua_State *L, int is_intercept) {
  *   If response is not specified, pass through the data to LuaUPnP but also send a monitor action to the HTTP server. 
  *   If response is specified, don't pass the data to LuaUPnP but send back the response expected by the controller.
  *      typically 06 (ACK)
+ * forward: If present and true, the response is forwarded to the Z-Wave controller and 
+ *   replaces the message from the device rather than being sent back to the device. In this way, it is possible
+ *   to filter messages that the controller does not understand and which confuses it. 
  * Returns: true if success 
  *          nil, errno, errString if error 
  */
@@ -951,6 +964,9 @@ static int zwint_monitor(lua_State *L) {
  *   Response is in hex and may have \0 .. \9 captures from the intercepted pattern an
  *   Use XX to fill in the checksum 
  *   ZwInt will automatically remove and 06 (ACK) responses from the controller acknowledging the response.
+ * forward: If present and true, the response is forwarded to the device and 
+ *   replaces the message from the controller rather than being sent back to the controller. In this way, it is possible
+ *   to filter messages from the controller that the device does not understand and which confuse it. 
  * Returns: true if success 
  *          nil, errno, errString if error 
  */

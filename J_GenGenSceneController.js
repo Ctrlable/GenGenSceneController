@@ -1,4 +1,4 @@
-// User interface for GenGeneric Scene Controller Version 1.08
+// User interface for GenGeneric Scene Controller Version 1.09
 // Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
@@ -1348,6 +1348,10 @@ function SceneController_Screens(SCObj, deviceId) {
 									}
 									var controllable = SceneController_GetDeviceProperties(obj);
 									if (!controllable.zWave) { // Non-Z-Wave devices cannot be controlled by direct scenes
+										return 0
+									}
+									if (mode.prefix == "H" && obj.category_num != 5 && obj.category_num != 17) {
+									    // Only allow temperature devices in thermostat mode.
 										return 0
 									}
 									var result = controllable.scene ? 2 : 1

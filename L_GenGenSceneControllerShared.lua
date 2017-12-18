@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller shared code Version 1.08
+-- GenGeneric Scene Controller shared code Version 1.09
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -231,6 +231,8 @@ local TaskHandleList = {}
 MonitorContextNum = 0
 MonitorContextList = {}
 local DeviceAwakeList = {}
+local DeviceAwakeStates = {}
+local DeviceAwakeNextState = 1
 local NoMoreInformationContexts = {}
 
 local function EnqueueInternalActionOrMessage(queueNode)
@@ -348,8 +350,11 @@ end
 --   If OneShot is false and arm_regex is not nil, then the intercept is disarmed when it triggers.
 -- Timeout and delay are in milliseconds.
 --   If timeout is 0 then the monitor will be active until canceled with CancelZWaveMonitor
+-- Label - A label used in creating the unique key for this monitor. Should be descriptive and helps with debugging.
+-- Forward is true if the response should be forwarded to the opposite party rather than returned back to the sender.
+--   Only used if AutoResponse is non-nil 
 -- Returns a context which can be passed to CancelZWaveMonitor or nil if error.
-function MonitorZWaveData(outgoing, peer_dev_num, arm_regex, intercept_regex, autoResponse, callback, owneshot, timeout, label)
+function MonitorZWaveData(outgoing, peer_dev_num, arm_regex, intercept_regex, autoResponse, callback, owneshot, timeout, label, forward)
 	VEntry()
   	local context
 	MonitorContextNum = MonitorContextNum + 1
@@ -357,13 +362,16 @@ function MonitorZWaveData(outgoing, peer_dev_num, arm_regex, intercept_regex, au
 	if outgoing then
   		prefix = "I_"
 	end
+	if not forward then
+		forward = false
+	end
 	context = prefix .. label .. "_" .. peer_dev_num.."_"..MonitorContextNum
 	MonitorContextList[context] = {outgoing=outgoing, callback=callback, oneshot=oneshot}
   	local result, errcode, errmessage
   	if outgoing then
-    	result, errcode, errmessage = zwint.intercept(peer_dev_num, context, intercept_regex, owneshot, timeout, arm_regex, autoResponse)
+    	result, errcode, errmessage = zwint.intercept(peer_dev_num, context, intercept_regex, owneshot, timeout, arm_regex, autoResponse, forward)
   	else
-    	result, errcode, errmessage = zwint.monitor(peer_dev_num, context, intercept_regex, owneshot, timeout, arm_regex, autoResponse)
+    	result, errcode, errmessage = zwint.monitor(peer_dev_num, context, intercept_regex, owneshot, timeout, arm_regex, autoResponse, forward)
   	end
   	if not result then
 		ELog("MonitorZWaveData: zwint failed. error code=", errcode, " error message=", errmessage)
@@ -491,8 +499,8 @@ end
 local function ChangeBatteryNoMoreInformationMonitor(peer_dev_num, zwave_node, enable)
 	VEntry("ChangeBatteryNoMoreInformationMonitor")
 	local BatteryNoMoreInformationCallback = function(installer, captures)
-		VEntry("BatteryNoMoreInformationCallback")
 		local deviceAwakeCount = DeviceAwakeList[zwave_node]
+		VEntry("BatteryNoMoreInformationCallback")
 		if not deviceAwakeCount == nil or deviceAwakeCount == 0 then
 			ELog("Received a No More Information message for device ", peer_dev_num, " Z-Wave node ", zwave_node, " without a corresponing wake-up event.")
 			return 
@@ -511,6 +519,8 @@ local function ChangeBatteryNoMoreInformationMonitor(peer_dev_num, zwave_node, e
 				TaskHandleList[peer_dev_num] = luup.task("", 4, device.description, handle)
 			end
 		    EnqueueFinalZWaveMessage("BatteryNoMoreInformation", zwave_node, "0x84 0x8", peer_dev_num);
+		else
+			VLog("BatteryNoMoreInformationCallback: Battery wait not released because deviceAwakeCount=",deviceAwakeCount)
 		end
 	end
 
@@ -562,7 +572,7 @@ Xmit options = ACK | AUTO_ROUTE ------------------------------------+        ¦  
 --]==]
 				"06 01 04 01 \\1 01 XX 01 05 00 \\1 \\3 00 XX",
 				BatteryNoMoreInformationCallback, 
-				false, -- not oneShot
+				false, -- oneShot
 				0, -- no timeout
 				"BatteryNoMoreInfo")
 		end
@@ -578,6 +588,27 @@ Xmit options = ACK | AUTO_ROUTE ------------------------------------+        ¦  
 	end -- else not enable
 end -- function ChangeBatteryNoMoreInformationMonitor
 
+function SceneController_NoMoreInformationTimeout(data)
+	local peer_dev_num, zwave_node, state = string.match(data,"(%d+)_(%d+)_(%d+)")
+	peer_dev_num = tonumber(peer_dev_num)
+	zwave_node = tonumber(zwave_node)
+	state = tonumber(state)
+	VEntry()
+	if DeviceAwakeStates[zwave_node] == state then
+	   	if  DeviceAwakeList[zwave_node] > 1 then
+	   		DeviceAwakeList[zwave_node] = 0
+			ChangeBatteryNoMoreInformationMonitor(peer_dev_num, zwave_node, false)
+		elseif  DeviceAwakeList[zwave_node] == 1 then
+			VLog("Ignoring No More Information timeout because we are currently activing commnicating with the devoce. DeviceAwakeList[",zwave_node,"]=",DeviceAwakeList[zwave_node]) 
+		else
+			VLog("Ignoring No More Information timeout because it is no longer active. DeviceAwakeList[",zwave_node,"]=",DeviceAwakeList[zwave_node]) 		 	
+		end
+	else
+		VLog("Ignoring stale No More Information timeout. callback state=",state, "DeviceAwakeStates[",zwave_node,"]=",DeviceAwakeStates[zwave_node])  	
+	end
+	RunInternalZWaveQueue("NoMoreInformationTimeout", 0) 
+end
+
 function InitWakeUpNotificationMonitor(peer_dev_num, zwave_node, alreadyAwake)
 	VEntry()
 	if DeviceAwakeList[zwave_node] ~= nil then
@@ -585,15 +616,19 @@ function InitWakeUpNotificationMonitor(peer_dev_num, zwave_node, alreadyAwake)
 	end
 	DeviceAwakeList[zwave_node] = 0
 	local WakeUpNotificationCallback = function(installer, captures)
+		local deviceAwake = DeviceAwakeList[zwave_node]
 		VEntry("WakeUpNotificationCallback")
-		if DeviceAwakeList[zwave_node] > 0 then
-			DeviceAwakeList[zwave_node] = DeviceAwakeList[zwave_node] + 1
+		if deviceAwake > 0 then
+			DeviceAwakeList[zwave_node] = deviceAwake + 1
 		else
 			DeviceAwakeList[zwave_node] = 2
 		end
 		if DeviceAwakeList[zwave_node] == 2 then
 			ChangeBatteryNoMoreInformationMonitor(peer_dev_num, zwave_node, true)
 		end
+		DeviceAwakeStates[zwave_node] = DeviceAwakeNextState
+		luup.call_delay("SceneController_NoMoreInformationTimeout", 10, peer_dev_num .. "_" .. zwave_node .. "_" .. DeviceAwakeNextState, true)
+		DeviceAwakeNextState = DeviceAwakeNextState+1
 	end 	
 	MonitorZWaveData( 
 				false, -- outgoing
@@ -896,7 +931,7 @@ function SceneController_ZWaveMonitorResponse(device, response, is_intercept, is
 			-- A non-first-peer receives the response message first but then relays it
 			-- to the first peer so that it can clear the WaitingForResponse flag
 			-- and allow more messages to be sent for that device.
-	  		luup.call_action(SID_ZWAVEMONITOR, "Monitor", response, GetFirstInstaller())
+	  		luup.call_action(SID_ZWAVEMONITOR, response.action, response, GetFirstInstaller())
 		end
 	end
 	if callback then
