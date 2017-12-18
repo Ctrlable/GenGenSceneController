@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller Version 1.10
+-- GenGeneric Scene Controller Version 1.10.1
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controller
 
@@ -2174,7 +2174,7 @@ function SceneController_WatchedIndicatorDeviceChanged(device, service, variable
 		if not SCObj.HasScreen or curScreen == screen then
 			SetIndicator(peer_dev_num, screen, false, 100)
 		end
-		RunZWaveQueue("WatchedIndicatorDeviceChanged", 0)
+		RunZWaveQueue("WatchedIndicatorDeviceChanged", 250) -- 250ms delay to avoid a "cannot get lock" crash as job is in progress
 	end
 end
 
