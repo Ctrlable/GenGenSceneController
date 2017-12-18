@@ -426,7 +426,7 @@ static void process_zwave(int input_fd, int output_fd, int send, zwave_state *s)
 															break;
 														case 5: /* Checksum */
 															if (s->response_zstate < 2) {
-																/* monitor_error(m, "Bad Response checksum"); */
+																monitor_error(m, "Bad Response checksum");
 																error = 1;
 															} else {
 																int newLen = s->response_zstate-1;
@@ -450,8 +450,8 @@ static void process_zwave(int input_fd, int output_fd, int send, zwave_state *s)
 													error = addZwaveResponseData(m, s, &byte, 1);
 												}
 												if (!error) {
-													if (s->response_partpos[s->response_numParts] < s->response_zpos && s->response_numParts < MAX_RESPONSE_PARTS) {
-														s->response_partpos[++s->response_numParts] = s->response_zpos;
+													if (response_partpos[s->response_numParts] < s->response_zpos && s->response_numParts < MAX_RESPONSE_PARTS) {
+														response_partpos[++s->response_numParts] = s->response_zpos
 													}
 													int rlen = s->response_partpos[1] - s->response_buff; 
 													int result = write(input_fd, s->response_buff, rlen);

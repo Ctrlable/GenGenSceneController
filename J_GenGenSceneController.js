@@ -1,3 +1,5 @@
+// User interface for GenGeneric Scene Controller Version 1.00
+// Copyright 2016 Gustavo A Fernandez All Rights Reserved
 
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
 
@@ -620,7 +622,7 @@ function SceneController_SetPlaceholder(SCObj, peerId, button)
 	SceneController_Screens(SCObj, peerId);
 }
 
-// Mode strings consist or Prefix {newScreen:}? {(S{SceneId@}?{offSceneId@}?)|C}? {entry}[0-5]
+// Mode strings consist or Prefix {newScreen:+}? {(S{SceneId@}?{offSceneId@}?)|C}? {entry}[0-5]
 // Prefix is M for momentary, T for Toggle, etc.
 // newScreen is a letter/digit such as C3 for Custom 3 or P4 for Preset 4
 // The S flag indicates that all subsequent associated devices are scene capable
@@ -636,9 +638,10 @@ function SceneController_ParseModeString(SCObj, str) {
 	} else {
 		mode.prefix = str.charAt(0);
 		str = str.slice(1);
-		if (str.match(/[A-Z][0-9]:/)) {
-			mode.newScreen = str.slice(0,2);
-			str = str.slice(3);
+		var matchArray = str.match(/([A-Z][0-9]):+(.*)$/)  // :+ to deal with an old bug
+		if (matchArray) {
+			mode.newScreen = matchArray[1];
+			str = matchArray[2];
 		} else if (mode.prefix == "N") {
 			// Legacy switch screen.
 			mode.newScreen = str;
@@ -1007,14 +1010,14 @@ function SceneController_IsZWaveObject(obj) {
 // zWave: Boolean - Device is Z-Wave
 // scene: Boolean - Device is Scene Controllable
 // basicSet: Boolean - Device is not scene controllable but Basic Set contrllable
-// multilevel: Boolean - Device is multilevel
+// multiL: Boolean - Device is multiL
 // binary: Boolean - Device is binary
 function SceneController_GetDeviceProperties(obj) {
 	var result = {
 		zWave: false,
 		scene: false,
 		basicSet: false,
-		multilevel: false,
+		multiLevel: false,
 		binary: false
 	}
 	if (!SceneController_IsZWaveObject(obj)) {
@@ -1043,7 +1046,7 @@ function SceneController_GetDeviceProperties(obj) {
 		result.basicSet = true; // Every Z-Wave device should implicitly support Basic Get/Set.
 	}
 	if (supportedClasses[38]) { // COMMAND_CLASS_SWITCH_MULTILEVEL
-		result.multilevel = true
+		result.multiL = true
 	} else if (supportedClasses[37]) {	// COMMAND_CLASS_SWITCH_BINARY
 		result.binary = true
 	}
@@ -1198,9 +1201,11 @@ function SceneController_Screens(SCObj, deviceId) {
 						}
 					}
 					var mode = SceneController_ParseModeString(SCObj, modeStr)
+					if (state > 1) {
+						mode.prefix = "M"
+					}
 					html += ' <tr>\n';
 					if (states > 1) {
-						mode.prefix = "M"
 						html +=  '  <td>'+(button+state/10)+'</td>\n';
 					}
 					else {
@@ -1268,7 +1273,7 @@ function SceneController_Screens(SCObj, deviceId) {
 						//var disableVeraScene = mode.length > 0 && SceneController_GetDeviceProperties(SceneController_get_device_object(mode[0].device)).basicSet;
 						var disableVeraScene = false;
 						//var enableNonSceneDirect = SceneController_FindScene(peerId, sceneNum, -1) == null && states == 1;
-						var enableNonSceneDirect = true; 
+						var enableNonSceneDirect = true;
 						switch (mode.prefix) {
 						   	case "M":	// Momentary
 							case "X":	// Exclusive
@@ -1329,7 +1334,7 @@ function SceneController_Screens(SCObj, deviceId) {
 								     +   '    <input class="styled" id="Level_'+peerId+'_'+curScreen+'_'+stateButton+'_'+j+'" type="number"'
 								     +   ' value="'+(mode[j].level == 255?"":mode[j].level)+'" style="width:40px;" onChange="SceneController_SelectDirectDevice('+SCObj.Id+',\''+mode.prefix+'\','+peerId+',\''+curScreen+'\',\''+stateButton+'\',\''+j+'\',3)">\n';
 							}
-							if (mode.sceneControllable && controllable.scene && controllable.multiLevel) {
+							if (mode.sceneControllable && controllable.scene && controllable.multiL) {
 								html +=  '<input type="checkbox"'+(mode[j].dimmingDuration != 255 ?' checked':'')+' id="DimmingDurationSelect_'+peerId+'_'+curScreen+'_'+stateButton+'_'+j+'"'
 								     +   ' style="min-width:10px;margin-left:10px;" onChange="SceneController_SelectDirectDevice('+SCObj.Id+',\''+mode.prefix+'\','+peerId+',\''+curScreen+'\',\''+stateButton+'\',\''+j+'\',4)"><span/>\n'
 								     +   'Duration: '

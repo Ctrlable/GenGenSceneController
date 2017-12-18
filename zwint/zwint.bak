@@ -70,15 +70,19 @@ typedef struct httpRequest {
 } httpRequest;
 
 #define MAX_ZWAVE_BUFF_SIZE 128
+#define MAX_RESPONSE_PARTS 3
 typedef struct zwave_state {
 	unsigned char packet_buff[MAX_ZWAVE_BUFF_SIZE];
 	int state;
 	unsigned char checksum;
 	unsigned char response_buff[MAX_ZWAVE_BUFF_SIZE];
 	int response_zstate;
-	unsigned char *response_zpos; 
+	int response_numParts;
+	int response_partNum;
+	unsigned char *response_zpos;
+	unsigned char *response_lenpos;
+	unsigned char *response_partpos[MAX_RESPONSE_PARTS+1]; 
 	unsigned char *response_zstart;
-	unsigned char *response_midpos;
 	unsigned char response_checksum;
 }zwave_state;
 
@@ -95,7 +99,6 @@ static int http_state = 0;
 static httpRequest *nextRequest, *lastRequest;
 static pthread_t zwint_thread;
 static zwave_state send_state, receive_state;
-static int kill_acks;
 
 /*
  * now_fp_seconds is only used for the HTTP timestamp and is compatible with the
@@ -267,6 +270,7 @@ static int addZwaveResponseData(monitor *m, zwave_state *s, unsigned char *data,
 				s->response_zstate = 1;
 				s->response_zstart = s->response_zpos-1;
 				s->response_checksum = 0xFF;
+				s->response_lenpos = s->response_zpos;
 			}	
 		} else {
 			s->response_zstate++;
@@ -288,22 +292,22 @@ static void process_zwave(int input_fd, int output_fd, int send, zwave_state *s)
 		while (p < endp) {
 			unsigned char c = *p++;
 			DBG("   s->state=%d c=0x%02X", s->state, c);
-			if (send && kill_acks && s->state == 0) {
+			if (send && s->response_partNum < s->response_numParts && s->state == 0) {
 				if (c == 6) {	/* ack */
 					startp = p;
-					DBG("   Swallowed an ack due to kill_acks=%d", kill_acks);
-					if (kill_acks == 2) {
-						int rlen = s->response_zpos-s->response_midpos;
-						DBG("   Writing second part of response: %d bytes", rlen);
-						int result = write(input_fd, s->response_midpos, rlen);
+					++s->response_partNum;
+					DBG("   Swallowing ack %d of %d", s->response_partNum, s->response_numParts);
+					if (s->response_partNum < s->response_numParts) {
+						int rlen = s->response_partpos[s->response_partNum+1] - s->response_partpos[s->response_partNum];
+						DBG("   Writing part %d of response: %d bytes", s->response_partNum+1, rlen);
+						int result = write(input_fd, s->response_partpos[s->response_partNum], rlen);
 						if (result < 0) {
-							thread_error("Intercept write part 2", errno);
+							thread_error("Intercept write", errno);
 						}
-						kill_acks = 1;
 					}
 					continue;
 				} else {
-					kill_acks = 0;
+					s->response_numParts = 0;
 				}
 			}
 			if (s->state == 0) {	/* Not locked onto packet yet */
@@ -361,7 +365,9 @@ static void process_zwave(int input_fd, int output_fd, int send, zwave_state *s)
 											if(m->response) {
 												const char *r = m->response;
 												s->response_zpos = s->response_buff;
-												s->response_midpos = NULL;
+												s->response_numParts = 0;
+												s->response_partNum = 0;
+												s->response_partpos[0] = s->response_buff;
 												s->response_zstate = 0;
 												int rstate = 0;
 												char c;
@@ -411,7 +417,7 @@ static void process_zwave(int input_fd, int output_fd, int send, zwave_state *s)
 															break;
 														case 3: /* \1 - \9 replacement */
 															if (matches[val].rm_so < 0) {
-																monitor_error(m, "More replacements than matches");
+																monitor_error(m, "Unmatched replacement");
 																error = 1;
 															} else {
 																error = addZwaveResponseData(m, s, &s->packet_buff[matches[val].rm_so/3], (2 + matches[val].rm_eo-matches[val].rm_so)/3);
@@ -420,16 +426,20 @@ static void process_zwave(int input_fd, int output_fd, int send, zwave_state *s)
 															break;
 														case 5: /* Checksum */
 															if (s->response_zstate < 2) {
-																monitor_error(m, "Response too short for checksum");
-																error = 1;
-															} else if (addZwaveResponseData(m, s,&s->response_checksum, 1)) {
+																monitor_error(m, "Bad Response checksum");
 																error = 1;
 															} else {
-																s->response_zpos[1] = s->response_zstate-2; /* Set the length byte */
+																int newLen = s->response_zstate-1;
+																s->response_checksum ^= (newLen ^ *s->response_lenpos);
+																*s->response_lenpos = newLen;
+																if (addZwaveResponseData(m, s, &s->response_checksum, 1)) {
+																	error = 1;
+																}
 															}
-															if (!s->response_midpos) {
-																s->response_midpos = s->response_zpos;
-															}
+															s->response_partpos[++s->response_numParts] = s->response_zpos;
+															if (s->response_numParts > MAX_RESPONSE_PARTS) {
+																error = 1;
+															}															
 															s->response_zstart = s->response_zpos;
 															s->response_zstate = 0;
 															rstate = 0;
@@ -440,19 +450,16 @@ static void process_zwave(int input_fd, int output_fd, int send, zwave_state *s)
 													error = addZwaveResponseData(m, s, &byte, 1);
 												}
 												if (!error) {
-													int rlen = s->response_zpos - s->response_buff; 
-													if (send) {
-														if (s->response_midpos && s->response_midpos < s->response_zpos) {
-														 	rlen = s->response_midpos - s->response_buff;
-															kill_acks = 2; 
-														} else {
-															kill_acks = 1;
-														}
+													if (s->response_partpos[s->response_numParts] < s->response_zpos && s->response_numParts < MAX_RESPONSE_PARTS) {
+														s->response_partpos[++s->response_numParts] = s->response_zpos;
 													}
+													int rlen = s->response_partpos[1] - s->response_buff; 
 													int result = write(input_fd, s->response_buff, rlen);
 													if (result < 0) {
 														thread_error("Intercept write", errno);
+													
 													}
+													s->response_partNum = 0;
 													intercepted = 1;
 												} else { /* error */
 													break;
