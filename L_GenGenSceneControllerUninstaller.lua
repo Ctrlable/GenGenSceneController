@@ -1,8 +1,8 @@
 -- Uninstaller for GenGeneric Scene Controller Version 1.16
 -- Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
 local VerboseLogging = 0
-local nixio = require "nixio"
 
+local nixio = require "nixio"
 local HAG_SID                 = "urn:micasaverde-com:serviceId:HomeAutomationGateway1"
 
 local function logList(...)
@@ -160,3 +160,4 @@ function SceneControllerUninstaller_Init(lul_device)
 		VLog("Scene Controller core still present. Do nothing.");
 	end
 end
+

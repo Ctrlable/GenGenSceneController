@@ -1,6 +1,19 @@
-// User interface for GenGeneric Scene Controller Version 1.20d
-// Copyright 2016-2017 Gustavo A Fernandez. All Rights Reserved
-
+// User interface for GenGeneric Scene Controller Version 1.21d
+// Copyright (C) 2017  Gustavo A Fernandez
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You can access the terms of this license at
+// https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
+//
 var SID_SCENECONTROLLER   = "urn:gengen_mcv-org:serviceId:SceneController1"
 
 	// Evolve LCD1
@@ -59,6 +72,7 @@ var EVOLVELCD1 = {
 		// 1001-1030 - State 2 for multi-state custom screens. (1031-2000 - Unused)
 		// ...
 		// 8001-8030 - State 9 for multi-state custom screens. (8031 and above - Unused)
+		// 9000, 9005, 9010, ... - Timeout scene for C1, C2, C3, etc.
 	},
 	// Returns true if the screen/version combination is supported at least in English
 	ScreenIsCompatible		: function(SCObj, screenType, screenNum, version) {
@@ -1026,6 +1040,21 @@ function SceneController_ScreenMenu(SCObj, selected, disabled, why, lcdVersion) 
 	return html;
 }
 
+function SceneController_ScreenName(SCObj, screen) {
+	if (!screen || screen.length < 2) {
+		screen = SCObj.DefaultScreen;
+	}
+	var screenPrefix = screen.charAt(0);
+	var screenNum = screen.slice(1);
+	for (var i = 0; i < SCObj.ScreenTypes.length; ++i) {
+		var screen_type = SCObj.ScreenTypes[i];
+		if (screen_type.prefix == screenPrefix) {
+			return screen_type.name + ' ' + screenNum;
+		} 
+	}
+	return "Unknown screen"
+}
+
 function SceneController_SortByName(a, b) {
 	var x = a.name.toLowerCase();
 	var y = b.name.toLowerCase();
@@ -1581,6 +1610,8 @@ function SceneController_Screens(SCObj, deviceId) {
 			timeoutEnable = false;
 		}
 		if (SCObj.HasScreen > 1) {
+			// Screen timeout scen number starts at 9000 for C1, 9005 for C2, etc.
+			var timeoutSceneNum = SCObj.SceneBases[screenType]+((screenNum-1)*SCObj.NumButtons)+8999;
 			html += ' <tr>\n'
 			     +  '  <td align="left" colspan=' + (hasCustomLabels ? '6>' : '4>\n')
 				 +  '   <input type="checkbox"'+(timeoutEnable?' checked':'')+' id="TimeoutEnable_'+peerId+'_'+curScreen+'" style="min-width:'+(SceneController_IsUI7() ? 20 : 10)+'px;" onChange="SceneController_ChangeTimeout('+SCObj.Id+','+peerId+',\''+curScreen+'\', false)" /><span></span>\n'
@@ -1590,8 +1621,12 @@ function SceneController_Screens(SCObj, deviceId) {
 			     +  '   </select>\n'
 			     +  '   if no button pressed after\n'
 			     +  '   <input class="styled" id="TimeoutSeconds_'+peerId+'_'+curScreen+'" type="text" value="'+timeoutSeconds+'" style="width:30px;" onChange="SceneController_ChangeTimeout('+SCObj.Id+','+peerId+',\''+curScreen+'\', true)" />\n'
-			     +  '   seconds.\n'
-				 + '   </td>\n'
+			     +  '   seconds, and then execute \n'
+				 +  '   <button type="button" class="btn showdisabledtitle" '+(timeoutEnable?'':'disabled ')+'style="min-width:10px;'
+				 +   	 (SceneController_FindScene(peerId, timeoutSceneNum, 2)?';color:orange;':'')+(timeoutEnable?'':'background-color:#AAAAAA;')+'"'
+				 +		 (timeoutEnable?' title="Device trigger:&#xa;   '+deviceName+':&#xa;      Scene number '+timeoutSceneNum+' is activated"':'')
+				 +       ' onClick="SceneController_SetScene('+peerId+','+timeoutSceneNum+',2,\''+SceneController_ScreenName(SCObj, curScreen)+' Screen timeout\')">Scene</button>\n'
+				 +  '   </td>\n'
 				 +  ' </tr>\n';
 		}
 		html += '</table>\n';
@@ -1624,6 +1659,7 @@ function SceneController_ChangeTimeout(SCObj, peerId, curScreen, enable) {
 	SceneController_set_device_state(peerId, SCObj.ServiceId, "TimeoutEnable_"+curScreen, String(timeoutEnable));
 	SceneController_set_device_state(peerId, SCObj.ServiceId, "TimeoutScreen_"+curScreen, timeoutScreen);
 	SceneController_set_device_state(peerId, SCObj.ServiceId, "TimeoutSeconds_"+curScreen, timeoutSeconds);
+	SceneController_Screens(SCObj, peerId);
 }
 
 function SceneController_ChangeNumLines(SCObj, peerId, curScreen) {
