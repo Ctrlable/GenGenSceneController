@@ -1,5 +1,8 @@
-// User interface for GenGeneric Scene Controller Version 1.21d
-// Copyright (C) 2017  Gustavo A Fernandez
+// User interface for GenGeneric Scene Controller Version 1.22d
+// Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controllers
+//
+// Copyright (C) 2017, 2018  Gustavo A Fernandez
+// Thanks to Ron Luna and Ctrlable for contributing for RFWC5 support
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License

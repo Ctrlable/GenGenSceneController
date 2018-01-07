@@ -1,5 +1,8 @@
--- GenGeneric Scene Controller Version 1.21d
--- Copyright (C) 2017  Gustavo A Fernandez
+-- GenGeneric Scene Controller Version 1.22d
+-- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controllers
+--
+-- Copyright (C) 2017, 2018  Gustavo A Fernandez
+-- Thanks to Ron Luna and Ctrlable for contributing for RFWC5 support
 --
 -- This program is free software; you can redistribute it and/or
 -- modify it under the terms of the GNU General Public License
@@ -107,7 +110,7 @@ Devices = {
 		ScreenWidth 		    = 65,
 		RightJustifyScreenWidth = 67,
 		SetTuningParameters = function(zwave_dev_num, peer_dev_num)
-			VEntry()
+	VEntry()
 			local versionString
 			local retry = 0
 			while retry < 10 do
@@ -268,7 +271,7 @@ Devices = {
 		end,
 
 		SetBacklight = function(peer_dev_num, blackLightOn)
-			DEntry("SetBacklight")
+	DEntry("SetBacklight")
 			local node_id = GetZWaveNode(peer_dev_num)
 			local level = 0
 			if blackLightOn then
@@ -353,7 +356,7 @@ Devices = {
 		screenWidth             = 1,  -- Dummy if not HasScreen
 		rightJustifyScreenWidth = 1,
 		SetTuningParameters = function(zwave_dev_num, peer_dev_num)
- 			VEntry()
+	VEntry()
 			GetTuningParameter("InitStaggerSeconds"	    , 30            , zwave_dev_num)
 			GetTuningParameter("MinReinitSeconds"	    , 60 * 60 * 24  , zwave_dev_num)
 			GetTuningParameter("ReturnRouteDelay"		, 500           , zwave_dev_num)
@@ -483,7 +486,7 @@ Devices = {
 		ScreenWidth 		    = 65,
 		RightJustifyScreenWidth = 67,
 		SetTuningParameters = function(zwave_dev_num, peer_dev_num)
- 			VEntry()
+	VEntry()
 			GetTuningParameter("BaseDelay"     		, 300 , zwave_dev_num)
 			GetTuningParameter("ClearDelay"    		, 700 , zwave_dev_num)
 			GetTuningParameter("ScrollDelay"    	, 1000 , zwave_dev_num)
@@ -651,10 +654,10 @@ Flags = List Mode | Group Count=1 ---------------------------------------+   ¦  
 			-- configuring it.
 
 			function WakeUpIntervalSetCallback(peer_dev_num, captures)
-				DEntry()
+	DEntry()
 				if captures and captures.C2 and captures.C3 then
 					wakeUpIntervals[peer_dev_num] = "0x84 0x04 0x" .. string.gsub(captures.C2 .. " " .. captures.C3, " ", " 0x")
-					DLog("WakeUpIntervalSetCallback: wakeUpIntervals[", peer_dev_num,"] set to", wakeUpIntervals[peer_dev_num]) 
+	DLog("WakeUpIntervalSetCallback: wakeUpIntervals[", peer_dev_num,"] set to", wakeUpIntervals[peer_dev_num]) 
 				end
 			end
 
@@ -762,7 +765,7 @@ Xmit options = ACK | AUTO_ROUTE ------------------------------------------------
 		end,
 
 		SetButtonType = function(peer_dev_num, node_id, physicalButton, newType, force, oldType)
-			DEntry("SetButtonType")
+	DEntry("SetButtonType")
 			if force or oldType ~= newType then
 				SetConfigurationOption("SetButtonType", peer_dev_num, node_id, physicalButton + 1, newType)
 			end
@@ -1079,7 +1082,7 @@ function EVLCDLabel(screenFlags,lineArray, node_id, zwave_dev_num, delay_overrid
 				if delay_override then
 					delay = delay_override
 				end
-				EnqueueZWaveMessage("SetLabel_"..node_id, node_id, data, peer_dev_num, delay);
+				EnqueueZWaveMessage(SCObj, "SetLabel_"..node_id, node_id, data, peer_dev_num, delay);
 				screenFlags = SCREEN_MD.NoChange
 		        data = "0x92 2 " .. tostring(screenFlags)
 				part = 1
@@ -1239,7 +1242,7 @@ function  EVLCDWrapStrings(stringArray, fontArray, alignArray, node_id, zwave_de
 					  		pos = pos + 1
 						end -- not longWord
 				    	if addLine then
-							DLog("Adding line \"", label, "\" entryNum=", entryNum, " lnum=", lnum, " part=", part, " word=", word, " wordWidth=", wordWidth, " font=", font, " align=", align)
+	DLog("Adding line \"", label, "\" entryNum=", entryNum, " lnum=", lnum, " part=", part, " word=", word, " wordWidth=", wordWidth, " font=", font, " align=", align)
 							local flags = lineFlags;
 					  		if part == 1 then
 								if screenFlags ~= SCREEN_MD.ClearScreen then
@@ -1365,9 +1368,9 @@ function SceneController_Init(lul_device)
 		local zwave_node, zwave_dev = GetZWaveNode(lul_device)
 		local veraZWaveNode, ZWaveNetworkDeviceId = GetVeraIDs()
 	    local ComPort = luup.variable_get(SID_ZWN, "ComPort", ZWaveNetworkDeviceId)
-		VLog("SceneController_Init: calling zwint.register(", ComPort, ")");
+	VLog("SceneController_Init: calling zwint.register(", ComPort, ")");
 		local result, errcode, errmsg = zwint.register(ComPort);
-		VLog("SceneController_Init: zwint.register(", ComPort, ") returned result=", result, " errcode=", errcode, " errmsg=", errmsg);
+	VLog("SceneController_Init: zwint.register(", ComPort, ") returned result=", result, " errcode=", errcode, " errmsg=", errmsg);
 		RegisterClientDevice()
 
 		    -- Devices are connected. Perform normal initialization on reload.
@@ -1605,7 +1608,7 @@ function CreatePeerDevices()
 		local candidate = Devices[v.device_type]
 		if candidate and v.device_num_parent == 1 then
 			SCObj = candidate
-			DLog("  CreatePeerDevices: Found z-wave device ", zwave_dev_num, ": ", SCObj.Name, "named ", v.description)
+	DLog("  CreatePeerDevices: Found z-wave device ", zwave_dev_num, ": ", SCObj.Name, "named ", v.description)
 	       	local peerID = luup.variable_get(SID_SCENECONTROLLER,"PeerID",zwave_dev_num);
 			if not peerID then
 	       		peerID = luup.variable_get(SCObj.OldServiceId,"PeerID",zwave_dev_num);
@@ -1656,12 +1659,12 @@ function CheckInvisible(devNumString)
 	local ShowSingleDevice = luup.variable_get(SID_SCENECONTROLLER,"ShowSingleDevice",zwave_dev_num)
 	if type(ShowSingleDevice) ~= "string" or (ShowSingleDevice ~= "1" and ShowSingleDevice ~= "0") then
 		ShowSingleDevice = "1"
-		DLog("  CheckInvisible: Setting ShowSingleDevice for the first time.")
+	DLog("  CheckInvisible: Setting ShowSingleDevice for the first time.")
 		luup.variable_set(SID_SCENECONTROLLER,"ShowSingleDevice",ShowSingleDevice,zwave_dev_num)
 	end
 	local invisible = luup.attr_get("invisible",zwave_dev_num)
 	local Invisible = luup.attr_get("Invisible",zwave_dev_num)
- 	DLog("  CheckInvisible: zwave_dev_num=", zwave_dev_num, " ShowSingleDevice=", ShowSingleDevice, " invisible=", invisible, " retry=", retry)
+	DLog("  CheckInvisible: zwave_dev_num=", zwave_dev_num, " ShowSingleDevice=", ShowSingleDevice, " invisible=", invisible, " retry=", retry)
 	if ShowSingleDevice == "0" then
   		if luup.version_major < 7 then
 			ShowSingleDevice = "" -- invisible should be 1 or empty in UI5
@@ -1670,7 +1673,7 @@ function CheckInvisible(devNumString)
 	end
 	if invisible ~= ShowSingleDevice then
 		-- UI5 bug has capitalization issues with "I/invisible" so set it both ways.
-		DLog("  CheckInvisible: zwave_dev_num=", zwave_dev_num, ": Setting invisible and Invisible to ", ShowSingleDevice)
+	DLog("  CheckInvisible: zwave_dev_num=", zwave_dev_num, ": Setting invisible and Invisible to ", ShowSingleDevice)
 		luup.attr_set("invisible",ShowSingleDevice,zwave_dev_num)
 		luup.attr_set("Invisible",ShowSingleDevice,zwave_dev_num)
 	end
@@ -1694,7 +1697,7 @@ function ConnectPeerDevice(peer_dev_num)
 	local candidate = Devices[v2.device_type]
 	if candidate then
 		SCObj = candidate
-		DLog("  ConnectPeerDevice: peer_dev_num=", peer_dev_num, " Found device: ", SCObj.Name)
+	DLog("  ConnectPeerDevice: peer_dev_num=", peer_dev_num, " Found device: ", SCObj.Name)
 	else
 		ELog("ConnectPeerDevice: Device", peer_dev_num, " type ", v2.device_type, " not supported.")
 		return
@@ -1831,7 +1834,7 @@ function IsVeraPrimaryController()
 					if pri ~= "NO" then
 						IsPrimaryController = true
 					end
-					DLog("  IsVeraPrimaryController: Found Z-Wave network=", k, " Role=", role, " masterslave=", masterslave, " sis=", sis, " pri=", pri, " IsPrimaryController=", IsPrimaryController)
+	DLog("  IsVeraPrimaryController: Found Z-Wave network=", k, " Role=", role, " masterslave=", masterslave, " sis=", sis, " pri=", pri, " IsPrimaryController=", IsPrimaryController)
 					break
 				end
 			end
@@ -1848,7 +1851,7 @@ function SetConfigurationOption(name, dev_num, node_id, option, value, delay)
 		delay = 0
 	end
 	local data = "112 4 " .. tostring(option) .. " 1 " .. tostring(value)
-    EnqueueZWaveMessage("SetConfigurationOption("..name..":"..tostring(option).."="..tostring(value)..")"..node_id, node_id, data, dev_num, delay)
+    EnqueueZWaveMessage(SCObj, "SetConfigurationOption("..name..":"..tostring(option).."="..tostring(value)..")"..node_id, node_id, data, dev_num, delay)
 end
 
 timeoutSequenceNumber = 0
@@ -1874,13 +1877,13 @@ function SceneController_ScreenTimeout(data)
 			-- Timeout scene for C1, C2, C3 is 9000, 9005, 9010, etc.
 			local timeout_scene = sceneBase + 8999 + ((tonumber(screenNumber) - 1) * SCObj.NumButtons)
 
-			DLog("ScreenTimeout: peer_dev_num=", peer_dev_num, " sequenceNumber=", sequenceNumber, " timeoutScreen=", timeoutScreen, " timeout_scene=",timeout_scene);
+	DLog("ScreenTimeout: peer_dev_num=", peer_dev_num, " sequenceNumber=", sequenceNumber, " timeoutScreen=", timeoutScreen, " timeout_scene=",timeout_scene);
 			-- DoTimeout, not force, not indicatorOnly
 			SetScreen(peer_dev_num, timeoutScreen, true, false, false);
 			TriggerVeraScene(peer_dev_num, 	timeout_scene, true); -- activate
 			RunZWaveQueue("ScreenTimeout", 0)
 		else
-			DLog("ScreenTimeout: Ignore stale ScreenTimeout(", data, ") Current timeoutSequenceNumber=", timeoutSequenceNumber);
+	DLog("ScreenTimeout: Ignore stale ScreenTimeout(", data, ") Current timeoutSequenceNumber=", timeoutSequenceNumber);
 		end
 	end
 end
@@ -1919,7 +1922,7 @@ function SetScreenTimeout(peer_dev_num, screen, doTimeout)
 			end
 			seconds = tonumber(seconds)
 			if enable == "true" and seconds > 0 and timeoutScreen then
-				DLog("SetScreenTimeout: Setting timeout timer for ", seconds, " seconds. peer_dev_num=", peer_dev_num, " current screen=", screen, " timeoutScreen=", timeoutScreen, " timeoutSequenceNumber=", timeoutSequenceNumber);
+	DLog("SetScreenTimeout: Setting timeout timer for ", seconds, " seconds. peer_dev_num=", peer_dev_num, " current screen=", screen, " timeoutScreen=", timeoutScreen, " timeoutSequenceNumber=", timeoutSequenceNumber);
 				luup.call_delay("SceneController_ScreenTimeout", tonumber(seconds), tostring(peer_dev_num)..","..tostring(timeoutSequenceNumber)..","..timeoutScreen..","..screen, true);
 			end
 		end
@@ -1928,7 +1931,7 @@ end
 
 function SceneController_SetNumLines(peer_dev_num, screen, lines)
 	if IsVeraPrimaryController() then
-		DLog("SceneController_SetNumLines: peer_dev_num=", peer_dev_num, " screen=", screen, " lines=", lines);
+	DLog("SceneController_SetNumLines: peer_dev_num=", peer_dev_num, " screen=", screen, " lines=", lines);
 		local oldLines = luup.variable_get(SID_SCENECONTROLLER, "NumLines_" .. screen, peer_dev_num)
 		if oldLines then
 			oldLines = tonumber(oldLines)
@@ -2111,7 +2114,7 @@ function SetIndicatorValue(peer_dev_num, indicator, force, cascadable)
 		end
 		local previous_indicator_string = luup.variable_get(SID_SCENECONTROLLER, CURRENT_INDICATOR, peer_dev_num)
 		previous_indicator = tonumber(previous_indicator_string)
-		DLog("  previous_indicator=",previous_indicator)
+	DLog("  previous_indicator=",previous_indicator)
 		if force or previous_indicator ~= indicator then
 			local delay = 0
 			if param.SCENE_CTRL_IndicatorDelay > 0 then
@@ -2133,7 +2136,7 @@ function SetIndicatorValue(peer_dev_num, indicator, force, cascadable)
 			if cascadable and (param.SCENE_CTRL_IndicatorDelay == 0 or not force) then
 				label = "*" .. label
 			end 
-			EnqueueZWaveMessage(label, node_id,  "0x87 0x01 "..indicator, zwave_dev_num, delay);
+			EnqueueZWaveMessage(SCObj, label, node_id,  "0x87 0x01 "..indicator, zwave_dev_num, delay);
 			luup.variable_set(SID_SCENECONTROLLER, CURRENT_INDICATOR, tostring(indicator), peer_dev_num)
 		end
 	end
@@ -2147,11 +2150,11 @@ function GetDeviceScoreForMode(mode, peer_dev_num, screen, virtualButton)
 	local count = 0
 
 	function GetScoreForElement(obj)
-		VEntry("GetScoreForElement")
+	VEntry("GetScoreForElement")
 		local device = obj.device
 		local status, lastUpdate, service, variable = GetDeviceStatus(device)
 		if VerboseLogging >= 2 then
-			DLog("GetDeviceScoreForMode: monitored device=", device, " status=", status, " lastUpdate=", os.date(nil,tonumber(lastUpdate)), " service=", service, " variable=", variable)
+	DLog("GetDeviceScoreForMode: monitored device=", device, " status=", status, " lastUpdate=", os.date(nil,tonumber(lastUpdate)), " service=", service, " variable=", variable)
 		end
 		if status ~= nil then
 			local target = 100;
@@ -2165,7 +2168,7 @@ function GetDeviceScoreForMode(mode, peer_dev_num, screen, virtualButton)
 		else
 			ELog("GetScoreForElement: Device ", device, " cannot be watched by ", luup.devices[peer_dev_num].description, ", screen: ", screen, ", button: ", virtualButton)
 		end
-		VLog("Running badScore=", score, " count=", count)
+	VLog("Running badScore=", score, " count=", count)
 	end
 
 	for i = 1, #mode do
@@ -2200,7 +2203,7 @@ function ChooseBestFromMultiState(peer_dev_num, screen, virtualButton, mode)
 			mode = ParseModeString(modeStr)
 		end
 		local score = GetDeviceScoreForMode(mode, peer_dev_num, screen, virtualButton)
-		DLog("  ChooseBestFromMultiState:    state=", state, " curButton=", curButton, " mode=", mode, " score=", score)
+	DLog("  ChooseBestFromMultiState:    state=", state, " curButton=", curButton, " mode=", mode, " score=", score)
 		if score > bestScore then
 			bestState = state
 		    bestScore = score
@@ -2230,7 +2233,7 @@ function SetIndicator(peer_dev_num, screen, force, cascadable)
 			-- 4. GenGenSceneController detects that the dimmer's status has changed, calls SetIndicator with only one bit cleared
 			-- 5. This messes up the "Indicator Get/Indicator Report" operation done when GenGenSceneController detects the Basic Set Off.
 			-- We solve this by temporarily deferring any SetIndicator operations on the given device while a Indicator Get is in progress.
-			DLog("  SetIndicator. Quick return because IndicatorLocks[", peer_dev_num, "]=", IndicatorLocks[peer_dev_num])
+	DLog("  SetIndicator. Quick return because IndicatorLocks[", peer_dev_num, "]=", IndicatorLocks[peer_dev_num])
 			IndicatorLocks[peer_dev_num] = 3
 			return
 		end
@@ -2266,7 +2269,7 @@ function SetIndicator(peer_dev_num, screen, force, cascadable)
 							bestXbutton = virtualButton
 							bestXhidden = hidden
 						end
-						VLog("  Score=",score," bestXscore=",bestXscore," bestXbutton=",bestXbutton, " bestXhidden=",bestXhidden) 
+	VLog("  Score=",score," bestXscore=",bestXscore," bestXbutton=",bestXbutton, " bestXhidden=",bestXhidden) 
 					else
 				   		local scene = luup.variable_get(SID_SCTRL, "sl_SceneActivated", peer_dev_num)
 						if scene then
@@ -2276,7 +2279,7 @@ function SetIndicator(peer_dev_num, screen, force, cascadable)
 								sceneButton = sceneButton + math.floor((scene-200)/100) * SCObj.NumButtons
 							end
 							highlighted = sceneButton == virtualButton
-							VLog("  Default scene=",scene," sceneButton=",sceneButton," virtualButton=",virtualButton," highlighted=",highlighted) 
+	VLog("  Default scene=",scene," sceneButton=",sceneButton," virtualButton=",virtualButton," highlighted=",highlighted) 
 						else
 							highlighted = false
 						end
@@ -2322,7 +2325,7 @@ function SetIndicator(peer_dev_num, screen, force, cascadable)
 					function checkElement(obj) 
 						local status, lastUpdate, service, variable = GetDeviceStatus(obj.device)
 						if VerboseLogging >= 2 then
-							DLog("monitored device=", obj.device, ": name=", luup.devices[obj.device].description," threshold=", threshold, " status=", status, " lastUpdate=", os.date(nil,tonumber(lastUpdate)), " service=", service, " variable=", variable)
+	DLog("monitored device=", obj.device, ": name=", luup.devices[obj.device].description," threshold=", threshold, " status=", status, " lastUpdate=", os.date(nil,tonumber(lastUpdate)), " service=", service, " variable=", variable)
 						end
 						if status ~= nil then
 							if status >= threshold then
@@ -2354,7 +2357,7 @@ function SetIndicator(peer_dev_num, screen, force, cascadable)
 							highlighted = num_on >= num_off;
 						end
 					end
- 					DLog("  button=", physicalButton, " mode=", modeStr, "mode.allDevices=", mode.allDevice, " num_on=", num_on, " num_off=", num_off, " highlighted=", highlighted)
+	DLog("  button=", physicalButton, " mode=", modeStr, "mode.allDevices=", mode.allDevice, " num_on=", num_on, " num_off=", num_off, " highlighted=", highlighted)
 				end
 			end
 			if highlighted then
@@ -2364,7 +2367,7 @@ function SetIndicator(peer_dev_num, screen, force, cascadable)
 
 		local function MakeLineVisible(virtualButton)
 			local wouldBePhysicalButton = virtualButton - scrollOffset
-			VEntry("MakeLineVisible")
+	VEntry("MakeLineVisible")
 			if wouldBePhysicalButton == 1 or wouldBePhysicalButton == SCObj.NumButtons then
 				-- Scrolling by one line up or down would make the highlighted line visible
 				SceneButtonPressed(peer_dev_num, true, wouldBePhysicalButton, false)
@@ -2395,7 +2398,7 @@ function SetIndicator(peer_dev_num, screen, force, cascadable)
 				indicator = bit.bor(indicator,SCObj.PhysicalButtonToIndicator(bestXbutton - scrollOffset, true))
 			end
 		end
-		DLog("  New indicator value=", indicator)
+	DLog("  New indicator value=", indicator)
 		SetIndicatorValue(peer_dev_num, indicator, force, cascadable)
 	end
 end
@@ -2408,7 +2411,7 @@ function SceneController_WatchedIndicatorDeviceChanged(device, service, variable
 		local ix1, ix2, peer_string, screen = context:find("(%d+),(%w+)")
 		local peer_dev_num = tonumber(peer_string)
 		local curScreen = GetCurrentScreen(peer_dev_num)
-		DLog("  WatchedIndicatorDeviceChanged: context=", context, " peer_dev_num=", peer_dev_num, " screen=", screen, " curScreen=", curScreen);
+	DLog("  WatchedIndicatorDeviceChanged: context=", context, " peer_dev_num=", peer_dev_num, " screen=", screen, " curScreen=", curScreen);
 		if not SCObj.HasScreen or curScreen == screen then
 			SetIndicator(peer_dev_num, screen, false, true)
 		end
@@ -2603,7 +2606,7 @@ function UpdateActConfList(actConfList, oldZWaveSceneId, newZWaveSceneId, contro
 			local target_node_id = GetZWaveNode(target.device)
 			actConfList[newZWaveSceneId]={controller=controller_dev_num, screen=screen, button=virtualButton, level=level, dimmingDuration=target.dimmingDuration}
 			zWaveSceneIdCache[newZWaveSceneId]={screen=screen, button=virtualButton, act=act}
-			EnqueueZWaveMessage("UpdateActConfList("..newZWaveSceneId..","..level..","..target.dimmingDuration..")"..target_node_id, target_node_id,  "44 1 ".. newZWaveSceneId .. " ".. target.dimmingDuration .. " 128 ".. level, target.device, 0);
+			EnqueueZWaveMessage(SCObj, "UpdateActConfList("..newZWaveSceneId..","..level..","..target.dimmingDuration..")"..target_node_id, target_node_id,  "44 1 ".. newZWaveSceneId .. " ".. target.dimmingDuration .. " 128 ".. level, target.device, 0);
 		end
 	end
 end
@@ -2623,9 +2626,9 @@ function SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton,
 		mode.sceneControllable = false
 		mode.zWaveSceneId = nil
 		mode.offZWaveSceneId = nil
-		VLog("  SelectZWaveSceneId #mode == 0 mode=",mode)
+	VLog("  SelectZWaveSceneId #mode == 0 mode=",mode)
 	elseif mode.sceneControllable then	
-		VLog("  SelectZWaveSceneId #mode == ",#mode," mode=",mode)
+	VLog("  SelectZWaveSceneId #mode == ",#mode," mode=",mode)
 		local needSceneId = false;
 		local defaultSceneId = physicalButton;
 		local sceneSet = {max=SCObj.LastFixedSceneId}
@@ -2634,7 +2637,7 @@ function SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton,
 			if screen ~= screen2 or virtualButton ~= virtualButton2 then
 				MarkZWaveSceneIdUsed(mode2.zWaveSceneId, sceneSet)
 				MarkZWaveSceneIdUsed(mode2.offZWaveSceneId, sceneSet)
-				VLog("  SelectZWaveSceneId->ForAllModes: Marked ", mode2.zWaveSceneId, " and ", mode2.offZWaveSceneId, " used. SceneSet now: ", sceneSet)
+	VLog("  SelectZWaveSceneId->ForAllModes: Marked ", mode2.zWaveSceneId, " and ", mode2.offZWaveSceneId, " used. SceneSet now: ", sceneSet)
 			end
 		end )
 		-- Now mark off all scene IDs used by other controllers associated with this target
@@ -2642,7 +2645,7 @@ function SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton,
 			if mode[target].dimmingDuration then
 				needSceneId = true;
 				local actConfList = ReadDeviceActuatorConfList(mode[target].device)
-				DLog("  actConfList for device ", mode[target].device, " is ", actConfList)
+	DLog("  actConfList for device ", mode[target].device, " is ", actConfList)
 				local changed = false
 				for zWaveSceneId, data in pairs(actConfList) do
 					if not luup.devices[data.controller] then
@@ -2669,7 +2672,7 @@ function SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton,
 						end
 					else
 						MarkZWaveSceneIdUsed(zWaveSceneId, sceneSet)
-						DLog("  ActConfList: (device=", mode[target].device, ") Marked ", zWaveSceneId, " used. SceneSet now: ", sceneSet)
+	DLog("  ActConfList: (device=", mode[target].device, ") Marked ", zWaveSceneId, " used. SceneSet now: ", sceneSet)
 					end
 				end
 				if changed then
@@ -2678,13 +2681,13 @@ function SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton,
 			end
 		end
 		-- The set of available scene IDs is now completed. Pick a new scene ID and perhaps a new off scene ID in case of a toggle.
-		DLog("  oldZWaveSceneId=", oldZWaveSceneId, " oldOffZWaveSceneId=", oldOffZWaveSceneId, " sceneSet=", sceneSet, " defaultSceneId=", defaultSceneId)
+	DLog("  oldZWaveSceneId=", oldZWaveSceneId, " oldOffZWaveSceneId=", oldOffZWaveSceneId, " sceneSet=", sceneSet, " defaultSceneId=", defaultSceneId)
 		local newZWaveSceneId =  pickSceneId(mode.zWaveSceneId, sceneSet, needSceneId, defaultSceneId)
 		local newOffZWaveSceneId
 		if mode.prefix == "T" and SCObj.HasOffScenes then
 			newOffZWaveSceneId = pickSceneId(mode.offZWaveSceneId, sceneSet, needSceneId, defaultSceneId+SCObj.NumButtons)
 		end
-		DLog("  newZWaveSceneId=", newZWaveSceneId, " newOffZWaveSceneId=", newOffZWaveSceneId, " sceneSet=", sceneSet)
+	DLog("  newZWaveSceneId=", newZWaveSceneId, " newOffZWaveSceneId=", newOffZWaveSceneId, " sceneSet=", sceneSet)
 		-- If either of the two scene IDs changed, then update all of the target devices
 		mode.zWaveSceneId = newZWaveSceneId
 		mode.offZWaveSceneId = newOffZWaveSceneId
@@ -2749,7 +2752,7 @@ function SetDeviceActuatorConf(controller_dev_num, target_dev_num, target_node_i
 	local actConfList=ReadDeviceActuatorConfList(target_dev_num)
 	actConfList[zWaveSceneId]={controller=controller_dev_num, screen=screen, button=button, level=level, dimmingDuration=dimmingDuration}
 	if WriteDeviceActuatorConfList(target_dev_num, actConfList) then
-		EnqueueZWaveMessage("SceneActuatorConf("..zWaveSceneId..","..level..","..dimmingDuration..")"..target_node_id, target_node_id,  "44 1 ".. zWaveSceneId .. " ".. dimmingDuration .. " 128 ".. level, target_dev_num, 0);
+		EnqueueZWaveMessage(SCObj, "SceneActuatorConf("..zWaveSceneId..","..level..","..dimmingDuration..")"..target_node_id, target_node_id,  "44 1 ".. zWaveSceneId .. " ".. dimmingDuration .. " 128 ".. level, target_dev_num, 0);
 	end
 end
 
@@ -2820,7 +2823,7 @@ function UnassociateDevice(zwave_dev_num, target_dev_num_list, firstGroup, lastG
 	end
 	-- COMMAND_CLASS_ASSOCIATION ASSOCIATION_REMOVE
 	for group = firstGroup, lastGroup, groupStep do
-		EnqueueZWaveMessage("RemoveAssociation("..group..")"..zwave_node_id.."-x->"..label, zwave_node_id,  "0x85 0x04 "..group..targets, zwave_dev_num, delay)
+		EnqueueZWaveMessage(SCObj, "RemoveAssociation("..group..")"..zwave_node_id.."-x->"..label, zwave_node_id,  "0x85 0x04 "..group..targets, zwave_dev_num, delay)
 	end
 end
 
@@ -2853,7 +2856,7 @@ function AssociateDevice(zwave_dev_num, target_dev_num_list, firstGroup, lastGro
 	end
 	-- COMMAND_CLASS_ASSOCIATION ASSOCIATION_REMOVE
 	for group = firstGroup, lastGroup, groupStep do
-		EnqueueZWaveMessage("SetAssociation("..group..")"..zwave_node_id.."->"..label, zwave_node_id, "0x85 0x01 "..group..targets, zwave_dev_num, delay)
+		EnqueueZWaveMessage(SCObj, "SetAssociation("..group..")"..zwave_node_id.."->"..label, zwave_node_id, "0x85 0x01 "..group..targets, zwave_dev_num, delay)
 	end
 end
 
@@ -2909,7 +2912,8 @@ Destination Node ID: 23 Device 29=Qubino light strip ----------------+   ¦    ¦
                     Checksum OK ----------------------------+
 41      11/05/17 9:21:45.641    ACK: 0x6 (#) 
 --]==]
-			EnqueueZWaveMessageWithResponse("AssignReturnRoute_"..lcd_node_id.."->"..target_node_id, -- label 
+			EnqueueZWaveMessageWithResponse(SCObj, 
+			                                "AssignReturnRoute_"..lcd_node_id.."->"..target_node_id, -- label 
 										    lcd_node_id, 
 										    "0x00 0x46 ".. lcd_node_id .. " " .. target_node_id .. " 1", -- sendData
 										    0, -- delay
@@ -2946,7 +2950,7 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 		local node_id = GetZWaveNode(zwave_dev_num)
 		local peer_dev_num = GetPeerDevNum(zwave_dev_num)
 		local mode = SelectZWaveSceneId(peer_dev_num, screen, virtualButton, physicalButton, prevModeStr, modeStr)
-		DLog("  newMode=", mode)
+	DLog("  newMode=", mode)
 		if force then
 			prevModeStr = mode.prefix
 		end
@@ -2993,18 +2997,18 @@ function UpdateAssociationForPhysicalButton(zwave_dev_num, screen, force, prevMo
 				associateList[ZWaveNetworkDeviceId] = {level=255, dimmingDuration=255}
 			end
 		end
-		DLog("  prevMode=", prevMode)
-		DLog("  mode=", mode)
-		DLog("  unassociateList=", unassociateList)
-		DLog("  associateList=", associateList)
+	DLog("  prevMode=", prevMode)
+	DLog("  mode=", mode)
+	DLog("  unassociateList=", unassociateList)
+	DLog("  associateList=", associateList)
 		if force or zWaveSceneId ~= prevZWaveSceneId then
 			-- Set on scene controller configuration, group id, sceneid
-			EnqueueZWaveMessage("SetSceneControllerConfig_On("..tostring(physicalButton)..","..zWaveSceneId..")"..node_id, node_id,  "0x2d 0x01 "..SceneControllerConfGroupId.." "..zWaveSceneId.." 0xFF", zwave_dev_num, param.SCENE_CTRL_SceneControllerConfDelay)
+			EnqueueZWaveMessage(SCObj, "SetSceneControllerConfig_On("..tostring(physicalButton)..","..zWaveSceneId..")"..node_id, node_id,  "0x2d 0x01 "..SceneControllerConfGroupId.." "..zWaveSceneId.." 0xFF", zwave_dev_num, param.SCENE_CTRL_SceneControllerConfDelay)
 		end
 		if SCObj.HasOffScenes and mode.prefix == "T" then
 			if force or offZWaveSceneId ~= prevOffZWaveSceneId or prevMode.prefix ~= "T" then
 				-- Set off scene controller configuration, group id, sceneid
-				EnqueueZWaveMessage("SetSceneControllerConfig_Off("..physicalButton..","..offZWaveSceneId..")"..node_id, node_id,  "0x2d 0x01 "..SceneControllerConfOffGroupId.." "..offZWaveSceneId.." 0xFF", zwave_dev_num, param.SCENE_CTRL_SceneControllerConfDelay)
+				EnqueueZWaveMessage(SCObj, "SetSceneControllerConfig_Off("..physicalButton..","..offZWaveSceneId..")"..node_id, node_id,  "0x2d 0x01 "..SceneControllerConfOffGroupId.." "..offZWaveSceneId.." 0xFF", zwave_dev_num, param.SCENE_CTRL_SceneControllerConfDelay)
 			end
 		end
 		if mode.sceneControllable then
@@ -3447,7 +3451,7 @@ function SetTemperatureLCDParameters(peer_dev_num, temperatureDevice)
 	end	
 	local temperature = math.floor(tonumber(temperatureString) + 0.5);
 	-- COMMAND_CLASS_SENSOR_MULTILEVEL SENSOR_MULTILEVEL_REPORT Sensor Type = Temperature Level = Size=1 | Scale=1 | Precision=0
-	EnqueueZWaveMessage("SetLCDTemperature", lcd_node_id,  "0x31 0x5 0x1 0x9 ".. temperature, peer_dev_num, 0)
+	EnqueueZWaveMessage(SCObj, "SetLCDTemperature", lcd_node_id,  "0x31 0x5 0x1 0x9 ".. temperature, peer_dev_num, 0)
 
 	if temperatureDevice > 0 and TemperatureDeviceIsSettable(temperatureDevice) then
 		local userMode = luup.variable_get(SID_USERMODE, USERMODE_VAR, temperatureDevice)
@@ -3488,10 +3492,10 @@ function SetTemperatureLCDParameters(peer_dev_num, temperatureDevice)
 			if setPoint then
 				if choice == USERMODE_COOL then
 					-- COMMAND_CLASS_THERMOSTAT_SETPOINT THERMOSTAT_SETPOINT_REPORT  SetPoint = Cooling 1 Level = Size=1 | Scale=1 | Precision=0
-					EnqueueZWaveMessage("SetLCDSetpointCool", lcd_node_id, "0x43 0x03 0x02 0x9 ".. setPoint, peer_dev_num, 0)
+					EnqueueZWaveMessage(SCObj, "SetLCDSetpointCool", lcd_node_id, "0x43 0x03 0x02 0x9 ".. setPoint, peer_dev_num, 0)
 				else
 					-- COMMAND_CLASS_THERMOSTAT_SETPOINT THERMOSTAT_SETPOINT_REPORT  SetPoint = Heating 1 Level = Size=1 | Scale=1 | Precision=0
-					EnqueueZWaveMessage("SetLCDSetpointHeat", lcd_node_id, "0x43 0x03 0x01 0x9 ".. setPoint, peer_dev_num, 0)
+					EnqueueZWaveMessage(SCObj, "SetLCDSetpointHeat", lcd_node_id, "0x43 0x03 0x01 0x9 ".. setPoint, peer_dev_num, 0)
 				end
 			end
 		end
@@ -3505,7 +3509,7 @@ function SetTemperatureLCDParameters(peer_dev_num, temperatureDevice)
 		--  4    16       Auto/Medium
 		--  5    32       On/Medium   Medium   
 		local supported = 11 -- upported 1 + 2 + 4 from table above
-		EnqueueZWaveMessage("SetLCDFanModeSupported", lcd_node_id, "0x44 0x5 ".. supported, peer_dev_num, 0)
+		EnqueueZWaveMessage(SCObj, "SetLCDFanModeSupported", lcd_node_id, "0x44 0x5 ".. supported, peer_dev_num, 0)
 
 		local fanModeString = luup.variable_get(SID_FANMODE, FANMODE_VAR, temperatureDevice)
 		if fanModeString ~= nil then
@@ -3516,7 +3520,7 @@ function SetTemperatureLCDParameters(peer_dev_num, temperatureDevice)
 				fanMode = 1
 			end
 			-- COMMAND_CLASS_THERMOSTAT_FAN_MODE  THERMOSTAT_FAN_MODE_REPORT
-			EnqueueZWaveMessage("SetLCDFanMode", lcd_node_id, "0x44 0x3 ".. fanMode, peer_dev_num, 100)
+			EnqueueZWaveMessage(SCObj, "SetLCDFanMode", lcd_node_id, "0x44 0x3 ".. fanMode, peer_dev_num, 100)
 		end
 	end
 end
@@ -3527,7 +3531,7 @@ function SceneController_UpdateTemperatureDevice(peer_dev_num, screen, temperatu
 	if SCObj.HasThremostatControl and IsVeraPrimaryController() then
 		temperatureDevice = tonumber(temperatureDevice);
 		local curTemperatureDevice = luup.variable_get(SID_SCENECONTROLLER, "TemperatureDevice_"  .. screen, peer_dev_num);
-		DLog("  Previous temperature device = ", curTemperatureDevice);
+	DLog("  Previous temperature device = ", curTemperatureDevice);
 		curTemperatureDevice = tonumber(curTemperatureDevice)
 		if temperatureDevice ~= curTemperatureDevice then
 			luup.variable_set(SID_SCENECONTROLLER, "TemperatureDevice_"  .. screen, temperatureDevice,  peer_dev_num)
@@ -3580,7 +3584,7 @@ end
 
 function ClearScreen(dev_num, node_id)
 	if SCObj.HasScreen then
-		EnqueueZWaveMessage("ClearScreen", node_id, "146 2 0 0 0 0 0 0 0", dev_num, param.SCENE_CTRL_ClearDelay);
+		EnqueueZWaveMessage(SCObj, "ClearScreen", node_id, "146 2 0 0 0 0 0 0 0", dev_num, param.SCENE_CTRL_ClearDelay);
 	end
 end
 
@@ -3669,7 +3673,7 @@ function SetTemperatureScreen(peer_dev_num, screenNum, doTimeout, forceClear, in
 
 	if screenNum > SCObj.NumTemperatureScreens and temperatureDevice > 0 then
 		-- Work-around to redisplay the custom labels if they get cleared
-		DLog("Watching temperature variables for temperatureDevice: ", temperatureDevice);
+	DLog("Watching temperature variables for temperatureDevice: ", temperatureDevice);
 		VariableWatch("SceneController_TemperatureDeviceChanged", SID_TEMPSENSOR,   TEMPSENSOR_VAR,   temperatureDevice, tostring(peer_dev_num))
 		VariableWatch("SceneController_TemperatureDeviceChanged", SID_COOLSETPOINT, SETPOINT_VAR,     temperatureDevice, tostring(peer_dev_num))
 		VariableWatch("SceneController_TemperatureDeviceChanged", SID_HEATSETPOINT, SETPOINT_VAR,     temperatureDevice, tostring(peer_dev_num))
@@ -3771,7 +3775,7 @@ function SceneController_ConfiguredChanged(lul_device, lul_service, lul_variable
 			-- If this is the first event which occurred since startup, and this is a battery device,
 			-- then it is already awake but we have not yet set up the monitor
 			if SCObj.HasBattery then
-				EnqueueInitWakeupMonitorMessage("WakeUpInit_ConfiguredChanged", node_id, peer_dev_num)
+				EnqueueInitWakeupMonitorMessage(SCObj, "WakeUpInit_ConfiguredChanged", node_id, peer_dev_num)
 			end
 			-- Force all scene actuator configurations to be re-sent eventually.
 			-- We gather up a set of all direct associations and then clear
@@ -3782,7 +3786,7 @@ function SceneController_ConfiguredChanged(lul_device, lul_service, lul_variable
 					associateList[mode2[i].device] = true
 				end
 			end )
-			DLog("  ConfiguredChanged: associateList=", associateList, " zwave_dev_num=", zwave_dev_num)
+	DLog("  ConfiguredChanged: associateList=", associateList, " zwave_dev_num=", zwave_dev_num)
 			for k, v in pairs(associateList) do
 				RemoveDeviceActuatorConfForController(zwave_dev_num, k)
 			end
@@ -3792,9 +3796,9 @@ function SceneController_ConfiguredChanged(lul_device, lul_service, lul_variable
 
 			-- We need to move the "Set Wakeup Interval" command for the Nexia One-Touch to the end of the configuration list
 			-- so that it doesn't go to sleep too soon.
-			DLog("SceneController_ConfiguredChanged: wakeUpIntervals[",peer_dev_num,"] is ", wakeUpIntervals[peer_dev_num],", node_id is ",node_id)
+	DLog("SceneController_ConfiguredChanged: wakeUpIntervals[",peer_dev_num,"] is ", wakeUpIntervals[peer_dev_num],", node_id is ",node_id)
 			if wakeUpIntervals[peer_dev_num] then
-				EnqueueZWaveMessage("wakeUpInterval_"..node_id, node_id, wakeUpIntervals[peer_dev_num], peer_dev_num, 0);
+				EnqueueZWaveMessage(SCObj, "wakeUpInterval_"..node_id, node_id, wakeUpIntervals[peer_dev_num], peer_dev_num, 0);
 				wakeUpIntervals[peer_dev_num] = nil;
 			end
 		end
@@ -3872,13 +3876,13 @@ function MultiLevelSwitchStartLevelChangeMonitorCallback(peer_dev_num, result)
 		IndicatorLocks[peer_dev_num] = 2 -- Don't change indicators while a button is being held down
 	    if SCObj.HasCooperConfiguration then
 			local mode = lastChangedModes[peer_dev_num]
-			VLog(" MultiLevelSwitchStartLevelChangeMonitorCallback: lastChangedModes[",peer_dev_num,"]=",mode) 
+	VLog(" MultiLevelSwitchStartLevelChangeMonitorCallback: lastChangedModes[",peer_dev_num,"]=",mode) 
 			local hexC3 = string.gsub(resultC3," "," 0x")
 			if mode then
 				for i = 1, #mode do
 					if not mode[i].dimmingDuration then
 						local node_id = GetZWaveNode(mode[i].device)
-						EnqueueZWaveMessage("StartLevelChangePassThrough", node_id, "0x26 0x04 0x" .. hexC3, mode[i].device, 0)
+						EnqueueZWaveMessage(SCObj, "StartLevelChangePassThrough", node_id, "0x26 0x04 0x" .. hexC3, mode[i].device, 0)
 					end
 				end
 			end
@@ -3898,14 +3902,14 @@ function MultiLevelSwitchStopLevelChangeMonitorCallback(peer_dev_num, result)
 			for i = 1, #mode do
 				if SCObj.HasCooperConfiguration and not mode[i].dimmingDuration then
 					local node_id = GetZWaveNode(mode[i].device)
-					EnqueueZWaveMessage("StopLevelChangePassThrough", node_id, "0x26 0x05", mode[i].device, 0)
+					EnqueueZWaveMessage(SCObj, "StopLevelChangePassThrough", node_id, "0x26 0x05", mode[i].device, 0)
 				end
 				-- Check whether polling is enabled for this particulat device (i.e. black or a non-zero value)
 				-- Skip polling only if set to 0 explicitly
 				local pollSettings = luup.variable_get(SID_ZWDEVICE, "PollSettings", mode[i].device)
 				pollSettings = tonumber(pollSettings) -- may be nil
 				if pollSettings ~= 0 then
-					EnqueueLuupAction("ZWJob_PollNode", SID_HADEVICE, "Poll", {}, mode[i].device, 0);
+					EnqueueLuupAction(SCObj, "ZWJob_PollNode", SID_HADEVICE, "Poll", {}, mode[i].device, 0);
 				end
 			end
 		end
@@ -4176,7 +4180,7 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 		if modeStr == nil then
 			modeStr = "M"
 		end
-		DLog("  SceneButtonPressed: modeStr for state ", state, " = ", modeStr)
+	DLog("  SceneButtonPressed: modeStr for state ", state, " = ", modeStr)
 		if mode.prefix == "T" then -- Fix legacy multi-state for Cooper.
 			mode.prefix = "M"
 		end
@@ -4192,7 +4196,7 @@ function SceneButtonPressed(peer_dev_num, activate, physicalButton, indicatorUpd
 		if newModeStr == nil then
 			newModeStr = "M"
 		end
-		DLog("  SceneButtonPressed: modeStr for next state ", nextState, " = ", newModeStr)
+	DLog("  SceneButtonPressed: modeStr for next state ", nextState, " = ", newModeStr)
 		UpdateAssociationForPhysicalButton(zwave_dev_num, currentScreen, false, modeStr, newModeStr, physicalButton, virtualButton+(nextState-1)*1000)
 		if SCObj.HasScreen and (oldLabels[physicalButton] ~= labels[physicalButton] or oldFonts[physicalButton] ~= fonts[physicalButton] or oldAligns[physicalButton] ~= aligns[physicalButton]) then
 			EVLCDWrapStrings(labels, fonts, aligns, node_id, zwave_dev_num, SCREEN_MD.NoChange)
@@ -4298,7 +4302,7 @@ function SceneChange(peer_dev_num, isSceneId, zwave_scene, cur_scene_time)
 				local retry = 0
 				local IndicatorReportCallback
 				IndicatorReportCallback = function(peer_dev_num, response)
-					DEntry("IndicatorReportCallback")
+	DEntry("IndicatorReportCallback")
 					if response then
 						local time = tonumber(response.time)
 						local receiveStatus = tonumber(response.C1, 16)
@@ -4306,7 +4310,7 @@ function SceneChange(peer_dev_num, isSceneId, zwave_scene, cur_scene_time)
 							local newIndicator = tonumber(response.C2, 16)
 							local oldindicator_string = luup.variable_get(SID_SCENECONTROLLER, CURRENT_INDICATOR, peer_dev_num)
 							local oldIndicator = tonumber(oldindicator_string)
-							DEntry("  IndicatorReportCallback")
+	DEntry("  IndicatorReportCallback")
 							luup.variable_set(SID_SCENECONTROLLER, CURRENT_INDICATOR, tostring(newIndicator), peer_dev_num)
 							local anyChange = false
 							for physicalButton = 1, SCObj.NumButtons do
@@ -4329,7 +4333,8 @@ function SceneChange(peer_dev_num, isSceneId, zwave_scene, cur_scene_time)
 						retry = retry + 1
 						if retry < 3 then
 							-- Same as below except the label
-							EnqueueZWaveMessageWithResponse("IndicatorReportRetry"..retry, -- label
+							EnqueueZWaveMessageWithResponse(SCObj, 
+															"IndicatorReportRetry"..retry, -- label
 															node_id, 
 															"0x87 0x02", -- sendData
 															0, -- delay
@@ -4368,7 +4373,8 @@ Device 20=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦
 41      12/18/16 13:37:28.574   ACK: 0x6 (#)
 --]]
 				IndicatorLocks[peer_dev_num] = 1
-				EnqueueZWaveMessageWithResponse("IndicatorReport", -- label
+				EnqueueZWaveMessageWithResponse(SCObj, 
+												"IndicatorReport", -- label
 												node_id, 
 												"0x87 0x02", -- sendData COMMAND_CLASS_INDICATOR INDICATOR_GET
 												0, -- delay
@@ -4391,7 +4397,7 @@ Device 20=Cooper RFWC5 Scene Controller Z-Wave -------+   ¦    ¦   ¦   ¦    ¦
 		if not zWaveSceneIdCache or not zWaveSceneIdCache[zwave_scene] then
 			zWaveSceneIdCache = {}
 			ForAllModes(peer_dev_num, function(mode, screen, virtualButton)
-				VLog("SceneChange->ForAllModes: mode=", mode, " screen=", screen, " virtualButton=", virtualButton)
+	VLog("SceneChange->ForAllModes: mode=", mode, " screen=", screen, " virtualButton=", virtualButton)
 				if mode.zWaveSceneId then
 					zWaveSceneIdCache[mode.zWaveSceneId] = {screen=screen, button=virtualButton, act=true}
 					if mode.offZWaveSceneId then
@@ -4483,7 +4489,7 @@ function SetDeviceStatus(device_num, value)
 	local result, lastUpdate = luup.variable_get(service, variable, device_num)
 	if result then
 		local oldValue = tonumber(result)
-		DLog("  SetDeviceStatus: service=", service, " variable=", variable, " oldValue=", oldValue, " value=", value)
+	DLog("  SetDeviceStatus: service=", service, " variable=", variable, " oldValue=", oldValue, " value=", value)
 		if oldValue ~= value then
 		    -- Temporarily unwatch the variable to avoid a loop which can cause problems if more than one device is attached to a button.
 		    TempVariableUnwatch(service, variable, device_num) 
@@ -4502,7 +4508,7 @@ function SetDeviceStatus(device_num, value)
 	result, lastUpdate = luup.variable_get(service, variable, device_num)
 	if result then
 		local oldStatus = tonumber(result)
-		DLog("  SetDeviceStatus: service=", service, " variable=", variable, " oldStatus=", oldStatus, " status=", status)
+	DLog("  SetDeviceStatus: service=", service, " variable=", variable, " oldStatus=", oldStatus, " status=", status)
 		if oldStatus ~= status then
 		    -- Temporarily unwatch the variable to avoid a loop which can cause problems if more than one device is attached to a button.
 		    TempVariableUnwatch(service, variable, device_num) 

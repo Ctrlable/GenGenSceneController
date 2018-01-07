@@ -38,6 +38,17 @@ The Installer device also acts as a master Z-Wave queue. It coordinates the Z-Wa
 
 ## The "Failed to get lock" bug
 
-As of December, 2017, Vera Controls has yet to completely resolve a long-standing bug in LuaUPnP which is the root cause of many Vera crashes. The LuaUPnP engine will suddenly freeze for one minute and then restart with any pending operations lost. This seems to be a race condition in some of LuaUPnP's internal threads and happens at random times, especially when the engine is performing several tasks concurrently. Veral Controls has been made well aware of this bug and hopefully, they will fix it soon.
+As of January, 2018, Vera Controls has yet to completely resolve a long-standing bug in LuaUPnP which is the root cause of many Vera crashes. The LuaUPnP engine will suddenly freeze for one minute and then restart with any pending operations lost. This seems to be a race condition in some of LuaUPnP's internal threads and happens at random times, especially when the engine is performing several tasks concurrently. Veral Controls has been made well aware of this bug and hopefully, they will fix it soon.
 
-The Z-Wave queue con be considered as a huge work-around for this bug. It has been designed to coordinate all Z-Wave activity from the plug-in in one place even when several different devices are being handled simultaneously.
+The Z-Wave queue can be considered as a huge work-around for this bug. It has been designed to coordinate all Z-Wave activity from the plug-in in one place even when several different devices are being handled simultaneously.
+
+## License
+
+This plug-in is distributed under the terms of the Gnu General Public License 2.0.
+
+Thanks to Ron Luna and Ctrlable for their contribution for RFWC5 support
+
+## Release notes
+
+1.21 - First public release since the original Evolve LCD1 controller  
+1.22 - Fix a bug which could cause commands to not be executed, which was exposed by January 2018 Vera beta firmware release  
