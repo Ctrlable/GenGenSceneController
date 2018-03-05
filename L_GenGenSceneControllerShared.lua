@@ -1,4 +1,4 @@
--- GenGeneric Scene Controller shared code Version 1.22d
+-- GenGeneric Scene Controller shared code Version 1.23d
 -- Supports Evolve LCD1, Cooper RFWC5 and Nexia One Touch Controllers
 --
 -- Copyright (C) 2017, 2018  Gustavo A Fernandez
@@ -89,7 +89,11 @@ local function getFunctionInfo(level,name)
 		if ix > 1 then
 			str = str .. ", "
 		end
-		str = str .. tostring(name) .. "=" .. tableToString(value)
+		local v = "..."
+		if name ~= "SCObj" then	-- Hack. SCObj is big and useless in DEntry/VEntry
+			v = tableToString(value)
+		end
+		str = str .. tostring(name) .. "=" .. v
 		ix = ix + 1
 	end
 	str = str .. ")"
@@ -109,19 +113,24 @@ local function logList(...)
   return s
 end
 
+function luup_device_message(device, error, message, timeout, source)
+	VEntry()
+	if luup.device_message then
+		luup.device_message(device, error, message, timeout, source)
+	end
+end
+
 function ELog(...)
   if VerboseLogging > 0 then
   	luup.log(ANSI_BRIGHT_RED .. GetDeviceName() .."   Error: " .. ANSI_RESET .. stackDepthIndent() .. logList(...) .. debug.traceback(ANSI_CYAN, 2) .. ANSI_RESET)
   else
   	luup.log(ANSI_BRIGHT_RED .. GetDeviceName() .."   Error: " .. ANSI_RESET .. stackDepthIndent() .. logList(...))
   end
-  if luup.device_message then
-	luup.device_message(luup.device, 
-				        2, -- job_Error
-				        logList(...), -- message
-				        0, -- No timeout
-				        GetDeviceName()) -- source    
-  end
+  luup_device_message(luup.device, 
+				      2, -- job_Error
+				      logList(...), -- message
+				      0, -- No timeout
+				      GetDeviceName()) -- source    
 end
 
 function log(...)
@@ -219,42 +228,42 @@ function printTable(tab,prefix,hash)
 end
 
 function tableToString(tab, hash)
-  if type(tab) == "string" then
-	return string.format("%q",tab)
-  elseif type(tab) ~= "table" then
-    return tostring(tab)
-  end
-  if hash == nil then
-	hash = {}
-  elseif hash[tab] then
-    return "recursive"
-  end
-  hash[tab] = true
-  local k,v,s
-  s = "{"
-  for k,v in pairs(tab) do
-      if s ~= "{" then
-	     s = s .. ", "
-	  end
-      if type(k) == "table" then
-	     s = s .. tableToString(k, hash)
-	  elseif type(k) == "number" then
-		 s = s .. "[" .. k .. "]"
-	  else
-	     s = s .. tostring(k)
-	  end
-	  s = s .. "="
-	  if type(v) == "string" then
-		 s = s .. string.format("%q",v)
-      elseif type(v) == "table" then
-	     s = s .. tableToString(v, hash)
-	  else
-	     s = s .. tostring(v)
-	  end
-   end
-   s = s .. "}"
-   hash[tab] = nil
-   return s
+	if type(tab) == "string" then
+		return string.format("%q",tab)
+	elseif type(tab) ~= "table" then
+		return tostring(tab)
+	end
+	if hash == nil then
+		hash = {}
+	elseif hash[tab] then
+		return "recursive"
+	end
+	hash[tab] = true
+	local k,v,s
+	s = "{"
+  	for k,v in pairs(tab) do
+		if s ~= "{" then
+	    	s = s .. ", "
+	  	end
+      	if type(k) == "table" then
+	    	s = s .. tableToString(k, hash)
+	  	elseif type(k) == "number" then
+			s = s .. "[" .. k .. "]"
+	  	else
+	    	s = s .. tostring(k)
+	  	end
+	  	s = s .. "="
+	  	if type(v) == "string" then
+			s = s .. string.format("%q",v)
+      	elseif type(v) == "table" then
+	    	s = s .. tableToString(v, hash)
+	  	else
+	    	s = s .. tostring(v)
+	  	end
+	end
+	s = s .. "}"
+	hash[tab] = nil
+	return s
 end
 
 --
@@ -311,7 +320,7 @@ local DeviceAwakeNextState = 1
 local NoMoreInformationContexts = {}
 
 local function EnqueueActionOrMessage(SCObj, queueNode)
- VEntry()
+  VEntry()
   local peer_dev_num = GetPeerDevNum(luup.device)
   local description = ""
   if peer_dev_num then
@@ -324,13 +333,13 @@ local function EnqueueActionOrMessage(SCObj, queueNode)
 	end
   end
   queueNode.description = description
- VLog("EnqueueActionOrMessage-External: ", queueNode)
+  VLog("EnqueueActionOrMessage-External: ", queueNode)
   table.insert(ExternalZWaveQueue, queueNode)
 end
 
 -- Enqueue a local Z-Wave controller message.
 function EnqueueZWaveControllerMessage(SCObj, name, node_id, data, dev_num, delay)
- VEntry()
+  VEntry()
   EnqueueActionOrMessage(SCObj, {
   	type=0,
   	name=name,
@@ -344,7 +353,7 @@ end
 -- Enqueue a Z-Wave message. No response is expected. Wait <delay> milliseconds
 -- before sending a Z-Wave command to the same device
 function EnqueueZWaveMessage(SCObj, name, node_id, data, dev_num, delay)
- VEntry()
+  VEntry()
   EnqueueActionOrMessage(SCObj, {
   	type=1,
   	name=name,
@@ -355,20 +364,37 @@ function EnqueueZWaveMessage(SCObj, name, node_id, data, dev_num, delay)
   	delay=delay})
 end
 
+-- Enqueue a Z-Wave message to a target device. 
+-- No response is expected. Wait <delay> milliseconds
+-- before sending a Z-Wave command to the same device
+function EnqueueTargetZWaveMessage(SCObj, name, node_id, data, dev_num, delay)
+  VEntry()
+  EnqueueActionOrMessage(SCObj, {
+  	type=1,
+  	name=name,
+	description=luup.devices[dev_num].description,
+	device=dev_num,
+  	node_id=node_id,
+  	data=data,
+  	delay=delay,
+  	hasBattery=false})
+end
+
 -- Enqueue a Lua action within the Z-Wave queue
 -- Name must be the name of the job as returned by the job watch callback. e.g. ZWJob_PollNode
 -- Parameters 2-5 are the same as luup_action.
-function EnqueueLuupAction(SCObj, name, service, action, arguments, device, delay)
- VEntry()
+function EnqueueLuupAction(SCObj, name, node_id, service, action, arguments, device, delay)
+  VEntry()
   EnqueueActionOrMessage(SCObj, {
   	type=2,
   	name=name,
   	device=device,
-  	node_id=-1,
+  	node_id=node_id,
   	service=service,
 	description=service..": "..action,
   	action=action,
   	arguments=arguments,
+	hasBattery=false,
   	delay=delay})
 end
 
@@ -440,8 +466,8 @@ local function EnqueueInternalActionOrMessage(queueNode)
 	end
 	local newDev = ZWaveQueue[node_id]
 	if not newDev then
-	  if luup.device_message and queueNode.type == 1 then
-		luup.device_message(queueNode.device, 
+	  if queueNode.type == 1 then
+		luup_device_message(queueNode.device, 
 					        0, -- job_WaitingToStart
 					        "Waiting to configure", -- message
 					        5, -- Timeout
@@ -489,8 +515,8 @@ local function EnqueueInternalActionOrMessage(queueNode)
 					handle = -1
 				end
 				TaskHandleList[queueNode.responseDevice] = luup.task("Waiting for device to wake up", 1, queueNode.description, handle)
-				if luup.device_message and queueNode.type == 1 then
-					luup.device_message(queueNode.device, 
+				if queueNode.type == 1 then
+					luup_device_message(queueNode.device, 
 								        5, -- job_WaitingForCallback
 								        "Waiting for device to wake up", -- message
 								        0, -- No timeout
@@ -565,7 +591,7 @@ end
 function MonitorZWaveData(outgoing, peer_dev_num, arm_regex, intercept_regex, autoResponse, callback, owneshot, timeout, label, forward)
 	VEntry()
 	if not zwint or not zwint.monitor then
-	DLog("MonitorZWaveData returning nil because zwint is not yet installer")
+		DLog("MonitorZWaveData returning nil because zwint is not yet installer")
 		return nil
 	end
   	local context
@@ -614,11 +640,11 @@ local function RemoveHeadFromZWaveQueue(job)
 	local removed = queue[1]
 	table.remove(queue,1)
 	if #queue == 0 then
-		if luup.device_message and removed and removed.type == 1 then
-			luup.device_message(removed.device, 
-						        -1, -- job_None
-						        "", -- message
-						        0, -- Timeout
+		if removed and removed.type == 1 then
+			luup_device_message(removed.device, 
+						        4, -- job_Completed
+						        "Done", -- message
+						        1, -- Timeout
 						        GetDeviceName()) -- source    
 		end
 		ZWaveQueue[queue.node_id] = nil
@@ -667,7 +693,7 @@ local function RemoveNodeFromZWaveQueue(job)
 	while #queue > 0 do
 		local j2 = table.remove(queue, 1)
 		if j2 ~= job and j2.responseDevice and j2.responseDevice > 0 and j2.timeout and j2.timeout > 0 then
-	VLog("RemoveNodeFromZWaveQueue: sending fake timeout for job which was never started due to previously failed job:", j2)
+			VLog("RemoveNodeFromZWaveQueue: sending fake timeout for job which was never started due to previously failed job:", j2)
 			while not take_global_lock() do
 				luup.sleep(100)	 -- Will this work and not cause LuaUPnP crashes? Using luup.call_delay here is difficult
 			end
@@ -720,7 +746,7 @@ local function ChangeBatteryNoMoreInformationMonitor(peer_dev_num, zwave_node, e
 	VEntry("ChangeBatteryNoMoreInformationMonitor")
 	local BatteryNoMoreInformationCallback = function(installer, captures)
 		local deviceAwakeCount = DeviceAwakeList[zwave_node]
-	VEntry("BatteryNoMoreInformationCallback")
+		VEntry("BatteryNoMoreInformationCallback")
 		if not deviceAwakeCount == nil or deviceAwakeCount == 0 then
 			ELog("Received a No More Information message for device ", peer_dev_num, " Z-Wave node ", zwave_node, " without a corresponing wake-up event.")
 			return 
@@ -740,7 +766,7 @@ local function ChangeBatteryNoMoreInformationMonitor(peer_dev_num, zwave_node, e
 			end
 		    EnqueueFinalZWaveMessage("BatteryNoMoreInformation", zwave_node, "0x84 0x8", peer_dev_num);
 		else
-	VLog("BatteryNoMoreInformationCallback: Battery wait not released because deviceAwakeCount=",deviceAwakeCount)
+			VLog("BatteryNoMoreInformationCallback: Battery wait not released because deviceAwakeCount=",deviceAwakeCount)
 		end
 	end
 
@@ -796,11 +822,11 @@ Xmit options = ACK | AUTO_ROUTE ------------------------------------+        ¦  
 				0, -- no timeout
 				"BatteryNoMoreInfo")
 		end
-	VLog("  Created no more information context: ", NoMoreInformationContexts[peer_dev_num]) 
+		VLog("  Created no more information context: ", NoMoreInformationContexts[peer_dev_num]) 
 	else
 		local context = NoMoreInformationContexts[peer_dev_num]
 		if context then 
-	VLog(" Deleting no more information context: ", context) 
+			VLog(" Deleting no more information context: ", context) 
 			zwint.cancel(luup.device, context)
 			MonitorContextList[context] = nil
 			NoMoreInformationContexts[peer_dev_num] = nil
@@ -816,7 +842,7 @@ function InitWakeUpNotificationMonitor(peer_dev_num, zwave_node, alreadyAwake)
 	DeviceAwakeList[zwave_node] = 0
 	local WakeUpNotificationCallback = function(installer, captures)
 		local deviceAwake = DeviceAwakeList[zwave_node]
-	VEntry("WakeUpNotificationCallback")
+		VEntry("WakeUpNotificationCallback")
 		if deviceAwake > 0 then
 			DeviceAwakeList[zwave_node] = deviceAwake + 1
 		else
@@ -866,19 +892,19 @@ function RunInternalZWaveQueue(fromWhere, delay_ms)
 	   ZWaveQueuePendingTime = delayTime
 	end
 	if OtherJobPending then
-	DLog("OtherJobPending. Quitting")
+		DLog("OtherJobPending. Quitting")
 		return
 	end
 	if ActiveZWaveJob then
-	DLog("ActiveZWaveJob. Quitting")
+		DLog("ActiveZWaveJob. Quitting")
 		return
 	end
 	if DelayingJob then
-	DLog("DelayingJob. Quitting")
+		DLog("DelayingJob. Quitting")
 		return
 	end
 	if not ZWaveQueueNext then
-	DLog("Not ZWaveQueueNext. Quitting")
+		DLog("Not ZWaveQueueNext. Quitting")
 		return
 	end
 	DelayingJob = true;
@@ -890,14 +916,14 @@ function RunInternalZWaveQueue(fromWhere, delay_ms)
 		delay_sec = math.floor(delay_ms / 1000)
 		local sleep_ms = math.floor(delay_ms - delay_sec*1000)
 		if sleep_ms > 0 then
-	VLog("RunInternalZWaveQueue: luup.sleep for ",delay_sec," seconds and ", sleep_ms," ms"); 
+			VLog("RunInternalZWaveQueue: luup.sleep for ",delay_sec," seconds and ", sleep_ms," ms"); 
 			luup.sleep(sleem_ms)
 			local t2 = socket.gettime()
 			if (t2 - t1) * 1000 < sleep_ms then
 				delay_sec = delay_sec + 1
-	VLog("luup.sleep too short. Delaying by an extra second: ", delay_sec)
+				VLog("luup.sleep too short. Delaying by an extra second: ", delay_sec)
 			else
-	VLog("luup.sleep done")
+				VLog("luup.sleep done")
 			end
 		end
 	end
@@ -909,12 +935,12 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 	DelayingJob = false
 
 	if OtherJobPending then
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") An outside job is still active")
+		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") An outside job is still active")
 	  	return
 	end
   	
   	if not ZWaveQueueNext then
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") queue is empty")
+		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") queue is empty")
 	  	return
   	end
 
@@ -943,19 +969,19 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 	repeat
 		if candidate[1].waitingForResponse then
 			if candidate[1].type == 0 then
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Stopping seach because waitingForResponse from local controller:", candidate[1])
+				VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Stopping seach because waitingForResponse from local controller:", candidate[1])
 				bestCandidate = nil
 				nextQueue = nil
 				break;
 			else
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Skipping candidate due to waitingForResponse:", candidate[1])
+				VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Skipping candidate due to waitingForResponse:", candidate[1])
 			end
 		elseif candidate[1].hasBattery and DeviceAwakeList[candidate[1].node_id] ~= 1 then
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Skipping candidate due to batteryWait:", candidate[1])
+			VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Skipping candidate due to batteryWait:", candidate[1])
   		else
   			if candidate[1].waitUntil then
   				if candidate[1].waitUntil > now then
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") time wait queue entry still waiting for ", (candidate[1].waitUntil - now), " seconds from now: ", candidate[1])
+					VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") time wait queue entry still waiting for ", (candidate[1].waitUntil - now), " seconds from now: ", candidate[1])
   					if not nextTime or nextTime > candidate[1].waitUntil then
   		    			nextTime = candidate[1].waitUntil
   		    			nextQueue = candidate
@@ -965,7 +991,7 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 						end
   		  			end
   		  		else
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Removing time wait queue entry which already passed ", (now - candidate[1].waitUntil), " seconds ago: ", candidate[1])
+					VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Removing time wait queue entry which already passed ", (now - candidate[1].waitUntil), " seconds ago: ", candidate[1])
 					ZWaveQueueNext = candidate
 	  		  		if RemoveHeadFromZWaveQueue() then
 	  		  			RunInternalZWaveQueue(fromWhere.." after timeout", 0)
@@ -973,20 +999,20 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
   		  			return
   		  		end
 			elseif candidate.type == 0 then -- local Z-Wave controller commands always have priority
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Found a local job and stopping search.", candidate[1])
+				VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Found a local job and stopping search.", candidate[1])
 				bestCandidate = candidate
 				break
 			elseif candidate[1].delay > biggestDelay then -- If several devices are in the queue, give priority to the one with the biggest delay to get it started first.
 				if biggestDelay > -1 then
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Found a bigger delay job. ", candidate[1].delay, " > ", biggestDelay, ": ",  candidate[1])
+					VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Found a bigger delay job. ", candidate[1].delay, " > ", biggestDelay, ": ",  candidate[1])
 			   	else
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Found viable job with delay= ", candidate[1].delay, " ms.: ",  candidate[1])
+					VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Found viable job with delay= ", candidate[1].delay, " ms.: ",  candidate[1])
 				end
 			   	bestCandidate = candidate
 				biggestDelay = candidate[1].delay
 				longestQueue = #candidate
 			elseif candidate[1].delay == biggestDelay and #candidate > longestQueue then -- If delays are the same (typically 0) then choose the device with the most jobs to do.
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Found a bigger queue length job. ",  #candidate, " > ", longestQueue, ": ",  candidate[1])
+				VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Found a bigger queue length job. ",  #candidate, " > ", longestQueue, ": ",  candidate[1])
 				bestCandidate = candidate
 				longestQueue = #candidate
   			end
@@ -1000,7 +1026,7 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
             return
 		end
 
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") running next job: ",  candidate[1])
+		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") running next job: ",  candidate[1])
 	    ZWaveQueueNext = bestCandidate
 	    -- At this pont, we know we have something to do.
 	    -- Dump the queue to the log in various ways.
@@ -1008,10 +1034,10 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 	      local curDev = ZWaveQueueNext
 		  local count = 1;
 		  repeat
-	DLog  ("SceneController_RunInternalZWaveQueue(", fromWhere, ")   Node_id: ", curDev.node_id, "  Next: ", curDev.next.node_id, "  Prev: ", curDev.prev.node_id)
+			DLog  ("SceneController_RunInternalZWaveQueue(", fromWhere, ")   Node_id: ", curDev.node_id, "  Next: ", curDev.next.node_id, "  Prev: ", curDev.prev.node_id)
 		    for i = 1, #curDev do
- DLog("SceneController_RunInternalZWaveQueue(", fromWhere, ")     Entry ", count, ": ", curDev[i])
-			  count = count + 1;
+				DLog("SceneController_RunInternalZWaveQueue(", fromWhere, ")     Entry ", count, ": ", curDev[i])
+			  	count = count + 1;
 		    end
 		    curDev = curDev.next
 		  until curDev == ZWaveQueueNext
@@ -1024,14 +1050,14 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 			curDev = curDev.next;
 			count = count + 1
 		  until curDev == ZWaveQueueNext or count > 10
- DLog("SceneController_RunInternalZWaveQueue(", fromWhere, "): Nodes: ", ZWaveQueueNodes, " ( ", nodelist, ")")
+		  DLog("SceneController_RunInternalZWaveQueue(", fromWhere, "): Nodes: ", ZWaveQueueNodes, " ( ", nodelist, ")")
 		end
 
 		local veraZWaveNode, ZWaveNetworkDeviceId = GetVeraIDs()
 	    local j = ZWaveQueueNext[1];
 
 		if j.pattern then
-	DLog("SceneController_RunInternalZWaveQueue(", fromWhere, "): Calling zwint.monitor: ", j)
+			DLog("SceneController_RunInternalZWaveQueue(", fromWhere, "): Calling zwint.monitor: ", j)
 			zwint.monitor(j.responseDevice,j.context,j.pattern,j.oneshot,j.timeout, j.armPattern, j.autoResponse);
 			j.waitingForResponse = true
 		end
@@ -1046,24 +1072,22 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 	    -- This is where we actually perform the action in a queue entry.
 		ActiveZWaveJob = j
 		if j.type == 0 then
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") type=ZWave, Node=Controller name=", j.name, ": ", SID_ZWN, " SendData ", {Data = j.data}, " ", ZWaveNetworkDeviceId);
+			VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") type=ZWave, Node=Controller name=", j.name, ": ", SID_ZWN, " SendData ", {Data = j.data}, " ", ZWaveNetworkDeviceId);
 		  	j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(SID_ZWN, "SendData", {                  Data = j.data}, ZWaveNetworkDeviceId)
 		elseif j.type == 1 then
-			if luup.device_message then
-				local message = "Working..."
-				if VerboseLogging > 0 then
-					message = "Executing " .. j.name
-				end
-				luup.device_message(j.device, 
-							        1, -- job_InProgress
-							        message,
-							        5, -- Timeout
-							        GetDeviceName()) -- source    
+			local message = "Working..."
+			if VerboseLogging > 0 then
+				message = "Executing " .. j.name
 			end
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") type=ZWave, Node=Device name=", j.name, ": ", SID_ZWN, " SendData ", {Node = j.node_id, Data = j.data}, " ", ZWaveNetworkDeviceId);
-		  	j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(SID_ZWN, "SendData", {Node = j.node_id, Data = j.data}, ZWaveNetworkDeviceId)
+			luup_device_message(j.device, 
+						        1, -- job_InProgress
+						        message,
+						        5, -- Timeout
+						        GetDeviceName()) -- source    
+			VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") type=ZWave, Node=Device name=", j.name, ": ", SID_ZWN, " SendData ", {Node = j.node_id, Data = j.data}, " ", ZWaveNetworkDeviceId);
+			j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(SID_ZWN, "SendData", {Node = j.node_id, Data = j.data}, ZWaveNetworkDeviceId)
 		elseif j.type == 2 then
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") type=LuaAction: name=", j.name)
+			VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") type=LuaAction: name=", j.name)
 			j.err_num, j.err_msg, j.job_num, j.arguments = luup.call_action(j.service, j.action, j.arguments, j.device)
 		else
 			ELog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Invalid job type: ", j)
@@ -1072,7 +1096,7 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 		give_global_lock()
 
 	    -- Check for an immediate failure and retry in 5 seconds if so.
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") call_action returned err_num=", j.err_num, " err_msg=", j.err_msg, " job_num=", j.job_num, " arguments=", j.arguments)
+		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") call_action returned err_num=", j.err_num, " err_msg=", j.err_msg, " job_num=", j.job_num, " arguments=", j.arguments)
 
 		if j.err_num ~= 0 or j.job_num == 0 then
 		    log("SceneController_RunInternalZWaveQueue(", fromWhere, "): call_action failed, retrying in 5 seconds. ", j);
@@ -1094,13 +1118,13 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 	    CheckUI5ZWaveQueueHeadStatus("")
 
 	elseif nextQueue then
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") waiting for  next job: ",  nextQueue[1])
+		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") waiting for  next job: ",  nextQueue[1])
 		-- No entries are ready to run, so wait until the one that will be ready sooonest
 	    ZWaveQueueNext = nextQueue
 	    local waitTime = nextTime - now
 	    if waitTime < 1 then
 			local waitms = math.floor(waitTime*1000)
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Delaying for ", waitms, " ms using luup.sleep.")
+			VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Delaying for ", waitms, " ms using luup.sleep.")
 		  	luup.sleep(waitms)
 			local t2 = socket.gettime()
 			if t2 - now >= waitms then
@@ -1109,18 +1133,17 @@ function SceneController_RunInternalZWaveQueue(fromWhere)
 		  			RunInternalZWaveQueue(fromWhere.." after sleep", 0)
 		  		end
 			else
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") luup.sleep too short.")
+				VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") luup.sleep too short.")
 				waitTime = waitTime + 1;
 			end
 		end
 		if waitTime >= 1 then
 			local waitSec = math.floor(waitTime)
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Delaying for ", waitSec, " seconds using luup.call_delay.")
+			VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Delaying for ", waitSec, " seconds using luup.call_delay.")
 		  	luup.call_delay("SceneController_RunInternalZWaveQueue", waitSec, fromWhere.." DelayFor ".. waitTime, true)
-	    else
 	  	end
 	else
-	VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Nothing to do")	
+		VLog("SceneController_RunInternalZWaveQueue(", fromWhere, ") Nothing to do")	
 	end
 end
 
@@ -1144,7 +1167,7 @@ function RegisterClientDevice(backoff)
 	-- luup.variable_set(SID_SCENECONTROLLER, "ZQ_ReadPtr", "0", luup.device)
 	local err_num, err_msg, job_num, arguments = luup.call_action(GENGENINSTALLER_SID, "RegisterClientDevice", {DeviceNumber=luup.device}, GetFirstInstaller())
 	if err_num ~= 0 then
-	DLog("RegisterClientDevice: call_action returnd ", err_num, ": ", err_msg,". Trying again.") 
+		DLog("RegisterClientDevice: call_action returnd ", err_num, ": ", err_msg,". Trying again.") 
 		local tryAgainSeconds = 3
 		luup.call_delay("RegisterClientDevice", tryAgainSeconds, tostring(backoff+2), true)
 	end
@@ -1202,12 +1225,12 @@ function SceneController_NoMoreInformationTimeout(data)
 	   		DeviceAwakeList[zwave_node] = 0
 			ChangeBatteryNoMoreInformationMonitor(peer_dev_num, zwave_node, false)
 		elseif  DeviceAwakeList[zwave_node] == 1 then
-	VLog("Ignoring No More Information timeout because we are currently activing commnicating with the devoce. DeviceAwakeList[",zwave_node,"]=",DeviceAwakeList[zwave_node]) 
+			VLog("Ignoring No More Information timeout because we are currently activing commnicating with the devoce. DeviceAwakeList[",zwave_node,"]=",DeviceAwakeList[zwave_node]) 
 		else
-	VLog("Ignoring No More Information timeout because it is no longer active. DeviceAwakeList[",zwave_node,"]=",DeviceAwakeList[zwave_node]) 		 	
+			VLog("Ignoring No More Information timeout because it is no longer active. DeviceAwakeList[",zwave_node,"]=",DeviceAwakeList[zwave_node]) 		 	
 		end
 	else
-	VLog("Ignoring stale No More Information timeout. callback state=",state, "DeviceAwakeStates[",zwave_node,"]=",DeviceAwakeStates[zwave_node])  	
+		VLog("Ignoring stale No More Information timeout. callback state=",state, "DeviceAwakeStates[",zwave_node,"]=",DeviceAwakeStates[zwave_node])  	
 	end
 	RunInternalZWaveQueue("NoMoreInformationTimeout", 0) 
 end
@@ -1268,13 +1291,13 @@ end
 function SceneController_JobWatchCallBack(lul_job)
 	VEntry("SceneController_JobWatchCallBack")
 	if not ZWaveQueueNext then
-	VLog("SceneController_JobWatchCallBack: ZWaveQueue is empty.");
+		VLog("SceneController_JobWatchCallBack: ZWaveQueue is empty.");
 		HandleOtherJob(lul_job)
 		return
 	end
 	local j = ActiveZWaveJob
 	if not j then
-	VLog("SceneController_JobWatchCallBack: No Active Z-Wave job.");
+		VLog("SceneController_JobWatchCallBack: No Active Z-Wave job.");
 		HandleOtherJob(lul_job)
 		return
 	end
@@ -1289,18 +1312,18 @@ function SceneController_JobWatchCallBack(lul_job)
 		expectedJobType = j.name
 	end
 	if lul_job.type ~= expectedJobType then
-	VLog("SceneController_JobWatchCallBack: Job type expected ", expectedJobType, " but got ", lul_job.type)
+		VLog("SceneController_JobWatchCallBack: Job type expected ", expectedJobType, " but got ", lul_job.type)
 		HandleOtherJob(lul_job)
 		return
 	end
 	if j.type ~= 2 then
 		if lul_job.name ~= expectedName then
-	VLog("SceneController_JobWatchCallBack: Expected ", expectedName, " but got ", lul_job.name)
+			VLog("SceneController_JobWatchCallBack: Expected ", expectedName, " but got ", lul_job.name)
 			HandleOtherJob(lul_job)
 			return
 		end
 		if lul_job.status < 2 or lul_job.status > 4 then
-	VLog("SceneController_JobWatchCallBack: status is still ", lul_job.status, ". notes:", lul_job.notes)
+			VLog("SceneController_JobWatchCallBack: status is still ", lul_job.status, ". notes:", lul_job.notes)
 			return
 		end
 	end
@@ -1325,8 +1348,8 @@ function SceneController_JobWatchCallBack(lul_job)
 			handle = -1
 		end
 		TaskHandleList[j.responseDevice] = luup.task("Device went to sleep unexpectedly", 1, j.description, handle)
-		if luup.device_message and j.type == 1 then
-			luup.device_message(j.device, 
+		if j.type == 1 then
+			luup_device_message(j.device, 
 						        5, -- job_WaitingForCallback
 						        "Device went to sleep unexpectedly", -- message
 						        0, -- No timeout
@@ -1337,8 +1360,8 @@ function SceneController_JobWatchCallBack(lul_job)
 	end
 	if lul_job.status ~= 4 and j.type ~= 2 then
 		ELog("SceneController_JobWatchCallBack: Job ",j.name," for ",j.description," failed. Give up and go to next node. Final status was ", lul_job.status, " notes:", lul_job.notes)
-		if luup.device_message and j.type == 1 then
-			luup.device_message(j.device, 
+		if j.type == 1 then
+			luup_device_message(j.device, 
 						        2, -- job_Error
 						        "Device did not respond. Giving up.", -- message
 						        0, -- No timeout
@@ -1430,12 +1453,12 @@ function GetVeraIDs()
 		for k,v in pairs(luup.devices) do
 			if v.device_type == DEVTYPE_ZWN then
 				local homeID = luup.variable_get(SID_ZWN, "HomeID", k)
-	DLog("GetVeraIDs: Found Z-Wave network Vera device ID=", k, " HomeID=", homeID)
+				DLog("GetVeraIDs: Found Z-Wave network Vera device ID=", k, " HomeID=", homeID)
 				local homeNode = tostring(homeID):match("House: %x+ Node (%x+) Suc %x+")
 				if homeNode then
 					zwave_device = k
 					node_id = tostring(tonumber(homeNode,16))
-	DLog("GetVeraIDs: Z-Wave node=0x", homeNode, "=", node_id)
+					DLog("GetVeraIDs: Z-Wave node=0x", homeNode, "=", node_id)
 					break
 				end
 			end
@@ -1499,11 +1522,11 @@ local function toidentifier(anything)
 end
 
 function WatchedVarHandler(xfunction_name, ufunction_name, context, device, service, variable, value_old, value_new)
- VEntry()
+  VEntry()
   if WatchedVariables[xfunction_name] then
     if UnwatchedVariables[ufunction_name] then
 	  local temp = UnwatchedVariables[ufunction_name] - 1
- VLog("Skipping Unwatched variable: ", ufunction_name, ". Unwatch count now ", UnwatchedVariables[ufunction_name])
+ 	  VLog("Skipping Unwatched variable: ", ufunction_name, ". Unwatch count now ", UnwatchedVariables[ufunction_name])
 	  if temp <= 0 then
 	    temp = nil
 	  end
@@ -1512,7 +1535,7 @@ function WatchedVarHandler(xfunction_name, ufunction_name, context, device, serv
 	end
     return true -- Normal case
   end
- VLog(xfunction_name, " no longer being watched")
+  VLog(xfunction_name, " no longer being watched")
   return false -- Variable no longer watched
 end
 
@@ -1523,7 +1546,7 @@ UnwatchedVariables = {}
 -- Returns an object which can be passed to CancelVariableWatch
 -- Watches created here can also be temporarily unwatched (once) using TempVariableUnwatch
 function VariableWatch(function_name, service, variable, device, context)
- VEntry()
+  VEntry()
   local xfunction_name = "VarWatch_" .. function_name .. toidentifier(context) .. "___" .. toidentifier(service) .. variable .. tostring(device)
   local ufunction_name = "VarUnwatch_" .. toidentifier(service) .. variable .. tostring(device)
   if WatchedVariables[xfunction_name] then
@@ -1550,7 +1573,7 @@ end
 
 -- Temporarily "unwatch" a variable which is expected to trigger
 function TempVariableUnwatch(service, variable, device)
- VEntry()
+  VEntry()
   local ufunction_name = "VarUnwatch_" .. toidentifier(service) .. variable .. tostring(device)
   local numWatched = WatchedVariables[ufunction_name]
   if numWatched then
@@ -1595,9 +1618,11 @@ local RECEIVE_STATUS_TYPE_MULTI = 0x08
 local RECEIVE_STATUS_TYPE_EXPLORE = 0x10
 local MAX_DUP_TIME = 0.250 -- seconds
 local MAX_EXPLORE_DUP_TIME = 0.400 -- seconds
-function CheckDups(peer_dev_num, time, receiveStatus, data)
+function CheckDups(peer_dev_num, result, data)
 	DEntry()
 	local oldTable = DupData[peer_dev_num]
+	local time = tonumber(result.time)
+	local receiveStatus = tonumber(result.C1, 16)
 	receiveStatus = bit.band(receiveStatus, RECEIVE_STATUS_TYPE_MASK);
 	local result = true
 	if oldTable and oldTable.data == data and 

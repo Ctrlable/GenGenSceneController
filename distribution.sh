@@ -32,11 +32,11 @@ fi
 
 installerversion=${1/./}
 
-sed -i.originaln -e "1 s/Version .*/Version ${1}/" -f nodebug.sed L_GenGenSceneController.lua
-sed -i.originaln -e "1 s/Version .*/Version ${1}/" \
-				 -e "s/local GenGenInstaller_Version = [0-9]\+/local GenGenInstaller_Version = ${installerversion}/" \
+sed -i.originaln -r -e "1 s/Version .*/Version ${1}/" -f nodebug.sed L_GenGenSceneController.lua
+sed -i.originaln -r -e "1 s/Version .*/Version ${1}/" \
+				 -e "s/local GenGenInstaller_Version = [0-9]+/local GenGenInstaller_Version = ${installerversion}/" \
 												   -f nodebug.sed L_GenGenSceneControllerInstaller.lua
-sed -i.originaln -e "1 s/Version .*/Version ${1}/" -f nodebug.sed L_GenGenSceneControllerShared.lua
+sed -i.originaln -r -e "1 s/Version .*/Version ${1}/" -f nodebug.sed L_GenGenSceneControllerShared.lua
 sed -i.originaln -e "1 s/Version .*/Version ${1}/"                J_GenGenSceneController.js
 dozip $1
 
